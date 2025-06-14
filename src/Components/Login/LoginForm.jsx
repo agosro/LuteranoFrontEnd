@@ -1,26 +1,23 @@
 import React, { useState } from 'react'
-import './login.css'
-import ColegioIcon from './assets/logo1.png';
+import './LoginForm.css'
+import ColegioIcon from '../../assets/logo1.png';
 
 function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
-  //Manejar el submit del form
   const handleSubmit = async (e) => {
     e.preventDefault()
     setErrorMessage('')
     setLoading(true)
 
     try {
-      // Cambia la URL a la ruta de tu backend para login
       const response = await fetch('http://localhost:8080/api/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       })
 
@@ -28,7 +25,7 @@ function Login() {
 
       if (response.ok) {
         alert('Has ingresado correctamente.')
-        //Aca podes guardar token, redirigir, etc.
+        // Aquí podés guardar token o redirigir
       } else {
         setErrorMessage(data.message || 'Credenciales incorrectas.')
       }
@@ -54,15 +51,25 @@ function Login() {
             required
           />
           <br />
-          <input
-            type="password"
-            id="password"
-            className="input-field"
-            placeholder="Contraseña"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
+          <div className="password-wrapper">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              id="password"
+              className="input-field"
+              placeholder="Contraseña"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+            <label className="show-password-label">
+              <input
+                type="checkbox"
+                checked={showPassword}
+                onChange={e => setShowPassword(e.target.checked)}
+              />
+              Mostrar contraseña
+            </label>
+          </div>
           <br />
           <button type="submit" className="btn" disabled={loading}>
             {loading ? 'Validando...' : 'Entrar'}
@@ -71,12 +78,10 @@ function Login() {
         <div id="error-message" className="error-message">{errorMessage}</div>
       </div>
       <div className="icon-container">
-        <img src={ColegioIcon} alt="Icono Colegio"/>
+        <img src={ColegioIcon} alt="Icono Colegio" />
       </div>
     </div>
-    
-  );
-
+  )
 }
 
 export default Login

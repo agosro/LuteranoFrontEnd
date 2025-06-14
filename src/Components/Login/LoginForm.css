@@ -1,3 +1,4 @@
+/* Lo que ya tenés */
 body {
   font-family: Arial, sans-serif;
   background-color: #f4f4f4;
@@ -18,7 +19,7 @@ body {
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   width: 300px;
-  height: 220px;
+  height: 240px;  /* un poco más alto para el checkbox */
 }
 
 h2 {
@@ -53,6 +54,26 @@ h2 {
   color: red;
   font-size: 14px;
   text-align: center;
+  margin-top: 8px;
+}
+
+/* Estilo para el label del checkbox */
+.show-password-label {
+  font-size: 13px;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  cursor: pointer;
+  margin-top: -8px; /* ajusta espacio arriba */
+}
+
+/* Para que el checkbox se vea normal, tamaño pequeño */
+.show-password-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
 }
 
 .icon-container {
@@ -61,14 +82,14 @@ h2 {
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   width: 300px;
-  height: 220px;
+  height: 240px;
   display: flex;            
   justify-content: center;  
   align-items: center; 
 }
 
 .icon-container img {
-  width: 200px;           /* tamaño original */
+  width: 200px;           
   height: auto;
-  object-fit: contain;   /* para no deformar la imagen */
+  object-fit: contain;
 }
