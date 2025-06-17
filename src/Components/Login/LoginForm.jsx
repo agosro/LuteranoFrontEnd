@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import './LoginForm.css'
 import ColegioIcon from '../../assets/logo1.png';
+import jwtDecode from 'jwt-decode';
+import { useNavigate } from 'react-router-dom';
 
 function Login() {
   const [username, setUsername] = useState('')
@@ -8,6 +10,8 @@ function Login() {
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -23,19 +27,28 @@ function Login() {
 
       const data = await response.json()
 
-      if (response.ok) {
-        alert('Has ingresado correctamente.')
-        // Aquí podés guardar token o redirigir
+      if (response.ok && data.token) {
+        // Guardar token en localStorage
+        localStorage.setItem('token', data.token);
+
+        // Decodificar token para obtener rol
+        const decoded = jwtDecode(data.token);
+        const role = decoded.role;
+
+        // Redirigir según el rol
+        if (role === 'admin') navigate('/admin');
+        else if (role === 'director') navigate('/director');
+        else if (role === 'docente') navigate('/docente');
+        else navigate('/'); // ruta por defecto
       } else {
-        setErrorMessage(data.message || 'Credenciales incorrectas.')
+        setErrorMessage(data.message || 'Credenciales incorrectas.');
       }
     } catch (error) {
-      setErrorMessage('Error de conexión con el servidor.')
+      setErrorMessage('Error de conexión con el servidor.');
     }
 
-    setLoading(false)
-  }
-
+    setLoading(false);
+  };
   return (
     <div className="container">
       <div className="login-container">
