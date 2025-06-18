@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import './LoginForm.css'
 import ColegioIcon from '../../assets/logo1.png';
-import jwtDecode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
 function Login() {
