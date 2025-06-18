@@ -1,33 +1,36 @@
 /* Lo que ya tenés */
 body {
   font-family: Arial, sans-serif;
-  background-color: #f4f4f4;
+  background-color: #dbeaec !important;
   margin: 0;
   height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
 }
-.container {
+.containerr {
   display: flex;
   justify-content: center;
   align-items: center;
 }
-.login-container {
+.login-containerr {
   background-color: white;
   padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  width: 300px;
-  height: 240px;  /* un poco más alto para el checkbox */
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 400px;
+  height: 300px;
 }
 
 h2 {
-  color: rgb(43, 42, 42);
+  color: rgb(61, 60, 60) !important;
   text-align: center;
 }
 
-.input-field {
+.input-fieldd {
   width: 100%;
   padding: 10px;
   margin: 10px 0;
@@ -36,17 +39,17 @@ h2 {
   box-sizing: border-box;
 }
 
-.btn {
+.btnn {
   width: 100%;
   padding: 10px;
-  background-color: #3e959b;
+  background-color: #5aadb3;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
 }
 
-.btn:hover {
+.btnn:hover {
   background-color: #3e959b;
 }
 
@@ -76,19 +79,21 @@ h2 {
   cursor: pointer;
 }
 
-.icon-container {
+.icon-containerr {
   background-color: white;
   padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   width: 300px;
-  height: 240px;
-  display: flex;            
-  justify-content: center;  
-  align-items: center; 
+  height: 300px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
-
-.icon-container img {
+.icon-containerr img {
   width: 200px;           
   height: auto;
   object-fit: contain;

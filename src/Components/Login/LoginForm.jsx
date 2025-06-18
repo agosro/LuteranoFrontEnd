@@ -50,14 +50,14 @@ function Login() {
     setLoading(false);
   };
   return (
-    <div className="container">
-      <div className="login-container">
+    <div className="containerr">
+      <div className="login-containerr">
         <h2>Iniciar sesión</h2>
         <form id="loginForm" onSubmit={handleSubmit}>
           <input
             type="text"
             id="username"
-            className="input-field"
+            className="input-fieldd"
             placeholder="Usuario"
             value={username}
             onChange={e => setUsername(e.target.value)}
@@ -68,7 +68,7 @@ function Login() {
             <input
               type={showPassword ? 'text' : 'password'}
               id="password"
-              className="input-field"
+              className="input-fieldd"
               placeholder="Contraseña"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -84,13 +84,13 @@ function Login() {
             </label>
           </div>
           <br />
-          <button type="submit" className="btn" disabled={loading}>
+          <button type="submit" className="btnn" disabled={loading}>
             {loading ? 'Validando...' : 'Entrar'}
           </button>
         </form>
         <div id="error-message" className="error-message">{errorMessage}</div>
       </div>
-      <div className="icon-container">
+      <div className="icon-containerr">
         <img src={ColegioIcon} alt="Icono Colegio" />
       </div>
     </div>
