@@ -5,11 +5,12 @@ import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
 function Login() {
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  
 
   const navigate = useNavigate();
 
@@ -19,33 +20,40 @@ function Login() {
     setLoading(true)
 
     try {
-      const response = await fetch('http://localhost:8080/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      })
+  const response = await fetch('http://localhost:8080/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  })
 
-      const data = await response.json()
+  const data = await response.json();
 
-      if (response.ok && data.token) {
-        // Guardar token en localStorage
-        localStorage.setItem('token', data.token);
+  if (response.ok && data.token) {
+    // Guardar token en localStorage
+    localStorage.setItem('token', data.token);
 
-        // Decodificar token para obtener rol
-        const decoded = jwtDecode(data.token);
-        const role = decoded.role;
+    // Decodificar token para obtener rol
+    const decoded = jwtDecode(data.token);
+    const role = decoded.role;
 
-        // Redirigir según el rol
-        if (role === 'admin') navigate('/admin');
-        else if (role === 'director') navigate('/director');
-        else if (role === 'docente') navigate('/docente');
-        else navigate('/'); // ruta por defecto
-      } else {
-        setErrorMessage(data.message || 'Credenciales incorrectas.');
-      }
-    } catch (error) {
-      setErrorMessage('Error de conexión con el servidor.');
+    // Redirigir según el rol
+    console.log(role);
+    if (role === 'ROLE_ADMIN') navigate('/admin');
+    else if (role === 'director') navigate('/director');
+    else if (role === 'docente') navigate('/docente');
+    else navigate('/'); // ruta por defecto
+
+  } else {
+    // Aquí chequeamos el código HTTP
+    if (response.status === 422) {
+      setErrorMessage('Credenciales incorrectas.');
+    } else {
+      setErrorMessage(data.mensaje || 'Error inesperado.');
     }
+  }
+} catch (error) {
+  setErrorMessage('Error de conexión con el servidor.');
+}
 
     setLoading(false);
   };
@@ -56,11 +64,11 @@ function Login() {
         <form id="loginForm" onSubmit={handleSubmit}>
           <input
             type="text"
-            id="username"
+            id="email"
             className="input-fieldd"
             placeholder="Usuario"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
+            value={email}
+            onChange={e => setEmail(e.target.value)}
             required
           />
           <br />
