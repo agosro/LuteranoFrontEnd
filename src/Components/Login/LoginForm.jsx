@@ -3,6 +3,7 @@ import './LoginForm.css'
 import ColegioIcon from '../../assets/logo1.png';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../Context/AuthContext';
 
 function Login() {
   const [email, setEmail] = useState('')
@@ -13,6 +14,7 @@ function Login() {
   
 
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -20,7 +22,7 @@ function Login() {
     setLoading(true)
 
     try {
-  const response = await fetch('http://localhost:8080/api/auth/login', {
+    const response = await fetch('http://localhost:8080/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
@@ -31,17 +33,13 @@ function Login() {
   if (response.ok && data.token) {
     // Guardar token en localStorage
     localStorage.setItem('token', data.token);
-
     // Decodificar token para obtener rol
     const decoded = jwtDecode(data.token);
     const role = decoded.role;
 
-    // Redirigir según el rol
-    console.log(role);
-    if (role === 'ROLE_ADMIN') navigate('/admin');
-    else if (role === 'director') navigate('/director');
-    else if (role === 'docente') navigate('/docente');
-    else navigate('/'); // ruta por defecto
+    login({ nombre: decoded.sub || decoded.email, rol: role, token: data.token });
+
+    navigate('/inicio');
 
   } else {
     // Aquí chequeamos el código HTTP
