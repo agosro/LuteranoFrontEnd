@@ -56,51 +56,53 @@ function Login() {
     setLoading(false);
   };
   return (
-    <div className="containerr">
-      <div className="login-containerr">
-        <h2>Iniciar sesión</h2>
-        <form id="loginForm" onSubmit={handleSubmit}>
-          <input
-            type="text"
-            id="email"
-            className="input-fieldd"
-            placeholder="Usuario"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-          <br />
-          <div className="password-wrapper">
+      <div className="login-page-container">
+      <div className="containerr">
+        <div className="login-containerr">
+          <h2>Iniciar sesión</h2>
+          <form id="loginForm" onSubmit={handleSubmit}>
             <input
-              type={showPassword ? 'text' : 'password'}
-              id="password"
+              type="text"
+              id="email"
               className="input-fieldd"
-              placeholder="Contraseña"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
+              placeholder="Usuario"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               required
             />
-            <label className="show-password-label">
+            <br />
+            <div className="password-wrapper">
               <input
-                type="checkbox"
-                checked={showPassword}
-                onChange={e => setShowPassword(e.target.checked)}
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                className="input-fieldd"
+                placeholder="Contraseña"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
               />
-              Mostrar contraseña
-            </label>
-          </div>
-          <br />
-          <button type="submit" className="btnn" disabled={loading}>
-            {loading ? 'Validando...' : 'Entrar'}
-          </button>
-        </form>
-        <div id="error-message" className="error-message">{errorMessage}</div>
+              <label className="show-password-label">
+                <input
+                  type="checkbox"
+                  checked={showPassword}
+                  onChange={e => setShowPassword(e.target.checked)}
+                />
+                Mostrar contraseña
+              </label>
+            </div>
+            <br />
+            <button type="submit" className="btnn" disabled={loading}>
+              {loading ? 'Validando...' : 'Entrar'}
+            </button>
+          </form>
+          <div id="error-message" className="error-message">{errorMessage}</div>
+        </div>
+        <div className="icon-containerr">
+          <img src={ColegioIcon} alt="Icono Colegio" />
+        </div>
       </div>
-      <div className="icon-containerr">
-        <img src={ColegioIcon} alt="Icono Colegio" />
-      </div>
-    </div>
-  )
+    </div>)
 }
+
 
 export default Login

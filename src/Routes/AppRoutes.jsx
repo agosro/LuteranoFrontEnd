@@ -35,8 +35,6 @@ function AppRoutes() {
         <Route index element={<Inicio />} />
         <Route path="inicio" element={<Inicio />} />
 
-        {/* Alumnos comunes */}
-        <Route path="alumnos/cargar" element={<AlumnosCargar />} />
 
         {/* Solo ADMIN puede ver lista de alumnos */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
