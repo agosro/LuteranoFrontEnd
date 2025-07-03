@@ -1,0 +1,14 @@
+/* Para los links normales */
+nav.bg-dark .nav-link:hover {
+  background-color: #117864;
+  border-radius: 4px; /* para que parezca recuadro */
+  color: white; /* asegurar texto visible */
+}
+
+/* Para los botones (como el menú desplegable "Alumnos") */
+nav.bg-dark button.nav-link:hover {
+  background-color: #117864;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer; /* que se vea clickeable */
+}

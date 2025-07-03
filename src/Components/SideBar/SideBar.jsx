@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
+import './SideBar.css'
 import { useAuth } from '../../Context/AuthContext';
 import { Link } from 'react-router-dom';
 import {
   FaHome, FaUsers, FaBook, FaChalkboardTeacher,
   FaTable, FaChartBar, FaDoorOpen, FaCaretDown, FaCaretUp
 } from 'react-icons/fa';
-
 
 export default function SidebarLayout() {
   const { user } = useAuth();
