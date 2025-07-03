@@ -1,10 +1,10 @@
 import React from 'react';
 
-function Inicio() {
-    return (<>
-    <h1>CADA</h1>
-    
-    </>);
+export default function Inicio() {
+return (
+    <div>
+        <h1>Página de Inicio</h1>
+        <p>Bienvenido al sistema.</p>
+    </div>
+    );
 }
-
-export default Inicio;
