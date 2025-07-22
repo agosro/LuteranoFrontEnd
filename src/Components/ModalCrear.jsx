@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 
-export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = [] }) {
+export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = [], titulo = "Crear" }) {
   const [formData, setFormData] = useState({});
 
+  // Solo cuando 'show' cambie (no formData), setea estado inicial
   useEffect(() => {
     if (show) {
       const initialData = {};
@@ -11,11 +12,11 @@ export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = []
       });
       setFormData(initialData);
     }
-  }, [show, campos]);
+  }, [show, campos]); // NO poner formData aquí
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e) => {
@@ -48,14 +49,12 @@ export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = []
           width: "100%",
         }}
       >
-        <h5 className="mb-3">Crear usuario</h5>
+        <h5 className="mb-3">{titulo}</h5>
 
         <form onSubmit={handleSubmit}>
           {campos.map(({ name, label, type, opciones }) => (
             <div className="mb-3" key={name}>
-              <label htmlFor={name} className="form-label">
-                {label}
-              </label>
+              <label htmlFor={name} className="form-label">{label}</label>
 
               {type === "select" ? (
                 <select
@@ -67,18 +66,13 @@ export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = []
                   required
                 >
                   <option value="">Seleccione...</option>
-                  {opciones &&
-                    opciones.map((opt) =>
-                      typeof opt === "object" ? (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ) : (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      )
-                    )}
+                  {opciones && opciones.map(opt =>
+                    typeof opt === "object" ? (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ) : (
+                      <option key={opt} value={opt}>{opt}</option>
+                    )
+                  )}
                 </select>
               ) : (
                 <input
