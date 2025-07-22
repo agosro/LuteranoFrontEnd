@@ -5,6 +5,7 @@ import BotonCrear from "./Botones/BotonCrear";
 import ExportarCSV from "./Botones/ExportarCSV";
 import Paginacion from "./Botones/Paginacion";
 import OrdenableHeader from "./Botones/OrdenarColumnas";
+import ModalCrearEntidad from "./ModalCrear";
 import { useState, useMemo} from "react";
 
 export default function TablaGenerica({
@@ -16,23 +17,22 @@ export default function TablaGenerica({
   onDelete,
   onCreate,
   textoCrear,
+  campos, // <-- Campos para el modal creación (array con objetos de definición)
 }) {
-  const [busqueda, setBusqueda] = useState('');
+  const [busqueda, setBusqueda] = useState("");
   const [modalShow, setModalShow] = useState(false);
   const [itemSeleccionado, setItemSeleccionado] = useState(null);
   const [orden, setOrden] = useState({ columna: null, asc: true });
   const [paginaActual, setPaginaActual] = useState(1);
+  const [modalCrearShow, setModalCrearShow] = useState(false);
   const itemsPorPagina = 10;
 
   // Filtrar datos
   const datosFiltrados = useMemo(() => {
     return datos.filter((item) => {
-      const nombreCompleto = `${item.nombre || ''} ${item.apellido || ''}`.toLowerCase();
-      const dni = (item.dni || '').toString();
-      return (
-        nombreCompleto.includes(busqueda.toLowerCase()) ||
-        dni.includes(busqueda)
-      );
+      const nombreCompleto = `${item.nombre || ""} ${item.apellido || ""}`.toLowerCase();
+      const dni = (item.dni || "").toString();
+      return nombreCompleto.includes(busqueda.toLowerCase()) || dni.includes(busqueda);
     });
   }, [datos, busqueda]);
 
@@ -44,7 +44,7 @@ export default function TablaGenerica({
       const valB = b[orden.columna];
       if (valA == null) return 1;
       if (valB == null) return -1;
-      if (typeof valA === 'string') {
+      if (typeof valA === "string") {
         return orden.asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
       }
       return orden.asc ? valA - valB : valB - valA;
@@ -79,21 +79,17 @@ export default function TablaGenerica({
   };
 
   return (
-    <div className="container mt-4" style={{ position: 'relative' }}>
+    <div className="container mt-4" style={{ position: "relative" }}>
       <h2>{titulo}</h2>
 
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <div style={{ width: '300px' }}>
-          <Buscador
-            valor={busqueda}
-            onCambio={setBusqueda}
-            placeholder="Buscar por nombre o DNI..."
-          />
+        <div style={{ width: "300px" }}>
+          <Buscador valor={busqueda} onCambio={setBusqueda} placeholder="Buscar por nombre o DNI..." />
         </div>
 
         <div className="d-flex gap-2 align-items-center">
           {onCreate && (
-            <BotonCrear texto={textoCrear || 'Crear registro'} onClick={onCreate} />
+            <BotonCrear texto={textoCrear || "Crear registro"} onClick={() => setModalCrearShow(true)} />
           )}
           <ExportarCSV datos={datosOrdenados} columnas={columnas} nombreArchivo={`${titulo}.csv`} />
         </div>
@@ -117,9 +113,7 @@ export default function TablaGenerica({
               <tr key={item.id}>
                 <td>{item.id}</td>
                 {columnas.map((col) => (
-                  <td key={col.key}>
-                    {col.render ? col.render(item) : item[col.key]}
-                  </td>
+                  <td key={col.key}>{col.render ? col.render(item) : item[col.key]}</td>
                 ))}
                 <td className="text-center">
                   <ActionButtons
@@ -145,8 +139,17 @@ export default function TablaGenerica({
         onClose={() => setModalShow(false)}
         onConfirm={confirmarEliminar}
         entidad="registro"
-        nombre={itemSeleccionado ? `${itemSeleccionado.nombre || itemSeleccionado.email || ''}` : ''}
+        nombre={itemSeleccionado ? `${itemSeleccionado.nombre || itemSeleccionado.email || ""}` : ""}
       />
+
+      {onCreate && (
+        <ModalCrearEntidad
+          show={modalCrearShow}
+          onClose={() => setModalCrearShow(false)}
+          onSubmit={onCreate}
+          campos={campos || []} // Aquí definís los campos dinámicos para crear la entidad
+        />
+      )}
     </div>
   );
 }
