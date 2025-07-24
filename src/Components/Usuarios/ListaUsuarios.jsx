@@ -1,8 +1,9 @@
 import TablaGenerica from '../TablaLista';
 import { useEffect, useState } from 'react';
-import { obtenerUsuarios, eliminarUsuario, registrarUsuario } from '../../Services/UsuarioService';
+import { obtenerUsuarios, eliminarUsuario, registrarUsuario, actualizarUsuario } from '../../Services/UsuarioService';
 import ModalVerEntidad from '../ModalVerEntidad';
 import ModalEditarEntidad from '../ModalEditarEntidad';
+import { useAuth } from '../../Context/AuthContext';
 
 export default function ListaUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
@@ -10,10 +11,14 @@ export default function ListaUsuarios() {
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
   const [modalEditarShow, setModalEditarShow] = useState(false);
-  const token = localStorage.getItem('token');
+
+  // Obtengo token del contexto de auth (recomendado)
+  const { user } = useAuth();
+  const token = user?.token;
 
   useEffect(() => {
     async function fetchUsuarios() {
+      if (!token) return; // Si no hay token no intento
       try {
         const data = await obtenerUsuarios(token);
         setUsuarios(data);
@@ -41,18 +46,14 @@ export default function ListaUsuarios() {
     setModalVerShow(true);
   };
 
-   // Función para abrir modal de editar y setear usuario
   const handleEdit = (usuario) => {
     setUsuarioSeleccionado(usuario);
     setModalEditarShow(true);
   };
 
-  // Función para enviar datos editados al backend
   const handleUpdate = async (datosEditados) => {
     try {
-      // suponiendo que tienes un servicio para actualizar usuario:
-      await actualizarUsuario(token, datosEditados.email, datosEditados); 
-      // Actualizás el estado local para reflejar cambios
+      await actualizarUsuario(token, datosEditados); 
       setUsuarios((prev) =>
         prev.map((u) => (u.email === datosEditados.email ? datosEditados : u))
       );
@@ -65,12 +66,10 @@ export default function ListaUsuarios() {
     }
   };
 
-  // Aquí recibimos los datos del formulario de creación
+  // Aquí no paso token al registrarUsuario porque es endpoint público
   const handleCreate = async (datosNuevoUsuario) => {
     try {
-      // Llamás al servicio para crear el usuario
-      const usuarioCreado = await registrarUsuario(token, datosNuevoUsuario);
-      // Actualizás la lista con el nuevo usuario
+      const usuarioCreado = await registrarUsuario(datosNuevoUsuario);
       setUsuarios(prev => [...prev, usuarioCreado]);
       alert('Usuario creado con éxito');
     } catch (error) {
@@ -81,73 +80,80 @@ export default function ListaUsuarios() {
 
   if (loading) return <p>Cargando usuarios...</p>;
 
+  const rolesDisponibles = [
+    { label: 'Admin', value: 'ROLE_ADMIN' },
+    { label: 'Director', value: 'ROLE_DIRECTOR' },
+    { label: 'Docente', value: 'ROLE_DOCENTE' },
+    { label: 'Preceptor', value: 'ROLE_PRECEPTOR' },
+  ];
+
   const columnasUsuarios = [
     {
       key: 'nombreApellido',
       label: 'Nombre y Apellido',
       render: (u) => `${u.nombre} ${u.apellido}`,
     },
-    { key: 'dni', label: 'DNI' },
     { key: 'email', label: 'Email' },
-    { key: 'rol', label: 'Rol' },
     {
-      key: 'estado',
-      label: 'Estado',
-      render: (u) => (
-        <div className="text-center">
-          <span className={`badge ${u.estado === true || u.estado === 'activo' ? 'bg-success' : 'bg-secondary'}`}>
-            {u.estado === true || u.estado === 'activo' ? 'Activo' : 'Inactivo'}
-          </span>
-        </div>
-      ),
+      key: 'role',
+      label: 'Rol',
+      render: (u) => {
+        const roleValue = typeof u.role === 'string' ? u.role : u.role?.name || '';
+        switch (roleValue) {
+          case 'ROLE_ADMIN': return 'Admin';
+          case 'ROLE_DIRECTOR': return 'Director';
+          case 'ROLE_DOCENTE': return 'Docente';
+          case 'ROLE_PRECEPTOR': return 'Preceptor';
+          default: return 'Sin rol';
+        }
+      },
     },
   ];
 
-  // Definís los campos que querés que se muestren en el modal crear usuario
   const camposUsuario = [
     { name: 'nombre', label: 'Nombre', type: 'text' },
     { name: 'apellido', label: 'Apellido', type: 'text' },
-    { name: 'dni', label: 'DNI', type: 'text' },
-    { name: 'rol', label: 'Rol', type: 'select', opciones: ['Admin', 'Director', 'Docente', 'Preceptor' ] },
     { name: 'email', label: 'Email', type: 'email' },
     { name: 'password', label: 'Contraseña', type: 'password' },
-    { name: 'activo', label: 'Activo', type: 'checkbox' }, // <-- campo para estado
-    
-    
+    {
+      name: 'role',
+      label: 'Rol',
+      type: 'select',
+      opciones: rolesDisponibles,
+    },
   ];
 
   return (
-      <>
-    <TablaGenerica
-      titulo="Lista de Usuarios"
-      columnas={columnasUsuarios}
-      datos={usuarios}
-      onView={handleView}
-      onEdit={handleEdit}
-      onDelete={handleDelete}
-      onCreate={handleCreate}
-      textoCrear="Crear usuario"
-      campos={camposUsuario}
-    />
-
-    <ModalVerEntidad
-      show={modalVerShow}
-      onClose={() => setModalVerShow(false)}
-      datos={usuarioSeleccionado}
-      campos={camposUsuario}
-      titulo="Detalle del Usuario"
-    />
-
-    {usuarioSeleccionado && (
-      <ModalEditarEntidad
-        show={modalEditarShow}
-        onClose={() => setModalEditarShow(false)}
-        datosIniciales={usuarioSeleccionado}
+    <>
+      <TablaGenerica
+        titulo="Lista de Usuarios"
+        columnas={columnasUsuarios}
+        datos={usuarios}
+        onView={handleView}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onCreate={handleCreate}
+        textoCrear="Crear usuario"
         campos={camposUsuario}
-        onSubmit={handleUpdate}   
       />
-    )}
-  </>
-);
 
+      <ModalVerEntidad
+        show={modalVerShow}
+        onClose={() => setModalVerShow(false)}
+        datos={usuarioSeleccionado}
+        campos={camposUsuario}
+        titulo="Detalle del Usuario"
+      />
+
+      {usuarioSeleccionado && (
+        <ModalEditarEntidad
+          show={modalEditarShow}
+          onClose={() => setModalEditarShow(false)}
+          datosIniciales={usuarioSeleccionado}
+          campos={camposUsuario}
+          onSubmit={handleUpdate}
+        />
+      )}
+    </>
+  );
 }

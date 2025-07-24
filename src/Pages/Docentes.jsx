@@ -3,8 +3,7 @@ import TablaGenerica from '../Components/TablaLista';
 import ModalVerEntidad from '../Components/ModalVerEntidad';
 import ModalCrearEntidad from '../Components/ModalCrear';
 import ModalEditarEntidad from '../Components/ModalEditarEntidad'; // tu modal editar separado
-import { listarDocentes, crearDocente, actualizarDocente, eliminarDocente } from '../Services/DocenteService';
-import CamposDocente from '../Components/Docentes/CamposDocente';
+import { listarDocentes, crearDocente, editarDocente, eliminarDocente } from '../Services/DocenteService';
 
 export default function Docentes() {
   const [docentes, setDocentes] = useState([]);
@@ -51,7 +50,7 @@ export default function Docentes() {
 
   // Guardar docente editado
   const handleGuardarEditar = async (docente) => {
-    await actualizarDocente(docente.id, docente);
+    await editarDocente(docente.id, docente);
     setModalEditarShow(false);
     fetchDocentes();
   };
