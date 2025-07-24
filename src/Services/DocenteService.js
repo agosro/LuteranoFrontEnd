@@ -1,11 +1,23 @@
 const API_URL = 'http://localhost:8080'; // Cambialo si usás otro host/puerto
+const token = localStorage.getItem('token');
 
 // Obtener lista de docentes
 export const listarDocentes = async () => {
   try {
-    const response = await fetch(`${API_URL}/docentes`);
+    const response = await fetch(`${API_URL}/docente/list`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
     if (!response.ok) throw new Error('Error al obtener docentes');
-    return await response.json();
+
+    const data = await response.json();
+
+    // Asegurate de devolver solo el array
+    return Array.isArray(data.docenteDtos) ? data.docenteDtos : [];
   } catch (error) {
     console.error('Error al listar docentes:', error);
     throw error;
@@ -15,14 +27,16 @@ export const listarDocentes = async () => {
 // Crear un nuevo docente
 export const crearDocente = async (docente) => {
   try {
-    const response = await fetch(`${API_URL}/docentes`, {
+    const response = await fetch(`${API_URL}/docente/create`, {
       method: 'POST',
-      headers: {
+        headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(docente),
     });
     if (!response.ok) throw new Error('Error al crear docente');
+    console.log(response);
     return await response.json();
   } catch (error) {
     console.error('Error al crear docente:', error);
@@ -33,10 +47,11 @@ export const crearDocente = async (docente) => {
 // Editar docente existente
 export const editarDocente = async (id, docente) => {
   try {
-    const response = await fetch(`${API_URL}/docentes/${id}`, {
+    const response = await fetch(`${API_URL}/docente/update`, {
       method: 'PUT',
-      headers: {
+        headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(docente),
     });
@@ -48,20 +63,16 @@ export const editarDocente = async (id, docente) => {
   }
 };
 
-export const actualizarDocente = async (id, docente) => {
-  const res = await fetch(`${API_URL}/docentes/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(docente),
-  });
-  return res.json();
-};
 
 // Eliminar docente por ID
 export const eliminarDocente = async (id) => {
   try {
-    const response = await fetch(`${API_URL}/docentes/${id}`, {
+    const response = await fetch(`${API_URL}/docente/${id}`, {
       method: 'DELETE',
+        headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
     });
     if (!response.ok) throw new Error('Error al eliminar docente');
     return true;

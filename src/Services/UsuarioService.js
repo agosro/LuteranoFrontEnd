@@ -16,26 +16,6 @@ export async function obtenerUsuarios(token) {
   return await res.json();
 }
 
-// Obtener usuarios filtrados por estado
-export async function obtenerUsuariosPorEstado(token, status) {
-  const res = await fetch(`${API_URL}/user/${status}`, {
-    method: 'GET',
-    headers: getHeaders(token)
-  });
-  if (!res.ok) throw new Error('Error al obtener usuarios por estado');
-  return await res.json();
-}
-
-// Activar usuario por email
-export async function activarUsuario(token, email) {
-  const res = await fetch(`${API_URL}/user/activar`, {
-    method: 'POST',
-    headers: getHeaders(token),
-    body: JSON.stringify({ email })
-  });
-  if (!res.ok) throw new Error('Error al activar usuario');
-  return await res.json();
-}
 
 // Actualizar usuario
 export async function actualizarUsuario(token, userData) {
@@ -71,12 +51,16 @@ export async function eliminarUsuario(token, email) {
 }
 
 // Registrar usuario (auth)
-export async function registrarUsuario(userData) {
-  const res = await fetch(`${API_URL}/api/auth/register`, {
+export async function registrarUsuario(token, userData) {
+  const res = await fetch(`${API_URL}/user/create`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(userData),
   });
   if (!res.ok) throw new Error('Error al registrar usuario');
   return await res.json();
 }
+
