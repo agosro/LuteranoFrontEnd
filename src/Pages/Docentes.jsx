@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import TablaGenerica from '../Components/TablaLista';
-import ModalVerEntidad from '../Components/ModalVerEntidad';
-import ModalCrearEntidad from '../Components/ModalCrear';
-import ModalEditarEntidad from '../Components/ModalEditarEntidad'; // tu modal editar separado
+import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
+import ModalCrearEntidad from '../Components/Modals/ModalCrear';
+import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad'; // tu modal editar separado
 import { listarDocentes, crearDocente, editarDocente, eliminarDocente } from '../Services/DocenteService';
 
 export default function Docentes() {

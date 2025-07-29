@@ -1,9 +1,15 @@
 import TablaGenerica from '../TablaLista';
 import { useEffect, useState } from 'react';
 import { obtenerUsuarios, eliminarUsuario, registrarUsuario, actualizarUsuario } from '../../Services/UsuarioService';
-import ModalVerEntidad from '../ModalVerEntidad';
-import ModalEditarEntidad from '../ModalEditarEntidad';
+import ModalVerEntidad from '../Modals/ModalVerEntidad';
+import ModalEditarEntidad from '../Modals/ModalEditarEntidad';
+import ModalCrearEntidad from '../Modals/ModalCrear';
+import ConfirmarEliminar from '../Modals/ConfirmarEliminar';
+import BotonCrear from '../Botones/BotonCrear';
+import { camposUsuarioVista } from '../../Entidades/camposUsuarioVista';
+import { camposUsuario } from '../../Entidades/camposUsuario';
 import { useAuth } from '../../Context/AuthContext';
+import { toast } from 'react-toastify';
 
 export default function ListaUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
@@ -11,6 +17,8 @@ export default function ListaUsuarios() {
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
   const [modalEditarShow, setModalEditarShow] = useState(false);
+  const [modalCrearShow, setModalCrearShow] = useState(false);
+  const [mostrarModalEliminar, setMostrarModalEliminar] = useState(false);
 
   // Obtengo token del contexto de auth (recomendado)
   const { user } = useAuth();
@@ -18,7 +26,7 @@ export default function ListaUsuarios() {
 
   useEffect(() => {
     async function fetchUsuarios() {
-      if (!token) return; // Si no hay token no intento
+      if (!token) return;
       try {
         const data = await obtenerUsuarios(token);
         setUsuarios(data);
@@ -31,15 +39,23 @@ export default function ListaUsuarios() {
     fetchUsuarios();
   }, [token]);
 
-  const handleDelete = async (usuario) => {
-    try {
-      await eliminarUsuario(token, usuario.email);
-      setUsuarios(prev => prev.filter(u => u.email !== usuario.email));
-    } catch (error) {
-      alert('Error al eliminar usuario');
-      console.error(error);
-    }
-  };
+  const handleDeleteClick = (usuario) => {
+  setUsuarioSeleccionado(usuario);
+  setMostrarModalEliminar(true);
+};
+
+const confirmarEliminar = async () => {
+  try {
+    await eliminarUsuario(token, usuarioSeleccionado.email);
+    setUsuarios((prev) => prev.filter((u) => u.email !== usuarioSeleccionado.email));
+    toast.success("Usuario eliminado con éxito");
+  } catch (error) {
+    toast.error("Error al eliminar usuario");
+    console.error(error);
+  } finally {
+    setMostrarModalEliminar(false);
+  }
+};
 
   const handleView = (usuario) => {
     setUsuarioSeleccionado(usuario);
@@ -53,45 +69,39 @@ export default function ListaUsuarios() {
 
   const handleUpdate = async (datosEditados) => {
     try {
-      await actualizarUsuario(token, datosEditados); 
-      setUsuarios((prev) =>
-        prev.map((u) => (u.email === datosEditados.email ? datosEditados : u))
+      const usuarioActualizado = await actualizarUsuario(token, datosEditados);
+      setUsuarios(prev =>
+        prev.map(u => (u.id === usuarioActualizado.id ? usuarioActualizado : u))
       );
-      alert('Usuario actualizado con éxito');
+      toast.success(usuarioActualizado.mensaje || 'Usuario actualizado con éxito');
       setModalEditarShow(false);
       setUsuarioSeleccionado(null);
     } catch (error) {
-      alert('Error al actualizar usuario');
+      toast.error(error.message || 'Error al actualizar usuario');
       console.error(error);
     }
   };
 
-  // Aquí no paso token al registrarUsuario porque es endpoint público
-  const handleCreate = async (datosNuevoUsuario) => {
+  // Maneja la creación y cierra el modal + actualiza la lista
+    const handleCreate = async (datosNuevoUsuario) => {
     try {
-      const usuarioCreado = await registrarUsuario(datosNuevoUsuario);
+      const usuarioCreado = await registrarUsuario(token, datosNuevoUsuario);
       setUsuarios(prev => [...prev, usuarioCreado]);
-      alert('Usuario creado con éxito');
+      toast.success(usuarioCreado.mensaje || 'Usuario creado con éxito');
+      setModalCrearShow(false);
     } catch (error) {
-      alert('Error al crear usuario');
+      toast.error(error.message || 'Error desconocido al crear usuario');
       console.error(error);
     }
   };
 
   if (loading) return <p>Cargando usuarios...</p>;
 
-  const rolesDisponibles = [
-    { label: 'Admin', value: 'ROLE_ADMIN' },
-    { label: 'Director', value: 'ROLE_DIRECTOR' },
-    { label: 'Docente', value: 'ROLE_DOCENTE' },
-    { label: 'Preceptor', value: 'ROLE_PRECEPTOR' },
-  ];
-
   const columnasUsuarios = [
     {
       key: 'nombreApellido',
       label: 'Nombre y Apellido',
-      render: (u) => `${u.nombre} ${u.apellido}`,
+      render: (u) => `${u.name || ''} ${u.lastName || ''}`,
     },
     { key: 'email', label: 'Email' },
     {
@@ -110,39 +120,33 @@ export default function ListaUsuarios() {
     },
   ];
 
-  const camposUsuario = [
-    { name: 'nombre', label: 'Nombre', type: 'text' },
-    { name: 'apellido', label: 'Apellido', type: 'text' },
-    { name: 'email', label: 'Email', type: 'email' },
-    { name: 'password', label: 'Contraseña', type: 'password' },
-    {
-      name: 'role',
-      label: 'Rol',
-      type: 'select',
-      opciones: rolesDisponibles,
-    },
-  ];
-
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Usuarios"
+        titulo="Usuarios"
         columnas={columnasUsuarios}
         datos={usuarios}
         onView={handleView}
         onEdit={handleEdit}
-        onDelete={handleDelete}
-        onCreate={handleCreate}
-        textoCrear="Crear usuario"
-        campos={camposUsuario}
+        onDelete={handleDeleteClick}
+        botonCrear={<BotonCrear texto="Crear usuario" onClick={() => setModalCrearShow(true)} />}
+        placeholderBuscador="Buscar por nombre o email"
       />
 
       <ModalVerEntidad
         show={modalVerShow}
         onClose={() => setModalVerShow(false)}
         datos={usuarioSeleccionado}
-        campos={camposUsuario}
+        campos={camposUsuarioVista}
         titulo="Detalle del Usuario"
+      />
+
+      <ConfirmarEliminar
+        show={mostrarModalEliminar}
+        onClose={() => setMostrarModalEliminar(false)}
+        onConfirm={confirmarEliminar}
+        item={usuarioSeleccionado}
+        tipo="usuario"
       />
 
       {usuarioSeleccionado && (
@@ -154,6 +158,14 @@ export default function ListaUsuarios() {
           onSubmit={handleUpdate}
         />
       )}
+
+      <ModalCrearEntidad
+        show={modalCrearShow}
+        onClose={() => setModalCrearShow(false)}
+        campos={camposUsuario}
+        onSubmit={handleCreate}
+        titulo="Crear Usuario"
+      />
     </>
   );
 }
