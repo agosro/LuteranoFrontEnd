@@ -1,11 +1,8 @@
 import ActionButtons from "../Components/Botones/ActionButtons";
 import Buscador from "./Botones/Buscador";
-import ConfirmarEliminar from "./Botones/ConfirmarEliminar";
-import BotonCrear from "./Botones/BotonCrear";
 import ExportarCSV from "./Botones/ExportarCSV";
 import Paginacion from "./Botones/Paginacion";
 import OrdenableHeader from "./Botones/OrdenarColumnas";
-import ModalCrearEntidad from "./ModalCrear";
 import { useState, useMemo} from "react";
 
 export default function TablaGenerica({
@@ -15,26 +12,28 @@ export default function TablaGenerica({
   onView,
   onEdit,
   onDelete,
-  onCreate,
-  textoCrear,
-  campos, // <-- Campos para el modal creación (array con objetos de definición)
+  botonCrear,
+  placeholderBuscador  
 }) {
   const [busqueda, setBusqueda] = useState("");
-  const [modalShow, setModalShow] = useState(false);
-  const [itemSeleccionado, setItemSeleccionado] = useState(null);
   const [orden, setOrden] = useState({ columna: null, asc: true });
   const [paginaActual, setPaginaActual] = useState(1);
-  const [modalCrearShow, setModalCrearShow] = useState(false);
   const itemsPorPagina = 10;
 
   // Filtrar datos
   const datosFiltrados = useMemo(() => {
-    return datos.filter((item) => {
-      const nombreCompleto = `${item.nombre || ""} ${item.apellido || ""}`.toLowerCase();
-      const dni = (item.dni || "").toString();
-      return nombreCompleto.includes(busqueda.toLowerCase()) || dni.includes(busqueda);
-    });
-  }, [datos, busqueda]);
+  return datos.filter((item) => {
+    const nombreCompleto = `${item.name || ""} ${item.lastName || ""}`.toLowerCase();
+    const dni = (item.dni || "").toString().toLowerCase();
+    const email = (item.email || "").toLowerCase();
+    const termino = busqueda.toLowerCase();
+    return (
+      nombreCompleto.includes(termino) ||
+      dni.includes(termino) ||
+      email.includes(termino)
+    );
+  });
+}, [datos, busqueda]);
 
   // Ordenar datos
   const datosOrdenados = useMemo(() => {
@@ -58,17 +57,6 @@ export default function TablaGenerica({
     paginaActual * itemsPorPagina
   );
 
-  const handleDeleteClick = (item) => {
-    setItemSeleccionado(item);
-    setModalShow(true);
-  };
-
-  const confirmarEliminar = () => {
-    onDelete(itemSeleccionado);
-    setModalShow(false);
-    setItemSeleccionado(null);
-  };
-
   const handleOrdenar = (key) => {
     if (orden.columna === key) {
       setOrden({ columna: key, asc: !orden.asc });
@@ -84,13 +72,11 @@ export default function TablaGenerica({
 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div style={{ width: "300px" }}>
-          <Buscador valor={busqueda} onCambio={setBusqueda} placeholder="Buscar por nombre o DNI..." />
+          <Buscador valor={busqueda} onCambio={setBusqueda} placeholder={placeholderBuscador} />
         </div>
 
         <div className="d-flex gap-2 align-items-center">
-          {onCreate && (
-            <BotonCrear texto={textoCrear || "Crear registro"} onClick={() => setModalCrearShow(true)} />
-          )}
+          {botonCrear}
           <ExportarCSV datos={datosOrdenados} columnas={columnas} nombreArchivo={`${titulo}.csv`} />
         </div>
       </div>
@@ -119,7 +105,7 @@ export default function TablaGenerica({
                   <ActionButtons
                     onView={() => onView(item)}
                     onEdit={() => onEdit(item)}
-                    onDelete={() => handleDeleteClick(item)}
+                    onDelete={() => onDelete(item)}
                   />
                 </td>
               </tr>
@@ -134,22 +120,6 @@ export default function TablaGenerica({
         onPaginaChange={(pagina) => setPaginaActual(pagina)}
       />
 
-      <ConfirmarEliminar
-        show={modalShow}
-        onClose={() => setModalShow(false)}
-        onConfirm={confirmarEliminar}
-        entidad="registro"
-        nombre={itemSeleccionado ? `${itemSeleccionado.nombre || itemSeleccionado.email || ""}` : ""}
-      />
-
-      {onCreate && (
-        <ModalCrearEntidad
-          show={modalCrearShow}
-          onClose={() => setModalCrearShow(false)}
-          onSubmit={onCreate}
-          campos={campos || []} // Aquí definís los campos dinámicos para crear la entidad
-        />
-      )}
     </div>
   );
 }

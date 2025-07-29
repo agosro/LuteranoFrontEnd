@@ -31,18 +31,16 @@ function Login() {
   const data = await response.json();
 
   if (response.ok && data.token) {
-    // Guardar token en localStorage
-    localStorage.setItem('token', data.token);
-    // Decodificar token para obtener rol
     const decoded = jwtDecode(data.token);
     const role = decoded.role;
+    const nombre = decoded.sub || decoded.email;
+    
 
-    login({ nombre: decoded.sub || decoded.email, rol: role, token: data.token });
+    login({ nombre, rol: role, token: data.token });
 
     navigate('/inicio');
 
   } else {
-    // Aquí chequeamos el código HTTP
     if (response.status === 422) {
       setErrorMessage('Credenciales incorrectas.');
     } else {
@@ -51,10 +49,12 @@ function Login() {
   }
 } catch (error) {
   setErrorMessage('Error de conexión con el servidor.');
+  console.error(error);
 }
 
     setLoading(false);
   };
+
   return (
       <div className="login-page-container">
       <div className="containerr">
@@ -101,7 +101,8 @@ function Login() {
           <img src={ColegioIcon} alt="Icono Colegio" />
         </div>
       </div>
-    </div>)
+    </div>
+    );
 }
 
 

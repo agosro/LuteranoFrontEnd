@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = [], titulo = "Crear" }) {
   const [formData, setFormData] = useState({});
 
-  // Solo cuando 'show' cambie (no formData), setea estado inicial
   useEffect(() => {
     if (show) {
       const initialData = {};
@@ -12,11 +11,14 @@ export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = []
       });
       setFormData(initialData);
     }
-  }, [show, campos]); // NO poner formData aquí
+  }, [show, campos]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   const handleSubmit = (e) => {
