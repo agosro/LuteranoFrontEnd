@@ -88,3 +88,34 @@ export async function registrarUsuario(token, userData) {
 
   return await res.json();
 }
+
+
+export const listarMaterias = async (token) => {
+  try {
+    const response = await fetch(`${API_URL}/materias/list`, {
+      method: 'GET',
+      headers: getHeaders(token),
+    });
+    if (!response.ok) throw new Error('Error al obtener materias');
+    const data = await response.json();
+    return data; // asumimos array de materias
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
+
+// export const listarUsuariosLibres = async (token) => {
+//   try {
+//     const response = await fetch(`${API_URL}/usuario/libres`, {
+//       method: 'GET',
+//       headers: getHeaders(token),
+//     });
+//     if (!response.ok) throw new Error('Error al obtener usuarios libres');
+//     const data = await response.json();
+//     return data; // asumimos array de usuarios libres
+//   } catch (error) {
+//     console.error(error);
+//     throw error;
+//   }
+// };

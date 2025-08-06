@@ -1,0 +1,8 @@
+.tabla-visual-externa {
+    border: 1px solid #d6d6d6; /* o el color que uses */
+    border-radius: 12px;
+    padding: 24px;
+    background-color: #f8f9fa;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    margin: 30px;
+}

@@ -123,7 +123,7 @@ const confirmarEliminar = async () => {
   return (
     <>
       <TablaGenerica
-        titulo="Usuarios"
+        titulo="Lista de Usuarios"
         columnas={columnasUsuarios}
         datos={usuarios}
         onView={handleView}

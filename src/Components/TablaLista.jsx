@@ -4,6 +4,7 @@ import ExportarCSV from "./Botones/ExportarCSV";
 import Paginacion from "./Botones/Paginacion";
 import OrdenableHeader from "./Botones/OrdenarColumnas";
 import { useState, useMemo} from "react";
+import './tabla.css';
 
 export default function TablaGenerica({
   titulo,
@@ -67,59 +68,60 @@ export default function TablaGenerica({
   };
 
   return (
-    <div className="container mt-4" style={{ position: "relative" }}>
-      <h2>{titulo}</h2>
+     <div className="tabla-visual-externa"> {/* Tabla decorativa */}
+      <div className="container mt-4" style={{ position: "relative" }}>
+        <h2>{titulo}</h2>
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div style={{ width: "300px" }}>
-          <Buscador valor={busqueda} onCambio={setBusqueda} placeholder={placeholderBuscador} />
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div style={{ width: "300px" }}>
+            <Buscador valor={busqueda} onCambio={setBusqueda} placeholder={placeholderBuscador} />
+          </div>
+
+          <div className="d-flex gap-2 align-items-center">
+            {botonCrear}
+            <ExportarCSV datos={datosOrdenados} columnas={columnas} nombreArchivo={`${titulo}.csv`} />
+          </div>
         </div>
 
-        <div className="d-flex gap-2 align-items-center">
-          {botonCrear}
-          <ExportarCSV datos={datosOrdenados} columnas={columnas} nombreArchivo={`${titulo}.csv`} />
-        </div>
-      </div>
-
-      <table className="table table-bordered table-hover">
-        <thead>
-          <tr>
-            <OrdenableHeader columnas={columnas} orden={orden} onOrdenar={handleOrdenar} />
-          </tr>
-        </thead>
-        <tbody>
-          {datosPaginados.length === 0 ? (
+        <table className="table table-bordered table-hover">
+          <thead>
             <tr>
-              <td colSpan={columnas.length + 2} className="text-center">
-                No hay registros.
-              </td>
+              <OrdenableHeader columnas={columnas} orden={orden} onOrdenar={handleOrdenar} />
             </tr>
-          ) : (
-            datosPaginados.map((item) => (
-              <tr key={item.id}>
-                <td>{item.id}</td>
-                {columnas.map((col) => (
-                  <td key={col.key}>{col.render ? col.render(item) : item[col.key]}</td>
-                ))}
-                <td className="text-center">
-                  <ActionButtons
-                    onView={() => onView(item)}
-                    onEdit={() => onEdit(item)}
-                    onDelete={() => onDelete(item)}
-                  />
+          </thead>
+          <tbody>
+            {datosPaginados.length === 0 ? (
+              <tr>
+                <td colSpan={columnas.length + 2} className="text-center">
+                  No hay registros.
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              datosPaginados.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.id}</td>
+                  {columnas.map((col) => (
+                    <td key={col.key}>{col.render ? col.render(item) : item[col.key]}</td>
+                  ))}
+                  <td className="text-center">
+                    <ActionButtons
+                      onView={() => onView(item)}
+                      onEdit={() => onEdit(item)}
+                      onDelete={() => onDelete(item)}
+                    />
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
 
-      <Paginacion
-        paginaActual={paginaActual}
-        totalPaginas={totalPaginas}
-        onPaginaChange={(pagina) => setPaginaActual(pagina)}
-      />
-
+        <Paginacion
+          paginaActual={paginaActual}
+          totalPaginas={totalPaginas}
+          onPaginaChange={(pagina) => setPaginaActual(pagina)}
+        />
+        </div>
     </div>
   );
 }

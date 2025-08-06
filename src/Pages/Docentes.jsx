@@ -1,24 +1,167 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import TablaGenerica from '../Components/TablaLista';
 import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
+import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad';
 import ModalCrearEntidad from '../Components/Modals/ModalCrear';
-import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad'; // tu modal editar separado
-import { listarDocentes, crearDocente, editarDocente, eliminarDocente } from '../Services/DocenteService';
+import ConfirmarEliminar from '../Components/Modals/ConfirmarEliminar';
+import BotonCrear from '../Components/Botones/BotonCrear';
+import { useAuth } from '../Context/AuthContext';
+import { toast } from 'react-toastify';
 
-export default function Docentes() {
+import {
+  listarDocentes,
+  crearDocente,
+  editarDocente,
+  eliminarDocente,
+  asignarMateriasADocente,
+  desasignarMateriasDeDocente,
+} from '../Services/DocenteService';
+
+import { listarMaterias } from '../Services/MateriaService';  // Debés tener este servicio para traer materias
+import { obtenerUsuarios } from '../Services/UsuarioService'; // Servicio para traer usuarios no asignados
+
+import { camposDocente } from '../Entidades/camposDocente';
+
+export default function ListaDocentes() {
   const [docentes, setDocentes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [materiasOptions, setMateriasOptions] = useState([]);
+  const [usuariosOptions, setUsuariosOptions] = useState([]);
+
   const [docenteSeleccionado, setDocenteSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
-  const [modalCrearShow, setModalCrearShow] = useState(false);
   const [modalEditarShow, setModalEditarShow] = useState(false);
+  const [modalCrearShow, setModalCrearShow] = useState(false);
+  const [mostrarModalEliminar, setMostrarModalEliminar] = useState(false);
 
+  const { user } = useAuth();
+  const token = user?.token;
+
+  // Cargar docentes, materias y usuarios disponibles
   useEffect(() => {
-    fetchDocentes();
-  }, []);
+    if (!token) return;
 
-  const fetchDocentes = async () => {
-    const datos = await listarDocentes();
-    setDocentes(datos);
+    const cargarDatos = async () => {
+      setLoading(true);
+      try {
+        const [docentesData, materiasData, usuariosData] = await Promise.all([
+          listarDocentes(token),
+          listarMaterias(token),
+          obtenerUsuarios(token),
+        ]);
+
+        setDocentes(docentesData);
+
+        // Preparar opciones para selects (materias)
+        const opcionesMaterias = materiasData.map(m => ({ value: m.id, label: m.nombre }));
+        setMateriasOptions(opcionesMaterias);
+
+        // Opciones usuarios (id y label nombre+email)
+        const opcionesUsuarios = usuariosData.map(u => ({
+          value: u.id,
+          label: `${u.nombre} ${u.apellido} (${u.email})`
+        }));
+        setUsuariosOptions(opcionesUsuarios);
+      } catch (error) {
+        toast.error('Error cargando datos: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarDatos();
+  }, [token]);
+
+  // Crear docente con materias y usuario asignado
+  const handleCreate = async (nuevoDocente) => {
+    try {
+      // Crear docente (sin materias aún)
+      const creadoResponse = await crearDocente(token, {
+        ...nuevoDocente,
+        materiasIds: undefined, // no mandar acá materias en el create si backend no lo espera
+      });
+
+      const docenteCreado = creadoResponse.docente;
+
+      // Asignar materias si seleccionadas
+      if (nuevoDocente.materiasIds?.length > 0) {
+        await asignarMateriasADocente(token, docenteCreado.id, nuevoDocente.materiasIds);
+      }
+
+      // Refrescar lista
+      const docentesActualizados = await listarDocentes(token);
+      setDocentes(docentesActualizados);
+
+      toast.success(creadoResponse.mensaje || 'Docente creado con éxito');
+      setModalCrearShow(false);
+    } catch (error) {
+      toast.error(error.message || 'Error creando docente');
+      console.error(error);
+    }
+  };
+
+  // Editar docente con asignación/desasignación de materias y cambio de usuario
+  const handleUpdate = async (datosEditados) => {
+    try {
+      // Primero obtener el docente original para comparar materias y usuario
+      const docenteOriginal = docentes.find(d => d.id === datosEditados.id);
+      if (!docenteOriginal) throw new Error('Docente no encontrado para actualizar');
+
+      // Editar datos generales (sin materias ni usuario)
+      const editResponse = await editarDocente(token, {
+        ...datosEditados,
+        materiasIds: undefined,
+        usuarioId: undefined,
+      });
+
+      // Comparar materias
+      const materiasPrevias = (docenteOriginal.materiasAsignadas || []).map(m => m.id);
+      const materiasNuevas = datosEditados.materiasIds || [];
+
+      // Materias a asignar y desasignar
+      const materiasAAsignar = materiasNuevas.filter(id => !materiasPrevias.includes(id));
+      const materiasADesasignar = materiasPrevias.filter(id => !materiasNuevas.includes(id));
+
+      if (materiasAAsignar.length) {
+        await asignarMateriasADocente(token, datosEditados.id, materiasAAsignar);
+      }
+      if (materiasADesasignar.length) {
+        await desasignarMateriasDeDocente(token, datosEditados.id, materiasADesasignar);
+      }
+
+      // Manejo de usuario asignado: si cambió, hacer la lógica correspondiente en backend o con otro endpoint
+      // Por simplicidad asumo que el backend maneja el cambio de usuario en editarDocente
+
+      // Refrescar lista
+      const docentesActualizados = await listarDocentes(token);
+      setDocentes(docentesActualizados);
+
+      toast.success(editResponse.mensaje || 'Docente actualizado con éxito');
+      setModalEditarShow(false);
+      setDocenteSeleccionado(null);
+    } catch (error) {
+      toast.error(error.message || 'Error al actualizar docente');
+      console.error(error);
+    }
+  };
+
+  const handleDeleteClick = (docente) => {
+    setDocenteSeleccionado(docente);
+    setMostrarModalEliminar(true);
+  };
+
+  const confirmarEliminar = async () => {
+    try {
+      await eliminarDocente(token, docenteSeleccionado.id);
+      setDocentes(prev => prev.filter(d => d.id !== docenteSeleccionado.id));
+      toast.success('Docente eliminado con éxito');
+    } catch (error) {
+      toast.error('Error al eliminar docente');
+      console.error(error);
+    } finally {
+      setMostrarModalEliminar(false);
+    }
   };
 
   const handleView = (docente) => {
@@ -26,92 +169,82 @@ export default function Docentes() {
     setModalVerShow(true);
   };
 
-  const handleCreate = () => {
-    setDocenteSeleccionado(null);
-    setModalCrearShow(true);
-  };
-
   const handleEdit = (docente) => {
     setDocenteSeleccionado(docente);
     setModalEditarShow(true);
   };
 
-  const handleDelete = async (id) => {
-    await eliminarDocente(id);
-    fetchDocentes();
-  };
+  if (loading) return <p>Cargando docentes...</p>;
 
-  // Guardar docente nuevo
-  const handleGuardarCrear = async (docente) => {
-    await crearDocente(docente);
-    setModalCrearShow(false);
-    fetchDocentes();
-  };
-
-  // Guardar docente editado
-  const handleGuardarEditar = async (docente) => {
-    await editarDocente(docente.id, docente);
-    setModalEditarShow(false);
-    fetchDocentes();
-  };
-
-  const columnas = [
-    { key: 'nombre', label: 'Nombre' },
-    { key: 'apellido', label: 'Apellido' },
+  // Columnas para TablaGenerica
+  const columnasDocentes = [
+    {
+      key: 'nombreApellido',
+      label: 'Nombre y Apellido',
+      render: (d) => `${d.nombre} ${d.apellido}`,
+    },
     { key: 'dni', label: 'DNI' },
     { key: 'email', label: 'Email' },
     { key: 'telefono', label: 'Teléfono' },
-    { key: 'ciudad', label: 'Ciudad' },
+    {
+      key: 'materias',
+      label: 'Materias',
+      render: (d) =>
+        d.materiasAsignadas?.length > 0
+          ? d.materiasAsignadas.map(m => m.nombre).join(', ')
+          : 'Sin asignar',
+    },
   ];
-
-  const campos = [
-  { name: 'nombre', label: 'Nombre', type: 'text' },
-  { name: 'apellido', label: 'Apellido', type: 'text' },
-  { name: 'dni', label: 'DNI', type: 'text' },
-  { name: 'email', label: 'Email', type: 'email' },
-  { name: 'telefono', label: 'Teléfono', type: 'text' },
-  { name: 'direccion', label: 'Dirección', type: 'text' },
-  { name: 'ciudad', label: 'Ciudad', type: 'text' },
-  { name: 'materia', label: 'Materia asignada', type: 'select', opciones: ['Matemática', 'Historia', 'Lengua'] },
-];
 
   return (
     <>
       <TablaGenerica
         titulo="Lista de Docentes"
-        columnas={columnas}
+        columnas={columnasDocentes}
         datos={docentes}
         onView={handleView}
         onEdit={handleEdit}
-        onDelete={(d) => handleDelete(d.id)}
-        onCreate={handleCreate}
-        textoCrear="Crear docente"
-        campos={campos}
+        onDelete={handleDeleteClick}
+        botonCrear={<BotonCrear texto="Crear docente" onClick={() => setModalCrearShow(true)} />}
+        placeholderBuscador="Buscar por nombre, DNI o email"
       />
 
       <ModalVerEntidad
         show={modalVerShow}
         onClose={() => setModalVerShow(false)}
         datos={docenteSeleccionado}
-        campos={campos}
+        campos={camposDocente(materiasOptions, usuariosOptions)}
         titulo="Detalle del Docente"
       />
+
+      <ConfirmarEliminar
+        show={mostrarModalEliminar}
+        onClose={() => setMostrarModalEliminar(false)}
+        onConfirm={confirmarEliminar}
+        item={docenteSeleccionado}
+        tipo="docente"
+      />
+
+      {docenteSeleccionado && (
+        <ModalEditarEntidad
+          show={modalEditarShow}
+          onClose={() => setModalEditarShow(false)}
+          datosIniciales={{
+            ...docenteSeleccionado,
+            materiasIds: docenteSeleccionado.materiasAsignadas?.map(m => m.id) || [],
+            usuarioId: docenteSeleccionado.usuario?.id || '',
+          }}
+          campos={camposDocente(materiasOptions, usuariosOptions)}
+          onSubmit={handleUpdate}
+        />
+      )}
 
       <ModalCrearEntidad
         show={modalCrearShow}
         onClose={() => setModalCrearShow(false)}
-        onSubmit={handleGuardarCrear}
-        campos={campos}
+        campos={camposDocente(materiasOptions, usuariosOptions)}
+        onSubmit={handleCreate}
         titulo="Crear Docente"
-      />
-
-      <ModalEditarEntidad
-        show={modalEditarShow}
-        onClose={() => setModalEditarShow(false)}
-        datos={docenteSeleccionado}
-        onSubmit={handleGuardarEditar}
-        campos={campos}
-        titulo="Editar Docente"
       />
     </>
   );
