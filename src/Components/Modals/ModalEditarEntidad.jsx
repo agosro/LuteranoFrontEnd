@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
+import Select from 'react-select';
 
 export default function ModalEditarEntidad({ show, onClose, datosIniciales, campos, onSubmit }) {
   const [formData, setFormData] = useState({});
@@ -9,7 +10,7 @@ export default function ModalEditarEntidad({ show, onClose, datosIniciales, camp
     if (!datos) return {};
 
     const datosProcesados = { ...datos };
-
+  
     // Ejemplo: si role es objeto, extraigo el name
     if (datos.role && typeof datos.role === 'object') {
       datosProcesados.role = datos.role.name || '';
@@ -23,6 +24,11 @@ export default function ModalEditarEntidad({ show, onClose, datosIniciales, camp
     return datosProcesados;
   };
 
+  const formatearFecha = (fechaISO) => {
+  if (!fechaISO) return '';
+  return fechaISO.split('T')[0];
+}
+
   useEffect(() => {
     if (show) {
       const datosParaForm = procesarDatosIniciales(datosIniciales);
@@ -35,6 +41,14 @@ export default function ModalEditarEntidad({ show, onClose, datosIniciales, camp
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
+      fechaNacimiento: formatearFecha(datosIniciales.fechaNacimiento),
+    }));
+  };
+  
+  const handleReactSelectChange = (selectedOptions, name) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: selectedOptions ? selectedOptions.map(opt => opt.value) : []
     }));
   };
 
@@ -64,6 +78,21 @@ export default function ModalEditarEntidad({ show, onClose, datosIniciales, camp
                 </Form.Group>
               );
             }
+            if (type === 'multiselect') {
+              return (
+                <Form.Group key={name} className="mb-3" controlId={name}>
+                  <Form.Label>{label}</Form.Label>
+                  <Select
+                    isMulti
+                    options={opciones}
+                    value={opciones.filter(opt => formData[name]?.includes(opt.value))}
+                    onChange={(selected) => handleReactSelectChange(selected, name)}
+                    classNamePrefix="react-select"
+                    placeholder={`Seleccione ${label.toLowerCase()}...`}
+                  />
+                </Form.Group>
+              );
+            }
             if (type === 'select') {
               return (
                 <Form.Group key={name} className="mb-3" controlId={name}>
@@ -75,14 +104,13 @@ export default function ModalEditarEntidad({ show, onClose, datosIniciales, camp
                     required
                   >
                     <option value="">Seleccionar...</option>
-                    {opciones.map((opt) => (
-                      // Si opt es objeto (con value y label), usalo bien:
+                    {opciones.map((opt) =>
                       typeof opt === 'object' ? (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ) : (
                         <option key={opt} value={opt}>{opt}</option>
                       )
-                    ))}
+                    )}
                   </Form.Select>
                 </Form.Group>
               );
@@ -96,7 +124,7 @@ export default function ModalEditarEntidad({ show, onClose, datosIniciales, camp
                   name={name}
                   value={formData[name] || ''}
                   onChange={handleChange}
-                  required={name !== 'password'} // la contraseña puede no ser obligatoria en edición
+                  required={name !== 'password'}
                 />
               </Form.Group>
             );

@@ -54,7 +54,10 @@ export default function ListaDocentes() {
         setDocentes(docentesData);
 
         // Preparar opciones para selects (materias)
-        const opcionesMaterias = materiasData.map(m => ({ value: m.id, label: m.nombre }));
+        const opcionesMaterias = (materiasData || []).map(m => ({
+        value: m.id,
+        label: m.nombreMateria, // asegúrate que el campo sea este
+        }));
         setMateriasOptions(opcionesMaterias);
 
         // Opciones usuarios (id y label nombre+email)
@@ -116,7 +119,7 @@ export default function ListaDocentes() {
       });
 
       // Comparar materias
-      const materiasPrevias = (docenteOriginal.materiasAsignadas || []).map(m => m.id);
+      const materiasPrevias = (docenteOriginal.materias || []).map(m => m.id);
       const materiasNuevas = datosEditados.materiasIds || [];
 
       // Materias a asignar y desasignar
@@ -190,11 +193,13 @@ export default function ListaDocentes() {
       key: 'materias',
       label: 'Materias',
       render: (d) =>
-        d.materiasAsignadas?.length > 0
-          ? d.materiasAsignadas.map(m => m.nombre).join(', ')
+        d.materias?.length > 0
+          ? d.materias.map(m => m.nombreMateria).join(', ')
           : 'Sin asignar',
     },
   ];
+
+  const campos = camposDocente(materiasOptions, usuariosOptions);
 
   return (
     <>
@@ -213,7 +218,7 @@ export default function ListaDocentes() {
         show={modalVerShow}
         onClose={() => setModalVerShow(false)}
         datos={docenteSeleccionado}
-        campos={camposDocente(materiasOptions, usuariosOptions)}
+          campos={camposDocente([], [], true)}
         titulo="Detalle del Docente"
       />
 
@@ -231,10 +236,10 @@ export default function ListaDocentes() {
           onClose={() => setModalEditarShow(false)}
           datosIniciales={{
             ...docenteSeleccionado,
-            materiasIds: docenteSeleccionado.materiasAsignadas?.map(m => m.id) || [],
+            materiasIds: docenteSeleccionado.materias?.map(m => m.id) || [],
             usuarioId: docenteSeleccionado.usuario?.id || '',
           }}
-          campos={camposDocente(materiasOptions, usuariosOptions)}
+          campos={campos}
           onSubmit={handleUpdate}
         />
       )}
@@ -242,7 +247,7 @@ export default function ListaDocentes() {
       <ModalCrearEntidad
         show={modalCrearShow}
         onClose={() => setModalCrearShow(false)}
-        campos={camposDocente(materiasOptions, usuariosOptions)}
+        campos={campos}
         onSubmit={handleCreate}
         titulo="Crear Docente"
       />

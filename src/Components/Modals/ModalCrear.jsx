@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Select from "react-select";
 
 export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = [], titulo = "Crear" }) {
   const [formData, setFormData] = useState({});
@@ -21,10 +22,13 @@ export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = []
     }));
   };
 
-  // Manejo especial para multiselect
-  const handleMultiSelectChange = (e, name) => {
-    const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value);
-    setFormData(prev => ({ ...prev, [name]: selectedOptions }));
+  // NUEVO para react-select multiselect
+  const handleReactSelectChange = (selectedOptions, name) => {
+    // selectedOptions es array de objetos {value, label} o null
+    setFormData(prev => ({
+      ...prev,
+      [name]: selectedOptions ? selectedOptions.map(opt => opt.value) : []
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -66,7 +70,16 @@ export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = []
             <div className="mb-3" key={name}>
               <label htmlFor={name} className="form-label">{label}</label>
 
-              {type === "select" ? (
+              {type === "multiselect" ? (
+                <Select
+                  isMulti
+                  options={opciones}
+                  value={opciones.filter(opt => formData[name]?.includes(opt.value))}
+                  onChange={(selected) => handleReactSelectChange(selected, name)}
+                  classNamePrefix="react-select"
+                  placeholder={`Seleccione ${label.toLowerCase()}...`}
+                />
+              ) : type === "select" ? (
                 <select
                   id={name}
                   name={name}
@@ -76,24 +89,6 @@ export default function ModalCrearEntidad({ show, onClose, onSubmit, campos = []
                   required
                 >
                   <option value="">Seleccione...</option>
-                  {opciones && opciones.map(opt =>
-                    typeof opt === "object" ? (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ) : (
-                      <option key={opt} value={opt}>{opt}</option>
-                    )
-                  )}
-                </select>
-              ) : type === "multiselect" ? (
-                <select
-                  id={name}
-                  name={name}
-                  className="form-select"
-                  multiple
-                  value={formData[name] || []}
-                  onChange={(e) => handleMultiSelectChange(e, name)}
-                  required
-                >
                   {opciones && opciones.map(opt =>
                     typeof opt === "object" ? (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
