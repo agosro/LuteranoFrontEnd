@@ -1,6 +1,13 @@
+export const camposDocente = (usuariosOptions = [], modoVista = false, modoEdicion = false,  emailDisabled = false) => {
+  const campoUsuario = {
+    name: 'usuarioId',
+    label: 'Usuario',
+    type: 'select',
+    opciones: usuariosOptions,
+    required: false,
+    disabled: modoEdicion,  // deshabilita seleccionar otro usuario en edición
+  };
 
-// Los campos que usarás en el formulario modal
-export const camposDocente = (materiasOptions = [], usuariosOptions = [], modoVista = false) => {
   const camposBase = [
     { name: 'nombre', label: 'Nombre', type: 'text', required: true },
     { name: 'apellido', label: 'Apellido', type: 'text', required: true },
@@ -12,19 +19,27 @@ export const camposDocente = (materiasOptions = [], usuariosOptions = [], modoVi
         { value: 'MASCULINO', label: 'Masculino' },
         { value: 'FEMENINO', label: 'Femenino' },
         { value: 'OTRO', label: 'Otro' },
-      ]
+      ],
+      required: true,
+    },
+    {
+      name: 'tipoDoc',
+      label: 'Tipo Documento',
+      type: 'select',
+      opciones: [
+        { value: 'DNI', label: 'DNI' },
+        { value: 'PASAPORTE', label: 'Pasaporte' },
+        { value: 'CARNET_EXTRANJERIA', label: 'Carnet de Extranjería' },
+        // agregá los que correspondan según tu enum en backend
+      ],
+      required: true,
     },
     { name: 'dni', label: 'DNI', type: 'text', required: true },
-    { name: 'email', label: 'Email', type: 'email', required: true },
+    { name: 'email', label: 'Email', type: 'email', required: true, disabled: emailDisabled},
     { name: 'direccion', label: 'Dirección', type: 'text', required: true },
     { name: 'telefono', label: 'Teléfono', type: 'text', required: true },
     { name: 'fechaNacimiento', label: 'Fecha de Nacimiento', type: 'date', required: true },
     { name: 'fechaIngreso', label: 'Fecha de Ingreso', type: 'date', required: true },
-  ];
-
-  const camposFormulario = [
-    { name: 'materiasIds', label: 'Materias', type: 'multiselect', opciones: materiasOptions },
-    { name: 'usuarioId', label: 'Usuario', type: 'select', opciones: usuariosOptions },
   ];
 
   const campoMateriasVista = {
@@ -36,7 +51,7 @@ export const camposDocente = (materiasOptions = [], usuariosOptions = [], modoVi
         : 'Sin materias asignadas',
   };
 
-  return modoVista
-    ? [...camposBase, campoMateriasVista]
-    : [...camposBase, ...camposFormulario];
+  if (modoVista) return [...camposBase, campoMateriasVista];
+
+  return [campoUsuario, ...camposBase];
 };

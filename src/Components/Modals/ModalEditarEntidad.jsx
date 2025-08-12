@@ -1,71 +1,58 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Button, Form } from 'react-bootstrap';
-import Select from 'react-select';
+import React from "react";
+import { Modal, Button, Form } from "react-bootstrap";
+import Select from "react-select";
 
-export default function ModalEditarEntidad({ show, onClose, datosIniciales, campos, onSubmit }) {
-  const [formData, setFormData] = useState({});
-
-  // Función para procesar los datos iniciales y "aplanar" objetos para selects
-  const procesarDatosIniciales = (datos) => {
-    if (!datos) return {};
-
-    const datosProcesados = { ...datos };
-  
-    // Ejemplo: si role es objeto, extraigo el name
-    if (datos.role && typeof datos.role === 'object') {
-      datosProcesados.role = datos.role.name || '';
-    }
-
-    // Agrega aquí otros campos que necesiten similar tratamiento, por ej:
-    // if (datos.categoria && typeof datos.categoria === 'object') {
-    //   datosProcesados.categoria = datos.categoria.id || '';
-    // }
-
-    return datosProcesados;
-  };
-
-  const formatearFecha = (fechaISO) => {
-  if (!fechaISO) return '';
-  return fechaISO.split('T')[0];
-}
-
-  useEffect(() => {
-    if (show) {
-      const datosParaForm = procesarDatosIniciales(datosIniciales);
-      setFormData(datosParaForm);
-    }
-  }, [show, datosIniciales]);
+export default function ModalEditarEntidad({
+  show,
+  onClose,
+  campos,
+  onSubmit,
+  formData,
+  onInputChange,
+  onUsuarioChange,
+}) {
+  if (!show) return null;
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-      fechaNacimiento: formatearFecha(datosIniciales.fechaNacimiento),
-    }));
-  };
-  
-  const handleReactSelectChange = (selectedOptions, name) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: selectedOptions ? selectedOptions.map(opt => opt.value) : []
-    }));
+    onInputChange(name, type === "checkbox" ? checked : value);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(formData);
+  const handleSelectChange = (selectedOptions, name) => {
+    if (name === "usuarioId" && onUsuarioChange) {
+      const usuarioId = selectedOptions ? selectedOptions.value : "";
+      onUsuarioChange(usuarioId);
+    } else {
+      onInputChange(
+        name,
+        selectedOptions
+          ? Array.isArray(selectedOptions)
+            ? selectedOptions.map((o) => o.value)
+            : selectedOptions.value
+          : ""
+      );
+    }
   };
 
   return (
-    <Modal show={show} onHide={onClose} size="md">
+    <Modal show={show} onHide={onClose} size="md" centered>
       <Modal.Header closeButton>
-        <Modal.Title>Editar Usuario</Modal.Title>
+        <Modal.Title>Editar</Modal.Title>
       </Modal.Header>
-      <Form onSubmit={handleSubmit}>
+      <Form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit(formData);
+        }}
+      >
+        {/* Input oculto para enviar id si existe */}
+        {formData.id && (
+          <input type="hidden" name="id" value={formData.id} />
+        )}
+
         <Modal.Body>
-          {campos.map(({ name, label, type, opciones }) => {
-            if (type === 'checkbox') {
+          {campos.map(({ name, label, type, opciones, disabled, required }) => {
+            if (type === "checkbox") {
               return (
                 <Form.Group key={name} className="mb-3" controlId={name}>
                   <Form.Check
@@ -74,65 +61,69 @@ export default function ModalEditarEntidad({ show, onClose, datosIniciales, camp
                     name={name}
                     checked={!!formData[name]}
                     onChange={handleChange}
+                    disabled={disabled}
                   />
                 </Form.Group>
               );
             }
-            if (type === 'multiselect') {
+            if (type === "multiselect") {
+              return (
+                <Form.Group key={name} className="mb-3" controlId={name}>
+                  <Form.Label>
+                    {label}
+                    {required && <span style={{ color: 'red' }}> *</span>}
+                    </Form.Label>
+                  <Select
+                    isMulti
+                    options={opciones}
+                    value={opciones.filter((opt) =>
+                      formData[name]?.includes(opt.value)
+                    )}
+                    onChange={(selected) => handleSelectChange(selected, name)}
+                    classNamePrefix="react-select"
+                    placeholder={`Seleccione ${label.toLowerCase()}...`}
+                    isDisabled={disabled}
+                  />
+                </Form.Group>
+              );
+            }
+            if (type === "select") {
               return (
                 <Form.Group key={name} className="mb-3" controlId={name}>
                   <Form.Label>{label}</Form.Label>
                   <Select
-                    isMulti
                     options={opciones}
-                    value={opciones.filter(opt => formData[name]?.includes(opt.value))}
-                    onChange={(selected) => handleReactSelectChange(selected, name)}
+                    value={opciones.find((opt) => opt.value === formData[name]) || null}
+                    onChange={(selected) => handleSelectChange(selected, name)}
                     classNamePrefix="react-select"
                     placeholder={`Seleccione ${label.toLowerCase()}...`}
+                    isDisabled={disabled}
                   />
                 </Form.Group>
               );
             }
-            if (type === 'select') {
-              return (
-                <Form.Group key={name} className="mb-3" controlId={name}>
-                  <Form.Label>{label}</Form.Label>
-                  <Form.Select
-                    name={name}
-                    value={formData[name] || ''}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option value="">Seleccionar...</option>
-                    {opciones.map((opt) =>
-                      typeof opt === 'object' ? (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ) : (
-                        <option key={opt} value={opt}>{opt}</option>
-                      )
-                    )}
-                  </Form.Select>
-                </Form.Group>
-              );
-            }
-            // Por defecto input tipo texto, email, password, number, etc.
             return (
               <Form.Group key={name} className="mb-3" controlId={name}>
                 <Form.Label>{label}</Form.Label>
                 <Form.Control
-                  type={type || 'text'}
+                  type={type || "text"}
                   name={name}
-                  value={formData[name] || ''}
+                  value={formData[name] || ""}
                   onChange={handleChange}
-                  required={name !== 'password'}
+                  required={required && name !== "password"}
+                  disabled={disabled}
                 />
               </Form.Group>
             );
           })}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" type="submit">Guardar</Button>
+          <Button variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="primary" type="submit">
+            Guardar
+          </Button>
         </Modal.Footer>
       </Form>
     </Modal>

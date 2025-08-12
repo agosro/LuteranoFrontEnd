@@ -1,69 +1,61 @@
-import { useEffect, useState } from 'react';
-import TablaGenerica from '../Components/TablaLista';
-import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
-import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad';
-import ModalCrearEntidad from '../Components/Modals/ModalCrear';
-import ConfirmarEliminar from '../Components/Modals/ConfirmarEliminar';
-import BotonCrear from '../Components/Botones/BotonCrear';
-import { useAuth } from '../Context/AuthContext';
-import { toast } from 'react-toastify';
-
+import React, { useEffect, useState } from 'react';
 import {
   listarDocentes,
   crearDocente,
   editarDocente,
   eliminarDocente,
-  asignarMateriasADocente,
-  desasignarMateriasDeDocente,
 } from '../Services/DocenteService';
-
-import { listarMaterias } from '../Services/MateriaService';  // Debés tener este servicio para traer materias
-import { obtenerUsuarios } from '../Services/UsuarioService'; // Servicio para traer usuarios no asignados
-
+import { obtenerUsuariosSinAsignarPorRol } from '../Services/UsuarioService';
 import { camposDocente } from '../Entidades/camposDocente';
+import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
+import ModalCrearEntidad from '../Components/Modals/ModalCrear';
+import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad';
+import ConfirmarEliminar from '../Components/Modals/ConfirmarEliminar';
+import TablaGenerica from '../Components/TablaLista';
+import BotonCrear from '../Components/Botones/BotonCrear';
+import { toast } from 'react-toastify';
+import { useAuth } from '../Context/AuthContext';
 
 export default function ListaDocentes() {
+  const { user } = useAuth();
+  const token = user?.token;
+
   const [docentes, setDocentes] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const [materiasOptions, setMateriasOptions] = useState([]);
   const [usuariosOptions, setUsuariosOptions] = useState([]);
 
+  // Estados separados para cada modal
   const [docenteSeleccionado, setDocenteSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
   const [modalEditarShow, setModalEditarShow] = useState(false);
   const [modalCrearShow, setModalCrearShow] = useState(false);
-  const [mostrarModalEliminar, setMostrarModalEliminar] = useState(false);
+  const [modalEliminarShow, setModalEliminarShow] = useState(false);
 
-  const { user } = useAuth();
-  const token = user?.token;
+  const [formData, setFormData] = useState({});
 
-  // Cargar docentes, materias y usuarios disponibles
+  // Función para extraer solo la parte YYYY-MM-DD de la fecha ISO
+  const formatearFechaISO = (fecha) => {
+    if (!fecha) return '';
+    return fecha.split('T')[0];
+  };
+
   useEffect(() => {
     if (!token) return;
 
     const cargarDatos = async () => {
       setLoading(true);
       try {
-        const [docentesData, materiasData, usuariosData] = await Promise.all([
-          listarDocentes(token),
-          listarMaterias(token),
-          obtenerUsuarios(token),
-        ]);
+        const docentesData = await listarDocentes(token);
+        const usuariosData = await obtenerUsuariosSinAsignarPorRol(token, 'ROLE_DOCENTE');
 
         setDocentes(docentesData);
 
-        // Preparar opciones para selects (materias)
-        const opcionesMaterias = (materiasData || []).map(m => ({
-        value: m.id,
-        label: m.nombreMateria, // asegúrate que el campo sea este
-        }));
-        setMateriasOptions(opcionesMaterias);
-
-        // Opciones usuarios (id y label nombre+email)
-        const opcionesUsuarios = usuariosData.map(u => ({
+        const opcionesUsuarios = (usuariosData.usuarios || []).map(u => ({
           value: u.id,
-          label: `${u.nombre} ${u.apellido} (${u.email})`
+          label: `${u.name} ${u.lastName} (${u.email})`,
+          nombre: u.name,
+          apellido: u.lastName,
+          email: u.email,
         }));
         setUsuariosOptions(opcionesUsuarios);
       } catch (error) {
@@ -76,130 +68,192 @@ export default function ListaDocentes() {
     cargarDatos();
   }, [token]);
 
-  // Crear docente con materias y usuario asignado
-  const handleCreate = async (nuevoDocente) => {
-    try {
-      // Crear docente (sin materias aún)
-      const creadoResponse = await crearDocente(token, {
-        ...nuevoDocente,
-        materiasIds: undefined, // no mandar acá materias en el create si backend no lo espera
-      });
-
-      const docenteCreado = creadoResponse.docente;
-
-      // Asignar materias si seleccionadas
-      if (nuevoDocente.materiasIds?.length > 0) {
-        await asignarMateriasADocente(token, docenteCreado.id, nuevoDocente.materiasIds);
-      }
-
-      // Refrescar lista
-      const docentesActualizados = await listarDocentes(token);
-      setDocentes(docentesActualizados);
-
-      toast.success(creadoResponse.mensaje || 'Docente creado con éxito');
-      setModalCrearShow(false);
-    } catch (error) {
-      toast.error(error.message || 'Error creando docente');
-      console.error(error);
+  // Maneja cambio usuario en formData
+  const handleUsuarioChange = (usuarioId) => {
+    if (!usuarioId) {
+      setFormData(prev => ({ ...prev, usuarioId: '', nombre: '', apellido: '', email: '' }));
+      return;
+    }
+    const usuario = usuariosOptions.find(u => u.value === usuarioId);
+    if (usuario) {
+      setFormData(prev => ({
+        ...prev,
+        usuarioId: usuarioId,
+        nombre: usuario.nombre,
+        apellido: usuario.apellido,
+        email: usuario.email,
+      }));
     }
   };
 
-  // Editar docente con asignación/desasignación de materias y cambio de usuario
-  const handleUpdate = async (datosEditados) => {
-    try {
-      // Primero obtener el docente original para comparar materias y usuario
-      const docenteOriginal = docentes.find(d => d.id === datosEditados.id);
-      if (!docenteOriginal) throw new Error('Docente no encontrado para actualizar');
-
-      // Editar datos generales (sin materias ni usuario)
-      const editResponse = await editarDocente(token, {
-        ...datosEditados,
-        materiasIds: undefined,
-        usuarioId: undefined,
-      });
-
-      // Comparar materias
-      const materiasPrevias = (docenteOriginal.materias || []).map(m => m.id);
-      const materiasNuevas = datosEditados.materiasIds || [];
-
-      // Materias a asignar y desasignar
-      const materiasAAsignar = materiasNuevas.filter(id => !materiasPrevias.includes(id));
-      const materiasADesasignar = materiasPrevias.filter(id => !materiasNuevas.includes(id));
-
-      if (materiasAAsignar.length) {
-        await asignarMateriasADocente(token, datosEditados.id, materiasAAsignar);
-      }
-      if (materiasADesasignar.length) {
-        await desasignarMateriasDeDocente(token, datosEditados.id, materiasADesasignar);
-      }
-
-      // Manejo de usuario asignado: si cambió, hacer la lógica correspondiente en backend o con otro endpoint
-      // Por simplicidad asumo que el backend maneja el cambio de usuario en editarDocente
-
-      // Refrescar lista
-      const docentesActualizados = await listarDocentes(token);
-      setDocentes(docentesActualizados);
-
-      toast.success(editResponse.mensaje || 'Docente actualizado con éxito');
-      setModalEditarShow(false);
-      setDocenteSeleccionado(null);
-    } catch (error) {
-      toast.error(error.message || 'Error al actualizar docente');
-      console.error(error);
-    }
+  const handleInputChange = (name, value) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleDeleteClick = (docente) => {
+  // Abrir modales
+
+  const abrirModalCrear = () => {
+    setDocenteSeleccionado(null);
+    setFormData({});
+    setModalCrearShow(true);
+  };
+
+  const abrirModalEditar = (docente) => {
     setDocenteSeleccionado(docente);
-    setMostrarModalEliminar(true);
+    setFormData({
+      id: docente.id,
+      usuarioId: docente.user?.id || '',
+      nombre: docente.nombre,
+      apellido: docente.apellido,
+      genero: docente.genero,
+      tipoDoc: docente.tipoDoc || '',
+      dni: docente.dni,
+      email: docente.email,
+      direccion: docente.direccion,
+      telefono: docente.telefono,
+      fechaNacimiento: formatearFechaISO(docente.fechaNacimiento),
+      fechaIngreso: formatearFechaISO(docente.fechaIngreso),
+    });
+    setModalEditarShow(true);
   };
 
-  const confirmarEliminar = async () => {
-    try {
-      await eliminarDocente(token, docenteSeleccionado.id);
-      setDocentes(prev => prev.filter(d => d.id !== docenteSeleccionado.id));
-      toast.success('Docente eliminado con éxito');
-    } catch (error) {
-      toast.error('Error al eliminar docente');
-      console.error(error);
-    } finally {
-      setMostrarModalEliminar(false);
-    }
-  };
-
-  const handleView = (docente) => {
+  const abrirModalVer = (docente) => {
     setDocenteSeleccionado(docente);
     setModalVerShow(true);
   };
 
-  const handleEdit = (docente) => {
+  const abrirModalEliminar = (docente) => {
     setDocenteSeleccionado(docente);
-    setModalEditarShow(true);
+    setModalEliminarShow(true);
+  };
+
+  // Cerrar modales
+
+  const cerrarModalCrear = () => {
+    setFormData({});
+    setModalCrearShow(false);
+  };
+
+  const cerrarModalEditar = () => {
+    setDocenteSeleccionado(null);
+    setFormData({});
+    setModalEditarShow(false);
+  };
+
+  const cerrarModalVer = () => {
+    setDocenteSeleccionado(null);
+    setModalVerShow(false);
+  };
+
+  const cerrarModalEliminar = () => {
+    setDocenteSeleccionado(null);
+    setModalEliminarShow(false);
+  };
+
+  // CRUD handlers
+
+  const handleCreate = async (datos) => {
+  try {
+    const nuevoDocente = {
+      user: { id: datos.usuarioId },
+      nombre: datos.nombre,
+      apellido: datos.apellido,
+      genero: datos.genero,
+      tipoDoc: datos.tipoDoc || "DNI", // o el valor que uses por defecto si no está en formData
+      dni: datos.dni,
+      email: datos.email,
+      direccion: datos.direccion,
+      telefono: datos.telefono,
+      fechaNacimiento: datos.fechaNacimiento,
+      fechaIngreso: datos.fechaIngreso,
+      materias: [], // clave: enviamos array vacío
+    };
+    console.log('Datos que se envían para crear docente:', nuevoDocente);
+    const creadoResponse = await crearDocente(token, nuevoDocente);
+    toast.success(creadoResponse.mensaje || 'Docente creado con éxito');
+    cerrarModalCrear();
+    const docentesActualizados = await listarDocentes(token);
+    setDocentes(docentesActualizados);
+  } catch (error) {
+    toast.error(error.message || 'Error creando docente');
+    console.error(error);
+  }
+};
+
+const handleUpdate = async (datos) => {
+  if (!datos.id) {
+    toast.error('Falta el ID del docente para actualizar');
+    return;
+  }
+  try {
+    const docenteEditado = {
+      id: datos.id,
+      user: { id: datos.usuarioId },
+      nombre: datos.nombre,
+      apellido: datos.apellido,
+      genero: datos.genero,
+      tipoDoc: datos.tipoDoc || "DNI",
+      dni: datos.dni,
+      email: datos.email,
+      direccion: datos.direccion,
+      telefono: datos.telefono,
+      fechaNacimiento: datos.fechaNacimiento,
+      fechaIngreso: datos.fechaIngreso,
+    };
+    console.log('Datos para editar docente:', docenteEditado);
+    const editResponse = await editarDocente(token, docenteEditado);
+    toast.success(editResponse.mensaje || 'Docente actualizado con éxito');
+    cerrarModalEditar();
+    const docentesActualizados = await listarDocentes(token);
+    setDocentes(docentesActualizados);
+  } catch (error) {
+    toast.error(error.message || 'Error al actualizar docente');
+    console.error(error);
+  }
+};
+
+  const handleDelete = async () => {
+    if (!docenteSeleccionado) return;
+
+    try {
+      await eliminarDocente(token, docenteSeleccionado.id);
+      toast.success('Docente eliminado con éxito');
+      cerrarModalEliminar();
+      const docentesActualizados = await listarDocentes(token);
+      setDocentes(docentesActualizados);
+    } catch (error) {
+      toast.error(error.message || 'Error eliminando docente');
+    }
   };
 
   if (loading) return <p>Cargando docentes...</p>;
 
-  // Columnas para TablaGenerica
   const columnasDocentes = [
     {
       key: 'nombreApellido',
       label: 'Nombre y Apellido',
-      render: (d) => `${d.nombre} ${d.apellido}`,
+      render: d => `${d.nombre} ${d.apellido}`,
     },
     { key: 'dni', label: 'DNI' },
     { key: 'email', label: 'Email' },
     { key: 'telefono', label: 'Teléfono' },
     {
-      key: 'materias',
-      label: 'Materias',
-      render: (d) =>
-        d.materias?.length > 0
-          ? d.materias.map(m => m.nombreMateria).join(', ')
-          : 'Sin asignar',
-    },
+    key: 'materias',
+    label: 'Materias asignadas',
+    render: d => d.materias && d.materias.length > 0
+      ? d.materias.map(m => m.nombreMateria || m.nombre).join(', ')
+      : 'Sin materias asignadas',
+  }
   ];
 
-  const campos = camposDocente(materiasOptions, usuariosOptions);
+  // Aquí usamos la función para formatear las fechas antes de enviar a la vista
+  const docenteVistaFormateado = docenteSeleccionado
+    ? {
+        ...docenteSeleccionado,
+        fechaNacimiento: formatearFechaISO(docenteSeleccionado.fechaNacimiento),
+        fechaIngreso: formatearFechaISO(docenteSeleccionado.fechaIngreso),
+      }
+    : null;
 
   return (
     <>
@@ -207,49 +261,49 @@ export default function ListaDocentes() {
         titulo="Lista de Docentes"
         columnas={columnasDocentes}
         datos={docentes}
-        onView={handleView}
-        onEdit={handleEdit}
-        onDelete={handleDeleteClick}
-        botonCrear={<BotonCrear texto="Crear docente" onClick={() => setModalCrearShow(true)} />}
+        onView={abrirModalVer}
+        onEdit={abrirModalEditar}
+        onDelete={abrirModalEliminar}
+        botonCrear={<BotonCrear texto="Crear docente" onClick={abrirModalCrear} />}
         placeholderBuscador="Buscar por nombre, DNI o email"
+      />
+
+      <ModalCrearEntidad
+        show={modalCrearShow}
+        onClose={cerrarModalCrear}
+        campos={camposDocente(usuariosOptions, false, false, !!formData.usuarioId)}
+        formData={formData}
+        onInputChange={handleInputChange}
+        onUsuarioChange={handleUsuarioChange}
+        onSubmit={handleCreate}
+        titulo="Crear Docente"
+      />
+
+      <ModalEditarEntidad
+        show={modalEditarShow}
+        onClose={cerrarModalEditar}
+        campos={camposDocente(usuariosOptions, false, true, true)}
+        formData={formData}
+        onInputChange={handleInputChange}
+        onUsuarioChange={handleUsuarioChange}
+        onSubmit={handleUpdate}
+        titulo="Editar Docente"
       />
 
       <ModalVerEntidad
         show={modalVerShow}
-        onClose={() => setModalVerShow(false)}
-        datos={docenteSeleccionado}
-          campos={camposDocente([], [], true)}
-        titulo="Detalle del Docente"
+        onClose={cerrarModalVer}
+        datos={docenteVistaFormateado}
+        campos={camposDocente([], true)} // modoVista = true para campos solo lectura
+        titulo={`Datos del docente: ${docenteSeleccionado?.nombre} ${docenteSeleccionado?.apellido}`}
       />
 
       <ConfirmarEliminar
-        show={mostrarModalEliminar}
-        onClose={() => setMostrarModalEliminar(false)}
-        onConfirm={confirmarEliminar}
+        show={modalEliminarShow}
+        onClose={cerrarModalEliminar}
+        onConfirm={handleDelete}
         item={docenteSeleccionado}
         tipo="docente"
-      />
-
-      {docenteSeleccionado && (
-        <ModalEditarEntidad
-          show={modalEditarShow}
-          onClose={() => setModalEditarShow(false)}
-          datosIniciales={{
-            ...docenteSeleccionado,
-            materiasIds: docenteSeleccionado.materias?.map(m => m.id) || [],
-            usuarioId: docenteSeleccionado.usuario?.id || '',
-          }}
-          campos={campos}
-          onSubmit={handleUpdate}
-        />
-      )}
-
-      <ModalCrearEntidad
-        show={modalCrearShow}
-        onClose={() => setModalCrearShow(false)}
-        campos={campos}
-        onSubmit={handleCreate}
-        titulo="Crear Docente"
       />
     </>
   );

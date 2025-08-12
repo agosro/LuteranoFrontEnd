@@ -23,18 +23,18 @@ export default function TablaGenerica({
 
   // Filtrar datos
   const datosFiltrados = useMemo(() => {
-  return datos.filter((item) => {
-    const nombreCompleto = `${item.name || ""} ${item.lastName || ""}`.toLowerCase();
-    const dni = (item.dni || "").toString().toLowerCase();
-    const email = (item.email || "").toLowerCase();
-    const termino = busqueda.toLowerCase();
-    return (
-      nombreCompleto.includes(termino) ||
-      dni.includes(termino) ||
-      email.includes(termino)
-    );
-  });
-}, [datos, busqueda]);
+    return datos.filter((item) => {
+      const nombreCompleto = `${item.name || ""} ${item.lastName || ""}`.toLowerCase();
+      const dni = (item.dni || "").toString().toLowerCase();
+      const email = (item.email || "").toLowerCase();
+      const termino = busqueda.toLowerCase();
+      return (
+        nombreCompleto.includes(termino) ||
+        dni.includes(termino) ||
+        email.includes(termino)
+      );
+    });
+  }, [datos, busqueda]);
 
   // Ordenar datos
   const datosOrdenados = useMemo(() => {
@@ -68,7 +68,7 @@ export default function TablaGenerica({
   };
 
   return (
-     <div className="tabla-visual-externa"> {/* Tabla decorativa */}
+    <div className="tabla-visual-externa"> {/* Tabla decorativa */}
       <div className="container mt-4" style={{ position: "relative" }}>
         <h2>{titulo}</h2>
 
@@ -97,8 +97,9 @@ export default function TablaGenerica({
                 </td>
               </tr>
             ) : (
-              datosPaginados.map((item) => (
-                <tr key={item.id}>
+              datosPaginados.map((item, index) => (
+                <tr key={item.id || index}>
+                  {/* Si querés mostrar ID, dejalo, sino podés eliminar esta celda */}
                   <td>{item.id}</td>
                   {columnas.map((col) => (
                     <td key={col.key}>{col.render ? col.render(item) : item[col.key]}</td>
@@ -121,7 +122,7 @@ export default function TablaGenerica({
           totalPaginas={totalPaginas}
           onPaginaChange={(pagina) => setPaginaActual(pagina)}
         />
-        </div>
+      </div>
     </div>
   );
 }
