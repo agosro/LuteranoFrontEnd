@@ -1,117 +1,309 @@
 import React, { useEffect, useState } from 'react';
-import TablaGenerica from '../Components/TablaLista';
+import {
+  listarDocentes,
+  crearDocente,
+  editarDocente,
+  eliminarDocente,
+} from '../Services/DocenteService';
+import { obtenerUsuariosSinAsignarPorRol } from '../Services/UsuarioService';
+import { camposDocente } from '../Entidades/camposDocente';
 import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
 import ModalCrearEntidad from '../Components/Modals/ModalCrear';
-import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad'; // tu modal editar separado
-import { listarDocentes, crearDocente, editarDocente, eliminarDocente } from '../Services/DocenteService';
+import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad';
+import ConfirmarEliminar from '../Components/Modals/ConfirmarEliminar';
+import TablaGenerica from '../Components/TablaLista';
+import BotonCrear from '../Components/Botones/BotonCrear';
+import { toast } from 'react-toastify';
+import { useAuth } from '../Context/AuthContext';
 
-export default function Docentes() {
+export default function ListaDocentes() {
+  const { user } = useAuth();
+  const token = user?.token;
+
   const [docentes, setDocentes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [usuariosOptions, setUsuariosOptions] = useState([]);
+
+  // Estados separados para cada modal
   const [docenteSeleccionado, setDocenteSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
-  const [modalCrearShow, setModalCrearShow] = useState(false);
   const [modalEditarShow, setModalEditarShow] = useState(false);
+  const [modalCrearShow, setModalCrearShow] = useState(false);
+  const [modalEliminarShow, setModalEliminarShow] = useState(false);
 
-  useEffect(() => {
-    fetchDocentes();
-  }, []);
+  const [formData, setFormData] = useState({});
 
-  const fetchDocentes = async () => {
-    const datos = await listarDocentes();
-    setDocentes(datos);
+  // Función para extraer solo la parte YYYY-MM-DD de la fecha ISO
+  const formatearFechaISO = (fecha) => {
+    if (!fecha) return '';
+    return fecha.split('T')[0];
   };
 
-  const handleView = (docente) => {
+  useEffect(() => {
+    if (!token) return;
+
+    const cargarDatos = async () => {
+      setLoading(true);
+      try {
+        const docentesData = await listarDocentes(token);
+        const usuariosData = await obtenerUsuariosSinAsignarPorRol(token, 'ROLE_DOCENTE');
+
+        setDocentes(docentesData);
+
+        const opcionesUsuarios = (usuariosData.usuarios || []).map(u => ({
+          value: u.id,
+          label: `${u.name} ${u.lastName} (${u.email})`,
+          nombre: u.name,
+          apellido: u.lastName,
+          email: u.email,
+        }));
+        setUsuariosOptions(opcionesUsuarios);
+      } catch (error) {
+        toast.error('Error cargando datos: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarDatos();
+  }, [token]);
+
+  // Maneja cambio usuario en formData
+  const handleUsuarioChange = (usuarioId) => {
+    if (!usuarioId) {
+      setFormData(prev => ({ ...prev, usuarioId: '', nombre: '', apellido: '', email: '' }));
+      return;
+    }
+    const usuario = usuariosOptions.find(u => u.value === usuarioId);
+    if (usuario) {
+      setFormData(prev => ({
+        ...prev,
+        usuarioId: usuarioId,
+        nombre: usuario.nombre,
+        apellido: usuario.apellido,
+        email: usuario.email,
+      }));
+    }
+  };
+
+  const handleInputChange = (name, value) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Abrir modales
+
+  const abrirModalCrear = () => {
+    setDocenteSeleccionado(null);
+    setFormData({});
+    setModalCrearShow(true);
+  };
+
+  const abrirModalEditar = (docente) => {
+    setDocenteSeleccionado(docente);
+    setFormData({
+      id: docente.id,
+      usuarioId: docente.user?.id || '',
+      nombre: docente.nombre,
+      apellido: docente.apellido,
+      genero: docente.genero,
+      tipoDoc: docente.tipoDoc || '',
+      dni: docente.dni,
+      email: docente.email,
+      direccion: docente.direccion,
+      telefono: docente.telefono,
+      fechaNacimiento: formatearFechaISO(docente.fechaNacimiento),
+      fechaIngreso: formatearFechaISO(docente.fechaIngreso),
+    });
+    setModalEditarShow(true);
+  };
+
+  const abrirModalVer = (docente) => {
     setDocenteSeleccionado(docente);
     setModalVerShow(true);
   };
 
-  const handleCreate = () => {
-    setDocenteSeleccionado(null);
-    setModalCrearShow(true);
-  };
-
-  const handleEdit = (docente) => {
+  const abrirModalEliminar = (docente) => {
     setDocenteSeleccionado(docente);
-    setModalEditarShow(true);
+    setModalEliminarShow(true);
   };
 
-  const handleDelete = async (id) => {
-    await eliminarDocente(id);
-    fetchDocentes();
-  };
+  // Cerrar modales
 
-  // Guardar docente nuevo
-  const handleGuardarCrear = async (docente) => {
-    await crearDocente(docente);
+  const cerrarModalCrear = () => {
+    setFormData({});
     setModalCrearShow(false);
-    fetchDocentes();
   };
 
-  // Guardar docente editado
-  const handleGuardarEditar = async (docente) => {
-    await editarDocente(docente.id, docente);
+  const cerrarModalEditar = () => {
+    setDocenteSeleccionado(null);
+    setFormData({});
     setModalEditarShow(false);
-    fetchDocentes();
   };
 
-  const columnas = [
-    { key: 'nombre', label: 'Nombre' },
-    { key: 'apellido', label: 'Apellido' },
+  const cerrarModalVer = () => {
+    setDocenteSeleccionado(null);
+    setModalVerShow(false);
+  };
+
+  const cerrarModalEliminar = () => {
+    setDocenteSeleccionado(null);
+    setModalEliminarShow(false);
+  };
+
+  // CRUD handlers
+
+  const handleCreate = async (datos) => {
+  try {
+    const nuevoDocente = {
+      user: { id: datos.usuarioId },
+      nombre: datos.nombre,
+      apellido: datos.apellido,
+      genero: datos.genero,
+      tipoDoc: datos.tipoDoc || "DNI", // o el valor que uses por defecto si no está en formData
+      dni: datos.dni,
+      email: datos.email,
+      direccion: datos.direccion,
+      telefono: datos.telefono,
+      fechaNacimiento: datos.fechaNacimiento,
+      fechaIngreso: datos.fechaIngreso,
+      materias: [], // clave: enviamos array vacío
+    };
+    console.log('Datos que se envían para crear docente:', nuevoDocente);
+    const creadoResponse = await crearDocente(token, nuevoDocente);
+    toast.success(creadoResponse.mensaje || 'Docente creado con éxito');
+    cerrarModalCrear();
+    const docentesActualizados = await listarDocentes(token);
+    setDocentes(docentesActualizados);
+  } catch (error) {
+    toast.error(error.message || 'Error creando docente');
+    console.error(error);
+  }
+};
+
+const handleUpdate = async (datos) => {
+  if (!datos.id) {
+    toast.error('Falta el ID del docente para actualizar');
+    return;
+  }
+  try {
+    const docenteEditado = {
+      id: datos.id,
+      user: { id: datos.usuarioId },
+      nombre: datos.nombre,
+      apellido: datos.apellido,
+      genero: datos.genero,
+      tipoDoc: datos.tipoDoc || "DNI",
+      dni: datos.dni,
+      email: datos.email,
+      direccion: datos.direccion,
+      telefono: datos.telefono,
+      fechaNacimiento: datos.fechaNacimiento,
+      fechaIngreso: datos.fechaIngreso,
+    };
+    console.log('Datos para editar docente:', docenteEditado);
+    const editResponse = await editarDocente(token, docenteEditado);
+    toast.success(editResponse.mensaje || 'Docente actualizado con éxito');
+    cerrarModalEditar();
+    const docentesActualizados = await listarDocentes(token);
+    setDocentes(docentesActualizados);
+  } catch (error) {
+    toast.error(error.message || 'Error al actualizar docente');
+    console.error(error);
+  }
+};
+
+  const handleDelete = async () => {
+    if (!docenteSeleccionado) return;
+
+    try {
+      await eliminarDocente(token, docenteSeleccionado.id);
+      toast.success('Docente eliminado con éxito');
+      cerrarModalEliminar();
+      const docentesActualizados = await listarDocentes(token);
+      setDocentes(docentesActualizados);
+    } catch (error) {
+      toast.error(error.message || 'Error eliminando docente');
+    }
+  };
+
+  if (loading) return <p>Cargando docentes...</p>;
+
+  const columnasDocentes = [
+    {
+      key: 'nombreApellido',
+      label: 'Nombre y Apellido',
+      render: d => `${d.nombre} ${d.apellido}`,
+    },
     { key: 'dni', label: 'DNI' },
     { key: 'email', label: 'Email' },
     { key: 'telefono', label: 'Teléfono' },
-    { key: 'ciudad', label: 'Ciudad' },
+    {
+    key: 'materias',
+    label: 'Materias asignadas',
+    render: d => d.materias && d.materias.length > 0
+      ? d.materias.map(m => m.nombreMateria || m.nombre).join(', ')
+      : 'Sin materias asignadas',
+  }
   ];
 
-  const campos = [
-  { name: 'nombre', label: 'Nombre', type: 'text' },
-  { name: 'apellido', label: 'Apellido', type: 'text' },
-  { name: 'dni', label: 'DNI', type: 'text' },
-  { name: 'email', label: 'Email', type: 'email' },
-  { name: 'telefono', label: 'Teléfono', type: 'text' },
-  { name: 'direccion', label: 'Dirección', type: 'text' },
-  { name: 'ciudad', label: 'Ciudad', type: 'text' },
-  { name: 'materia', label: 'Materia asignada', type: 'select', opciones: ['Matemática', 'Historia', 'Lengua'] },
-];
+  // Aquí usamos la función para formatear las fechas antes de enviar a la vista
+  const docenteVistaFormateado = docenteSeleccionado
+    ? {
+        ...docenteSeleccionado,
+        fechaNacimiento: formatearFechaISO(docenteSeleccionado.fechaNacimiento),
+        fechaIngreso: formatearFechaISO(docenteSeleccionado.fechaIngreso),
+      }
+    : null;
 
   return (
     <>
       <TablaGenerica
         titulo="Lista de Docentes"
-        columnas={columnas}
+        columnas={columnasDocentes}
         datos={docentes}
-        onView={handleView}
-        onEdit={handleEdit}
-        onDelete={(d) => handleDelete(d.id)}
-        onCreate={handleCreate}
-        textoCrear="Crear docente"
-        campos={campos}
-      />
-
-      <ModalVerEntidad
-        show={modalVerShow}
-        onClose={() => setModalVerShow(false)}
-        datos={docenteSeleccionado}
-        campos={campos}
-        titulo="Detalle del Docente"
+        onView={abrirModalVer}
+        onEdit={abrirModalEditar}
+        onDelete={abrirModalEliminar}
+        botonCrear={<BotonCrear texto="Crear docente" onClick={abrirModalCrear} />}
+        placeholderBuscador="Buscar por nombre, DNI o email"
       />
 
       <ModalCrearEntidad
         show={modalCrearShow}
-        onClose={() => setModalCrearShow(false)}
-        onSubmit={handleGuardarCrear}
-        campos={campos}
+        onClose={cerrarModalCrear}
+        campos={camposDocente(usuariosOptions, false, false, !!formData.usuarioId)}
+        formData={formData}
+        onInputChange={handleInputChange}
+        onUsuarioChange={handleUsuarioChange}
+        onSubmit={handleCreate}
         titulo="Crear Docente"
       />
 
       <ModalEditarEntidad
         show={modalEditarShow}
-        onClose={() => setModalEditarShow(false)}
-        datos={docenteSeleccionado}
-        onSubmit={handleGuardarEditar}
-        campos={campos}
+        onClose={cerrarModalEditar}
+        campos={camposDocente(usuariosOptions, false, true, true)}
+        formData={formData}
+        onInputChange={handleInputChange}
+        onUsuarioChange={handleUsuarioChange}
+        onSubmit={handleUpdate}
         titulo="Editar Docente"
+      />
+
+      <ModalVerEntidad
+        show={modalVerShow}
+        onClose={cerrarModalVer}
+        datos={docenteVistaFormateado}
+        campos={camposDocente([], true)} // modoVista = true para campos solo lectura
+        titulo={`Datos del docente: ${docenteSeleccionado?.nombre} ${docenteSeleccionado?.apellido}`}
+      />
+
+      <ConfirmarEliminar
+        show={modalEliminarShow}
+        onClose={cerrarModalEliminar}
+        onConfirm={handleDelete}
+        item={docenteSeleccionado}
+        tipo="docente"
       />
     </>
   );

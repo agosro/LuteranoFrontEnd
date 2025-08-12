@@ -21,20 +21,22 @@ export async function obtenerUsuarios(token) {
 
 
 // Actualizar usuario
-export async function actualizarUsuario(token, userData) {
+export async function actualizarUsuario(token, datos) {
   const res = await fetch(`${API_URL}/user/update`, {
     method: 'PUT',
-    headers: getHeaders(token),
-    body: JSON.stringify(userData)
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(datos),
   });
 
-  const data = await res.json();
-
   if (!res.ok) {
-    throw new Error(data.mensaje || data.message || 'Error al actualizar usuario');
+    const errorData = await res.json();
+    throw new Error(errorData.mensaje || 'Error al actualizar usuario');
   }
 
-  return data;
+  return await res.json();
 }
 
 // Buscar usuario por email (ojo, este endpoint usa GET con body, poco común)
@@ -86,5 +88,35 @@ export async function registrarUsuario(token, userData) {
     throw new Error(errorMessage);
   }
 
+  return await res.json();
+}
+
+// Obtener usuarios sin asignar a Docente, Preceptor, u otro
+export async function obtenerUsuariosSinAsignar(token) {
+  const res = await fetch(`${API_URL}/user/sin-asignar`, {
+    method: 'GET',
+    headers: getHeaders(token, false),
+  });
+  if (!res.ok) throw new Error('Error al obtener usuarios sin asignar');
+  return await res.json();
+}
+
+// Obtener usuarios por rol
+export async function obtenerUsuariosPorRol(token, rol) {
+  const res = await fetch(`${API_URL}/user/rol/${rol}`, {
+    method: 'GET',
+    headers: getHeaders(token, false),
+  });
+  if (!res.ok) throw new Error(`Error al obtener usuarios por rol: ${rol}`);
+  return await res.json();
+}
+
+// Obtener usuarios sin asignar por rol
+export async function obtenerUsuariosSinAsignarPorRol(token, rol) {
+  const res = await fetch(`${API_URL}/user/sin-asignar/rol/${rol}`, {
+    method: 'GET',
+    headers: getHeaders(token, false),
+  });
+  if (!res.ok) throw new Error(`Error al obtener usuarios sin asignar por rol: ${rol}`);
   return await res.json();
 }
