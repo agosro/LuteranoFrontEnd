@@ -28,9 +28,7 @@ export const camposDocente = (usuariosOptions = [], modoVista = false, modoEdici
       type: 'select',
       opciones: [
         { value: 'DNI', label: 'DNI' },
-        { value: 'PASAPORTE', label: 'Pasaporte' },
-        { value: 'CARNET_EXTRANJERIA', label: 'Carnet de Extranjería' },
-        // agregá los que correspondan según tu enum en backend
+
       ],
       required: true,
     },

@@ -152,39 +152,42 @@ export default function ListaDocentes() {
 
   // CRUD handlers
 
-  const handleCreate = async (datos) => {
+
+const handleCreate = async (datos) => {
+  console.log('Enviar fechas:', datos.fechaNacimiento, datos.fechaIngreso);
+console.log('Tipo fechaNacimiento:', typeof datos.fechaNacimiento);
+console.log('Tipo fechaIngreso:', typeof datos.fechaIngreso);
+
   try {
     const nuevoDocente = {
       user: { id: datos.usuarioId },
       nombre: datos.nombre,
       apellido: datos.apellido,
       genero: datos.genero,
-      tipoDoc: datos.tipoDoc || "DNI", // o el valor que uses por defecto si no está en formData
+      tipoDoc: datos.tipoDoc || "DNI",
       dni: datos.dni,
       email: datos.email,
       direccion: datos.direccion,
       telefono: datos.telefono,
-      fechaNacimiento: datos.fechaNacimiento,
-      fechaIngreso: datos.fechaIngreso,
-      materias: [], // clave: enviamos array vacío
+      fechaNacimiento: new Date(datos.fechaNacimiento).toISOString(),
+      fechaIngreso: new Date(datos.fechaIngreso).toISOString(),
+      materias: [],
     };
-    console.log('Datos que se envían para crear docente:', nuevoDocente);
+
+    console.log('Payload enviado:', JSON.stringify(nuevoDocente));
+
     const creadoResponse = await crearDocente(token, nuevoDocente);
-    toast.success(creadoResponse.mensaje || 'Docente creado con éxito');
+    toast.success(creadoResponse.mensaje || "Docente creado con éxito");
     cerrarModalCrear();
     const docentesActualizados = await listarDocentes(token);
     setDocentes(docentesActualizados);
   } catch (error) {
-    toast.error(error.message || 'Error creando docente');
-    console.error(error);
+    toast.error(error.message || "Error creando docente");
+    console.error("Error al crear docente:", error);
   }
 };
 
 const handleUpdate = async (datos) => {
-  if (!datos.id) {
-    toast.error('Falta el ID del docente para actualizar');
-    return;
-  }
   try {
     const docenteEditado = {
       id: datos.id,
@@ -197,18 +200,18 @@ const handleUpdate = async (datos) => {
       email: datos.email,
       direccion: datos.direccion,
       telefono: datos.telefono,
-      fechaNacimiento: datos.fechaNacimiento,
-      fechaIngreso: datos.fechaIngreso,
+      fechaNacimiento: new Date(datos.fechaNacimiento).toISOString(),
+      fechaIngreso: new Date(datos.fechaIngreso).toISOString(),
     };
-    console.log('Datos para editar docente:', docenteEditado);
+
     const editResponse = await editarDocente(token, docenteEditado);
-    toast.success(editResponse.mensaje || 'Docente actualizado con éxito');
+    toast.success(editResponse.mensaje || "Docente actualizado con éxito");
     cerrarModalEditar();
     const docentesActualizados = await listarDocentes(token);
     setDocentes(docentesActualizados);
   } catch (error) {
-    toast.error(error.message || 'Error al actualizar docente');
-    console.error(error);
+    toast.error(error.message || "Error al actualizar docente");
+    console.error("Error al actualizar docente:", error);
   }
 };
 
