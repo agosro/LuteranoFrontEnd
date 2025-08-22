@@ -10,8 +10,17 @@ export const crearMateria = async (token, materia) => {
     },
     body: JSON.stringify(materia),
   });
-  return await response.json();
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    // Lanza un error que luego atrapará el catch en handleCreate
+    throw new Error(data.mensaje || 'Error creando materia');
+  }
+
+  return data;
 };
+
 
 // Actualizar una materia existente
 export const actualizarMateria = async (token, materia) => {

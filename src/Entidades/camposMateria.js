@@ -12,7 +12,7 @@ export const camposMateria = (soloLectura = false) => [
     type: 'text',
     placeholder: 'Ingrese el nombre',
     required: true,
-    readOnly: soloLectura,
+    disabled: soloLectura,
   },
   {
     name: 'descripcion',
@@ -20,15 +20,15 @@ export const camposMateria = (soloLectura = false) => [
     type: 'textarea',
     placeholder: 'Ingrese la descripción de la materia',
     required: true,
-    readOnly: soloLectura,
+    disabled: soloLectura,
   },
   {
     name: 'nivel',
     label: 'Nivel',
     type: 'select',
-    options: nivelesOptions,
+    opciones: nivelesOptions,
     required: true,
-    readOnly: soloLectura,
+    disabled: soloLectura,
   },
   // Si en el modal quieres seleccionar cursos, se puede agregar un multiselect aquí:
   // {

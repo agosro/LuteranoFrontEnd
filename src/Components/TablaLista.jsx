@@ -14,27 +14,25 @@ export default function TablaGenerica({
   onEdit,
   onDelete,
   botonCrear,
-  placeholderBuscador  
+  placeholderBuscador,
+  camposFiltrado = [] ,
+  extraButtons, // <-- agregar aquí
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [orden, setOrden] = useState({ columna: null, asc: true });
   const [paginaActual, setPaginaActual] = useState(1);
   const itemsPorPagina = 10;
 
-  // Filtrar datos
+  // Filtrar datos dinámicamente
   const datosFiltrados = useMemo(() => {
-    return datos.filter((item) => {
-      const nombreCompleto = `${item.name || ""} ${item.lastName || ""}`.toLowerCase();
-      const dni = (item.dni || "").toString().toLowerCase();
-      const email = (item.email || "").toLowerCase();
-      const termino = busqueda.toLowerCase();
-      return (
-        nombreCompleto.includes(termino) ||
-        dni.includes(termino) ||
-        email.includes(termino)
-      );
-    });
-  }, [datos, busqueda]);
+    const termino = busqueda.toLowerCase();
+    return datos.filter((item) =>
+      camposFiltrado.some((campo) => 
+        (item[campo]?.toString().toLowerCase() || "").includes(termino)
+      )
+    );
+  }, [datos, busqueda, camposFiltrado]);
+  
 
   // Ordenar datos
   const datosOrdenados = useMemo(() => {
@@ -109,6 +107,7 @@ export default function TablaGenerica({
                       onView={() => onView(item)}
                       onEdit={() => onEdit(item)}
                       onDelete={() => onDelete(item)}
+                      extraButtons={extraButtons ? extraButtons(item) : []} // <-- prop opcional
                     />
                   </td>
                 </tr>

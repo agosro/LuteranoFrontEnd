@@ -7,6 +7,8 @@ import ConfirmarEliminar from '../Components/Modals/ConfirmarEliminar';
 import BotonCrear from '../Components/Botones/BotonCrear';
 import { useAuth } from '../Context/AuthContext';
 import { toast } from 'react-toastify';
+import { FaUserPlus } from 'react-icons/fa';
+import ModalAsignarDocentes from '../Components/Modals/ModalAsignarDocentes';
 
 import {
   listarMaterias,
@@ -27,10 +29,29 @@ export default function ListaMaterias() {
   const [modalCrearShow, setModalCrearShow] = useState(false);
   const [mostrarModalEliminar, setMostrarModalEliminar] = useState(false);
 
+  const [modalAsignarDocentes, setModalAsignarDocentes] = useState(false);
+  const [materiaSeleccionadaAsignar, setMateriaSeleccionadaAsignar] = useState(null);
   const { user } = useAuth();
   const token = user?.token;
 
-  // Memoizamos la carga para que no se regenere en cada render
+  // Estado para crear materia
+  const [formDataCrear, setFormDataCrear] = useState({
+    nombreMateria: "",
+    descripcion: "",
+    nivel: "",
+  });
+
+  const handleInputChangeCrear = (name, value) => {
+    setFormDataCrear(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Estado para editar materia
+  const [formDataEditar, setFormDataEditar] = useState({});
+  const handleInputChangeEditar = (name, value) => {
+    setFormDataEditar(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Carga de materias
   const cargarMaterias = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -54,6 +75,7 @@ export default function ListaMaterias() {
       const creadoResponse = await crearMateria(token, nuevaMateria);
       toast.success(creadoResponse.mensaje || 'Materia creada con éxito');
       setModalCrearShow(false);
+      setFormDataCrear({ nombreMateria: "", descripcion: "", nivel: "" });
       cargarMaterias();
     } catch (error) {
       toast.error(error.message || 'Error creando materia');
@@ -100,8 +122,19 @@ export default function ListaMaterias() {
   };
 
   const handleEdit = (materia) => {
-    setMateriaSeleccionada(materia);
-    setModalEditarShow(true);
+  setMateriaSeleccionada(materia); // esto siempre tiene id
+  setFormDataEditar({ 
+    nombreMateria: materia.nombreMateria || '',
+    descripcion: materia.descripcion || '',
+    nivel: materia.nivel || ''
+  });
+  setModalEditarShow(true);
+};
+
+  // Abrir modal de asignación de docentes
+  const handleAsignarDocente = (materia) => {
+    setMateriaSeleccionadaAsignar(materia);
+    setModalAsignarDocentes(true);
   };
 
   if (loading) return <p>Cargando materias...</p>;
@@ -116,8 +149,6 @@ export default function ListaMaterias() {
     },
   ];
 
-  const campos = camposMateria();
-
   return (
     <>
       <TablaGenerica
@@ -127,8 +158,16 @@ export default function ListaMaterias() {
         onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDeleteClick}
+        camposFiltrado={['nombreMateria', 'descripcion']}
         botonCrear={<BotonCrear texto="Crear materia" onClick={() => setModalCrearShow(true)} />}
         placeholderBuscador="Buscar por nombre o descripción"
+        extraButtons={(materia) => [
+        {
+          icon: <FaUserPlus />,
+          onClick: () => handleAsignarDocente(materia),
+          title: "Asignar Docentes"
+        }
+      ]}
       />
 
       <ModalVerEntidad
@@ -147,23 +186,40 @@ export default function ListaMaterias() {
         tipo="materia"
       />
 
+      {/* Modal Editar */}
       {materiaSeleccionada && (
         <ModalEditarEntidad
           show={modalEditarShow}
           onClose={() => setModalEditarShow(false)}
-          datosIniciales={materiaSeleccionada}
-          campos={campos}
+          datosIniciales={materiaSeleccionada} // para referencias como id
+          formData={formDataEditar}             // para inputs editables
+          campos={camposMateria(false)}
+          onInputChange={handleInputChangeEditar}
           onSubmit={handleUpdate}
         />
       )}
 
+      {materiaSeleccionadaAsignar && (
+        <ModalAsignarDocentes
+          show={modalAsignarDocentes}
+          onClose={() => setModalAsignarDocentes(false)}
+          materia={materiaSeleccionadaAsignar}
+          token={token}
+          onActualizar={cargarMaterias} // se encarga de recargar la lista tras guardar
+        />
+      )}
+
+      {/* Modal Crear */}
       <ModalCrearEntidad
         show={modalCrearShow}
         onClose={() => setModalCrearShow(false)}
-        campos={campos}
+        campos={camposMateria(false)}
         onSubmit={handleCreate}
+        formData={formDataCrear}
+        onInputChange={handleInputChangeCrear}
         titulo="Crear Materia"
       />
     </>
   );
 }
+  
