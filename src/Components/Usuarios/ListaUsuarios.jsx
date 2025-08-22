@@ -264,6 +264,7 @@ export default function ListaUsuarios() {
         onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDeleteClick}
+        camposFiltrado={['nombreApellido', 'email']}
         botonCrear={<BotonCrear texto="Crear usuario" onClick={abrirModalCrear} />}
         placeholderBuscador="Buscar por nombre o email"
       />

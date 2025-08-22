@@ -267,8 +267,9 @@ const handleUpdate = async (datos) => {
         onView={abrirModalVer}
         onEdit={abrirModalEditar}
         onDelete={abrirModalEliminar}
+        camposFiltrado={['nombreApellido', 'email']}
         botonCrear={<BotonCrear texto="Crear docente" onClick={abrirModalCrear} />}
-        placeholderBuscador="Buscar por nombre, DNI o email"
+        placeholderBuscador="Buscar por nombre o email"
       />
 
       <ModalCrearEntidad

@@ -3,7 +3,7 @@ import { useAuth } from '../Context/AuthContext.jsx';
 
 import Login from '../Pages/Login.jsx';
 import Inicio from '../Pages/Inicio.jsx';
-import AlumnosLista from '../Pages/Alumnos.jsx';
+import AlumnosLista from '../Pages/AlumnosLista.jsx';
 import Docentes from '../Pages/Docentes.jsx';
 import Usuarios from '../Pages/Usuarios.jsx';
 import Materias from '../Pages/Materias.jsx';
