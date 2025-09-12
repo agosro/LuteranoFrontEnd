@@ -5,7 +5,7 @@ export default function VistaEntidad({ datos, campos }) {
 
   return (
     <div>
-      {campos.map(({ name, label, render }) => {
+      {campos.map(({ name, label, type, render }) => {
         const valor = datos[name];
 
         let contenido;
@@ -16,11 +16,18 @@ export default function VistaEntidad({ datos, campos }) {
           contenido = valor.length
             ? valor.map((item, i) => (
                 <span key={i}>
-                  {item.nombre || item} {/* mostrar el nombre si es objeto */}
+                  {item.nombre || item}
                   {i < valor.length - 1 ? ', ' : ''}
                 </span>
               ))
             : '-';
+        } else if (type === "date" && valor) {
+          // 🔥 Formatear fecha
+          contenido = new Date(valor).toLocaleDateString("es-AR", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          });
         } else {
           contenido = valor !== undefined && valor !== null ? valor : '-';
         }

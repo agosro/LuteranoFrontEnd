@@ -140,7 +140,7 @@ export default function ListaMaterias() {
   if (loading) return <p>Cargando materias...</p>;
 
   const columnasMaterias = [
-    { key: 'nombreMateria', label: 'Nombre de la materia' },
+    { key: 'nombre', label: 'Nombre de la materia' },
     { key: 'descripcion', label: 'Descripción' },
     {
       key: 'nivel',

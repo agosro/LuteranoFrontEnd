@@ -4,6 +4,7 @@ import { useAuth } from '../Context/AuthContext.jsx';
 import Login from '../Pages/Login.jsx';
 import Inicio from '../Pages/Inicio.jsx';
 import AlumnosLista from '../Pages/AlumnosLista.jsx';
+import AlumnosFiltro from '../Pages/AlumnosFiltro.jsx';
 import Docentes from '../Pages/Docentes.jsx';
 import Usuarios from '../Pages/Usuarios.jsx';
 import Materias from '../Pages/Materias.jsx';
@@ -11,7 +12,6 @@ import Cursos from '../Pages/Cursos.jsx';
 import Mesas from '../Pages/Mesas.jsx';
 import Reportes from '../Pages/Reportes.jsx';
 import EspaciosAulicos from '../Pages/EspaciosAulicos.jsx';
-
 import DashboardLayout from '../Layout/DashboardLayout.jsx';
 import PrivateRoute from './PrivateRoute';
 
@@ -38,6 +38,7 @@ function AppRoutes() {
 
         {/* Solo ADMIN puede ver lista de alumnos */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+          <Route path="alumnos" element={<AlumnosFiltro />} />
           <Route path="alumnos/lista" element={<AlumnosLista />} />
         </Route>
 

@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import './SideBar.css'
 import { useAuth } from '../../Context/AuthContext';
 import { Link } from 'react-router-dom';
@@ -11,10 +10,7 @@ export default function SidebarLayout() {
   const { user } = useAuth();
 
   const isAdmin = user?.rol === 'ROLE_ADMIN';
-  const isDocente = user?.rol === 'docente';
 
-  const [alumnosOpen, setAlumnosOpen] = useState(false);
-  const toggleAlumnos = () => setAlumnosOpen(!alumnosOpen);
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh' }}>
@@ -35,37 +31,12 @@ export default function SidebarLayout() {
               </Link>
             </li>
           )}
-          {/* Menú desplegable ALUMNOS */}
-          <li className="nav-item mb-2">
-            <button
-              onClick={toggleAlumnos}
-              className="btn btn-link nav-link text-white d-flex align-items-center w-100"
-              type="button"
-              aria-expanded={alumnosOpen}
-              style={{ gap: '0.5rem' }}
-            >
-              <span>
-                <FaUsers className="me-2" />
-                Alumnos
-              </span>
-              {alumnosOpen ? <FaCaretUp /> : <FaCaretDown />}
-            </button>
-            {alumnosOpen && (
-              <ul className="nav flex-column ms-3">
-                {isAdmin && (
-                  <li>
-                    <Link className="nav-link text-white" to="/alumnos/lista">
-                      Lista de alumnos
-                    </Link>
-                  </li>
-                )}
-                <li>
-                  <Link className="nav-link text-white" to="/alumnos/cargar">
-                    Cargar calificaciones
-                  </Link>
-                </li>
-              </ul>
-            )}
+          
+          {/* Alumnos */}
+          <li className="nav-item mb-2" >
+            <Link className="nav-link text-white" to="/alumnos">
+              <FaChalkboardTeacher className="me-2" /> Alumnos
+            </Link>
           </li>
 
           {/* Docentes */}

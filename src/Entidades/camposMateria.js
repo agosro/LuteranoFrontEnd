@@ -7,7 +7,7 @@ const nivelesOptions = [
 
 export const camposMateria = (soloLectura = false) => [
   {
-    name: 'nombreMateria',
+    name: 'nombre',
     label: 'Nombre de la materia',
     type: 'text',
     placeholder: 'Ingrese el nombre',
