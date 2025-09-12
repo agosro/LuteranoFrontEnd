@@ -54,6 +54,13 @@ export default function SidebarLayout() {
             </Link>
           </li>
 
+          {/* Cursos */}
+          <li className="nav-item mb-2" >
+            <Link className="nav-link text-white" to="/aulas">
+              <FaDoorOpen className="me-2" /> Aulas
+            </Link>
+          </li>
+
           {/* Materias */}
           <li className="nav-item mb-2" >
             <Link className="nav-link text-white" to="/materias">
