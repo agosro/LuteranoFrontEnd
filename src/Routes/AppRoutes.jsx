@@ -9,6 +9,7 @@ import Docentes from '../Pages/Docentes.jsx';
 import Usuarios from '../Pages/Usuarios.jsx';
 import Materias from '../Pages/Materias.jsx';
 import Cursos from '../Pages/Cursos.jsx';
+import Aulas from '../Pages/Aulas.jsx';
 import Mesas from '../Pages/Mesas.jsx';
 import Reportes from '../Pages/Reportes.jsx';
 import EspaciosAulicos from '../Pages/EspaciosAulicos.jsx';
@@ -53,6 +54,11 @@ function AppRoutes() {
         {/* Materias y Cursos, acceso libre */}
         <Route path="materias" element={<Materias />} />
         <Route path="cursos" element={<Cursos />} />
+
+        {/* Aulas */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+          <Route path="aulas" element={<Aulas />} />
+        </Route>
 
         {/* Mesas de examen solo ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>

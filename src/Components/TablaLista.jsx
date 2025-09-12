@@ -96,7 +96,7 @@ export default function TablaGenerica({
               </tr>
             ) : (
               datosPaginados.map((item, index) => (
-                <tr key={item.id || index}>
+                <tr key={`${item.id}-${index}`}>
                   {/* Si querés mostrar ID, dejalo, sino podés eliminar esta celda */}
                   <td>{item.id}</td>
                   {columnas.map((col) => (
