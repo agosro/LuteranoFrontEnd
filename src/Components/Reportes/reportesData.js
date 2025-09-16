@@ -1,0 +1,97 @@
+const reportes = [
+  // 📑 Reportes de Alumnos
+  {
+    id: 1,
+    titulo: "Legajo de Alumnos",
+    descripcion: "Accedé a toda la información personal y académica de cada alumno en un solo lugar.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 2,
+    titulo: "Alumnos Libres",
+    descripcion: "Identificá rápidamente qué estudiantes perdieron la regularidad y el motivo.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 3,
+    titulo: "Notas de Alumnos",
+    descripcion: "Consultá las calificaciones por materia y período, con promedios claros y comparativos.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 4,
+    titulo: "Alumnos que rinden en Diciembre y Febrero",
+    descripcion: "Revisá qué alumnos deben presentarse a mesas de examen final.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 5,
+    titulo: "Alumnos que llegan tarde regularmente",
+    descripcion: "Detectá a los alumnos con reincidencias de llegadas tarde.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 6,
+    titulo: "Alumnos con Bajo Rendimiento",
+    descripcion: "Visualizá a los estudiantes con promedios bajos que necesitan apoyo escolar.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 7,
+    titulo: "Informe Anual de Alumno",
+    descripcion: "Generá un informe completo con notas, inasistencias y conducta de todo el año.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 8,
+    titulo: "Desempeño de Alumno",
+    descripcion: "Hacé un seguimiento de la evolución académica de un alumno a lo largo de su trayectoria.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 9,
+    titulo: "Ranking de Alumnos",
+    descripcion: "Conocé quiénes son los alumnos con mejores promedios y posiciones destacadas.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 10,
+    titulo: "Alumnos con Asistencia Perfecta",
+    descripcion: "Identificá a los estudiantes que no faltaron nunca en el período.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 11,
+    titulo: "Alumnos que Recuperan Etapa",
+    descripcion: "Registrá qué alumnos aprobaron después de instancias de recuperación.",
+    categoria: "Alumnos"
+  },
+  {
+    id: 12,
+    titulo: "Inasistencia de Alumnos",
+    descripcion: "Consultá las faltas de cada alumno y detectá casos con riesgo de abandono.",
+    categoria: "Alumnos"
+  },
+
+  // 👩‍🏫 Reportes de Docentes
+  {
+    id: 13,
+    titulo: "Disponibilidad Docente",
+    descripcion: "Revisá los horarios libres de los docentes para organizar clases o mesas.",
+    categoria: "Docentes"
+  },
+  {
+    id: 14,
+    titulo: "Carga Horaria Docente",
+    descripcion: "Visualizá la cantidad de horas asignadas a cada docente.",
+    categoria: "Docentes"
+  },
+  {
+    id: 15,
+    titulo: "Desempeño Docente",
+    descripcion: "Evaluá el trabajo docente con indicadores de asistencia y compromiso.",
+    categoria: "Docentes"
+  }
+];
+
+export default reportes;
