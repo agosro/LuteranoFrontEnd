@@ -7,9 +7,11 @@ import AlumnosLista from '../Pages/AlumnosLista.jsx';
 import AlumnosFiltro from '../Pages/AlumnosFiltro.jsx';
 import Docentes from '../Pages/Docentes.jsx';
 import Usuarios from '../Pages/Usuarios.jsx';
+import Preceptores from '../Pages/Preceptores.jsx';
 import Materias from '../Pages/Materias.jsx';
 import Cursos from '../Pages/Cursos.jsx';
 import Aulas from '../Pages/Aulas.jsx';
+import Tutores from '../Pages/Tutores.jsx';
 import Mesas from '../Pages/Mesas.jsx';
 import Reportes from '../Pages/Reportes.jsx';
 import EspaciosAulicos from '../Pages/EspaciosAulicos.jsx';
@@ -58,6 +60,16 @@ function AppRoutes() {
         {/* Aulas */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="aulas" element={<Aulas />} />
+        </Route>
+
+        {/* Tutores */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+          <Route path="tutores" element={<Tutores />} />
+        </Route>
+
+        {/* Preceptores */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+          <Route path="preceptores" element={<Preceptores />} />
         </Route>
 
         {/* Mesas de examen solo ADMIN */}

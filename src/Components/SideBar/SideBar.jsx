@@ -23,7 +23,7 @@ export default function SidebarLayout() {
             </Link>
           </li>
 
-           {/* Usuarios */}
+          {/* Usuarios */}
           {isAdmin && (
             <li className="nav-item mb-2" >
               <Link className="nav-link text-white" to="/usuarios">
@@ -46,6 +46,12 @@ export default function SidebarLayout() {
             </Link>
           </li>
 
+          {/* Preceptores */}
+          <li className="nav-item mb-2" >
+            <Link className="nav-link text-white" to="/preceptores">
+              <FaChalkboardTeacher className="me-2" /> Preceptores
+            </Link>
+          </li>
 
           {/* Cursos */}
           <li className="nav-item mb-2" >
@@ -68,6 +74,15 @@ export default function SidebarLayout() {
             </Link>
           </li>
 
+          {/* Tutores */}
+          {isAdmin && (
+            <li className="nav-item mb-2" >
+              <Link className="nav-link text-white" to="/tutores">
+                <FaUsers className="me-2" /> Tutores
+              </Link>
+            </li>
+          )}
+          
           {/* Mesas de Examen */}
           {isAdmin && (
             <li className="nav-item mb-2">
