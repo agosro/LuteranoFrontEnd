@@ -14,7 +14,9 @@ import Aulas from '../Pages/Aulas.jsx';
 import Tutores from '../Pages/Tutores.jsx';
 import Mesas from '../Pages/Mesas.jsx';
 import Reportes from '../Pages/Reportes.jsx';
-import EspaciosAulicos from '../Pages/EspaciosAulicos.jsx';
+import ReservarEspacio from '../Pages/Reservar.jsx';
+import MisReservas from '../Pages/MisReservas.jsx';
+import GestionarReservas from '../Pages/GestionarReservas.jsx';
 import DashboardLayout from '../Layout/DashboardLayout.jsx';
 import PrivateRoute from './PrivateRoute';
 
@@ -82,8 +84,12 @@ function AppRoutes() {
           <Route path="reportes" element={<Reportes />} />
         </Route>
 
-        {/* Espacios Áulicos libre */}
-        <Route path="espacios-aulicos" element={<EspaciosAulicos />} />
+        {/* Espacios Áulicos */}
+        <Route path="espacios-aulicos/reservar" element={<ReservarEspacio />} />
+        <Route path="espacios-aulicos/mis-reservas" element={<MisReservas />} />
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+          <Route path="espacios-aulicos/gestionar" element={<GestionarReservas />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/inicio" />} />
