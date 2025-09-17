@@ -7,6 +7,7 @@ import {
 } from '../Services/DocenteService';
 import { obtenerUsuariosSinAsignarPorRol } from '../Services/UsuarioService';
 import { camposDocente } from '../Entidades/camposDocente';
+import { listarCursos } from '../Services/CursoService';
 import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
 import ModalCrearEntidad from '../Components/Modals/ModalCrear';
 import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad';
@@ -44,27 +45,42 @@ export default function ListaDocentes() {
     if (!token) return;
 
     const cargarDatos = async () => {
-      setLoading(true);
-      try {
-        const docentesData = await listarDocentes(token);
-        const usuariosData = await obtenerUsuariosSinAsignarPorRol(token, 'ROLE_DOCENTE');
+  setLoading(true);
+  try {
+    const [docentesData, usuariosData, cursosData] = await Promise.all([
+      listarDocentes(token),
+      obtenerUsuariosSinAsignarPorRol(token, 'ROLE_DOCENTE'),
+      listarCursos(token), // 👈 traemos cursos
+    ]);
 
-        setDocentes(docentesData);
+    // Enriquecer dictados de cada docente con nombre del curso
+    const docentesConCursos = docentesData.map(doc => {
+      const dictadosConCurso = (doc.dictados || []).map(d => {
+        const curso = cursosData.find(c => c.id === d.cursoId);
+        return {
+          ...d,
+          cursoNombre: curso ? `${curso.anio} ${curso.division}` : `Curso ${d.cursoId}`
+        };
+      });
+      return { ...doc, dictados: dictadosConCurso };
+    });
 
-        const opcionesUsuarios = (usuariosData.usuarios || []).map(u => ({
-          value: u.id,
-          label: `${u.name} ${u.lastName} (${u.email})`,
-          nombre: u.name,
-          apellido: u.lastName,
-          email: u.email,
-        }));
-        setUsuariosOptions(opcionesUsuarios);
-      } catch (error) {
-        toast.error('Error cargando datos: ' + error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+    setDocentes(docentesConCursos);
+
+    const opcionesUsuarios = (usuariosData.usuarios || []).map(u => ({
+      value: u.id,
+      label: `${u.name} ${u.lastName} (${u.email})`,
+      nombre: u.name,
+      apellido: u.lastName,
+      email: u.email,
+    }));
+    setUsuariosOptions(opcionesUsuarios);
+  } catch (error) {
+    toast.error('Error cargando datos: ' + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
     cargarDatos();
   }, [token]);
@@ -175,7 +191,6 @@ console.log('Tipo fechaIngreso:', typeof datos.fechaIngreso);
       materias: [],
     };
 
-    console.log('Payload enviado:', JSON.stringify(nuevoDocente));
 
     const creadoResponse = await crearDocente(token, nuevoDocente);
     toast.success(creadoResponse.mensaje || "Docente creado con éxito");
@@ -242,12 +257,16 @@ const handleUpdate = async (datos) => {
     { key: 'email', label: 'Email' },
     { key: 'telefono', label: 'Teléfono' },
     {
-    key: 'materias',
-    label: 'Materias asignadas',
-    render: d => d.materias && d.materias.length > 0
-      ? d.materias.map(m => m.nombreMateria || m.nombre).join(', ')
-      : 'Sin materias asignadas',
+  key: 'dictados',
+  label: 'Materias asignadas',
+  render: d => {
+    if (!d.dictados || d.dictados.length === 0) return 'Sin materias asignadas';
+
+    return d.dictados
+      .map(m => `${m.materiaNombre} (${m.cursoNombre})`)
+      .join(', ');
   }
+}
   ];
 
   // Aquí usamos la función para formatear las fechas antes de enviar a la vista

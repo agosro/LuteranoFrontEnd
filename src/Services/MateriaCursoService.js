@@ -53,6 +53,7 @@ export const listarMateriasDeCurso = async (token, cursoId) => {
     });
 
     const data = await response.json();
+ 
     if (!response.ok) throw new Error(data.mensaje || "Error al listar materias de curso");
     return Array.isArray(data.materiaCursoDtoLis) ? data.materiaCursoDtoLis : [];
   } catch (error) {

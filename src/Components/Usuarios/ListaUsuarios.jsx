@@ -189,7 +189,6 @@ export default function ListaUsuarios() {
     role: formData.role // ⚠️ Debe ser exactamente uno de los enum: "ROLE_ADMIN", etc.
   };
 
-  console.log("ENVIANDO CREAR:", datosParaEnviar);
 
   try {
     const response = await registrarUsuario(token, datosParaEnviar);
