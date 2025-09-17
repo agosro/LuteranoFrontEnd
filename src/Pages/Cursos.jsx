@@ -217,7 +217,7 @@ export default function ListaCursos() {
   const columnasCursos = [
     { key: "anioDivision", label: "Año/División", render: c => `${c.anio} ${c.division}` },
     { key: "nivel", label: "Nivel" },
-    { key: "aula", label: "Aula", render: c => c.aula?.nombre || "Sin aula" },
+    { key: "aula", label: "Aula", render: c => c.aulaNombre || "Sin aula" },
     { key: "materias", label: "Materias", render: c => c.dictados?.map(d => d.nombre).join(", ") || "Sin materias asignadas" }
   ];
 
