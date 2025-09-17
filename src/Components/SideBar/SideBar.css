@@ -1,3 +1,11 @@
+/* Sidebar con scroll solo cuando desborda */
+nav.bg-dark {
+  width: 250px;
+  margin-top: 100px;
+  height: calc(100vh - 100px); /* ocupa toda la pantalla menos el header */
+  overflow-y: auto;           /* activa scroll solo si es necesario */
+}
+
 /* Para los links normales */
 nav.bg-dark .nav-link:hover {
   background-color: #117864;
@@ -6,9 +14,39 @@ nav.bg-dark .nav-link:hover {
 }
 
 /* Para los botones (como el menú desplegable "Alumnos") */
-nav.bg-dark button.nav-link:hover {
+nav.bg-dark button.nav-link:hover,
+nav.bg-dark .btn.btn-toggle:hover {
   background-color: #117864;
   border-radius: 4px;
   color: white;
   cursor: pointer; /* que se vea clickeable */
+}
+
+/* Scrollbar minimalista (opcional) */
+nav.bg-dark::-webkit-scrollbar {
+  width: 6px;
+}
+
+nav.bg-dark::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 10px;
+}
+
+nav.bg-dark::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+.btn-toggle {
+  display: flex;
+  justify-content: space-between; /* texto a la izquierda, caret a la derecha */
+  align-items: center;            /* centra verticalmente */
+  padding: 0.375rem 0.75rem;      /* igual que nav-link */
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+}
+
+.btn-toggle:focus {
+  outline: none; /* saca borde feo */
 }

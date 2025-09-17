@@ -5,7 +5,6 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null); // { nombre, rol, token }
 
-  // Recuperar el usuario del localStorage cuando se monta la app
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
@@ -13,13 +12,16 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Al hacer login, guardar usuario en estado y en localStorage
   const login = (userData) => {
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
+    const normalizedUser = {
+      ...userData,
+      rol: userData.rol,   // dejamos "rol" tal cual viene del backend
+      token: userData.token,
+    };
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
+    setUser(normalizedUser);
   };
 
-  // Al hacer logout, limpiar estado y localStorage
   const logout = () => {
     localStorage.removeItem('user');
     setUser(null);

@@ -1,4 +1,4 @@
-import './SideBar.css'
+import './SideBar.css';
 import { useAuth } from '../../Context/AuthContext';
 import { Link } from 'react-router-dom';
 import {
@@ -9,20 +9,19 @@ import { useState } from 'react';
 
 export default function SidebarLayout() {
   const { user } = useAuth();
-  const isAdmin = user?.rol === 'ROLE_ADMIN';
+  const isAdmin = user?.rol === 'ROLE_ADMIN'; // 🔹 usamos siempre role
+  console.log("Usuario logueado:", user);
 
-  // estados para dropdowns
   const [openPersonas, setOpenPersonas] = useState(false);
   const [openAcademico, setOpenAcademico] = useState(false);
   const [openOrganizacion, setOpenOrganizacion] = useState(false);
+  const [openEspacios, setOpenEspacios] = useState(false);
   const [openConfig, setOpenConfig] = useState(false);
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh' }}>
-      {/* Sidebar */}
       <nav className="bg-dark text-white p-3 d-flex flex-column" style={{ width: '250px', marginTop: '100px' }}>
         <ul className="nav flex-column">
-
           {/* Inicio */}
           <li className="nav-item mb-2">
             <Link className="nav-link text-white" to="/inicio">
@@ -124,11 +123,41 @@ export default function SidebarLayout() {
                     <FaDoorOpen className="me-2" /> Aulas
                   </Link>
                 </li>
+
+                {/* Espacios Áulicos */}
                 <li>
-                  <Link className="nav-link text-white" to="/espacios-aulicos">
-                    <FaDoorOpen className="me-2" /> Espacios Áulicos
-                  </Link>
+                  <button
+                    className="btn btn-toggle align-items-center text-white w-100 text-start"
+                    onClick={() => setOpenEspacios(!openEspacios)}
+                  >
+                    <div className="d-flex align-items-center">
+                      <FaDoorOpen className="me-2" /> Espacios Áulicos
+                    </div>
+                    {openEspacios ? <FaCaretUp /> : <FaCaretDown />}
+                  </button>
+                  {openEspacios && (
+                    <ul className="nav flex-column ms-3 mt-2">
+                      <li>
+                        <Link className="nav-link text-white" to="/espacios-aulicos/reservar">
+                          Reservar
+                        </Link>
+                      </li>
+                      <li>
+                        <Link className="nav-link text-white" to="/espacios-aulicos/mis-reservas">
+                          Mis Reservas
+                        </Link>
+                      </li>
+                      {isAdmin && (
+                        <li>
+                          <Link className="nav-link text-white" to="/espacios-aulicos/gestionar">
+                            Gestionar
+                          </Link>
+                        </li>
+                      )}
+                    </ul>
+                  )}
                 </li>
+
                 <li>
                   <Link className="nav-link text-white" to="/asistencia-docente">
                     <FaTable className="me-2" /> Asistencia Docente
@@ -152,7 +181,7 @@ export default function SidebarLayout() {
             </li>
           )}
 
-          {/* Configuración (vacío por ahora) */}
+          {/* Configuración */}
           {isAdmin && (
             <li className="nav-item mb-2">
               <button
@@ -171,9 +200,7 @@ export default function SidebarLayout() {
         </ul>
       </nav>
 
-      {/* Contenido principal */}
-      <main className="flex-grow-1 p-3">
-      </main>
+      <main className="flex-grow-1 p-3"></main>
     </div>
   );
 }
