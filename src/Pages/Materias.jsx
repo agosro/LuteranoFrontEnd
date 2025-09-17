@@ -19,7 +19,6 @@ import {
 import { listarCursos } from '../Services/CursoService';
 import { camposMateria } from '../Entidades/camposMateria';
 
-// 🆕 imports para asignar docente
 import ModalSeleccionSimple from '../Components/Modals/ModalSeleccionSimple';
 import { listarDocentes } from '../Services/DocenteService';
 import { asignarDocente, desasignarDocente, listarCursosDeMateria } from '../Services/MateriaCursoService';
@@ -37,24 +36,21 @@ export default function ListaMaterias() {
   const { user } = useAuth();
   const token = user?.token;
 
-  // Estado para crear materia
   const [formDataCrear, setFormDataCrear] = useState({
     nombreMateria: "",
     descripcion: "",
     nivel: "",
   });
-
   const handleInputChangeCrear = (name, value) => {
     setFormDataCrear(prev => ({ ...prev, [name]: value }));
   };
 
-  // Estado para editar materia
   const [formDataEditar, setFormDataEditar] = useState({});
   const handleInputChangeEditar = (name, value) => {
     setFormDataEditar(prev => ({ ...prev, [name]: value }));
   };
 
-  // 🆕 Estado para modal de asignar docente
+  // Modal asignar docente
   const [modalAsignarDocenteShow, setModalAsignarDocenteShow] = useState(false);
   const [materiaParaAsignar, setMateriaParaAsignar] = useState(null);
 
@@ -62,81 +58,83 @@ export default function ListaMaterias() {
     setMateriaParaAsignar(materia);
     setModalAsignarDocenteShow(true);
   };
-
   const cerrarModalAsignarDocente = () => {
     setMateriaParaAsignar(null);
     setModalAsignarDocenteShow(false);
   };
 
-  // 🆕 Carga de materias con curso y docente
+  // 🆕 Cargar materias duplicadas por curso
   const cargarMaterias = useCallback(async () => {
-  if (!token) return;
-  setLoading(true);
-  try {
-    const [materiasData, cursosData] = await Promise.all([
-      listarMaterias(token),
-      listarCursos(token), // 👈 traemos todos los cursos para cruzar
-    ]);
+    if (!token) return;
+    setLoading(true);
+    try {
+      const [materiasData, cursosData] = await Promise.all([
+        listarMaterias(token),
+        listarCursos(token),
+      ]);
 
-    const materiasConCurso = await Promise.all(
-      materiasData.map(async (m) => {
-        try {
-          const cursosDeMateria = await listarCursosDeMateria(token, m.id);
+      const materiasConCurso = (
+        await Promise.all(
+          materiasData.map(async (m) => {
+            try {
+              const cursosDeMateria = await listarCursosDeMateria(token, m.id);
 
-          if (Array.isArray(cursosDeMateria) && cursosDeMateria.length > 0) {
-            const mc = cursosDeMateria[0]; // tomo el primero
-            const cursoEncontrado = cursosData.find(c => c.id === mc.cursoId);
+              if (Array.isArray(cursosDeMateria) && cursosDeMateria.length > 0) {
+                return cursosDeMateria.map((mc) => {
+                  const cursoEncontrado = cursosData.find(c => c.id === mc.cursoId);
+                  const cursoNombre = cursoEncontrado
+                    ? `${cursoEncontrado.anio} ${cursoEncontrado.division}`
+                    : `Curso ${mc.cursoId}`;
 
-            const cursoNombre = cursoEncontrado
-              ? `${cursoEncontrado.anio} ${cursoEncontrado.division}`
-              : `Curso ${mc.cursoId}`;
+                  const docenteNombre = mc.docente
+                    ? `${mc.docente.nombre} ${mc.docente.apellido}`
+                    : "Sin docente";
 
-            const docenteNombre = mc.docente
-              ? `${mc.docente.nombre} ${mc.docente.apellido}`
-              : "Sin docente";
+                  return {
+                    ...m,
+                    cursoId: mc.cursoId,
+                    cursoNombre,
+                    docente: mc.docente,
+                    docenteNombre,
+                  };
+                });
+              }
 
-            return {
-              ...m,
-              cursoId: mc.cursoId,
-              cursoNombre,
-              docente: mc.docente || null,
-              docenteNombre,
-            };
-          }
+              // sin cursos
+              return [{
+                ...m,
+                cursoId: null,
+                cursoNombre: "Sin curso",
+                docente: null,
+                docenteNombre: "Sin docente"
+              }];
+            } catch (error) {
+              console.error(`Error cargando cursos de la materia ${m.id}:`, error);
+              return [{
+                ...m,
+                cursoId: null,
+                cursoNombre: "Sin curso",
+                docente: null,
+                docenteNombre: "Sin docente"
+              }];
+            }
+          })
+        )
+      ).flat();
 
-          return { 
-            ...m, 
-            cursoId: null, 
-            cursoNombre: "Sin curso", 
-            docente: null, 
-            docenteNombre: "Sin docente" 
-          };
-        } catch (error) {
-          console.error(`Error cargando cursos de la materia ${m.id}:`, error);
-          return { 
-            ...m, 
-            cursoId: null, 
-            cursoNombre: "Sin curso", 
-            docente: null, 
-            docenteNombre: "Sin docente" 
-          };
-        }
-      })
-    );
-
-    setMaterias(materiasConCurso);
-  } catch (error) {
-    toast.error("Error cargando materias: " + error.message);
-  } finally {
-    setLoading(false);
-  }
-}, [token]);
+      setMaterias(materiasConCurso);
+    } catch (error) {
+      toast.error("Error cargando materias: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     cargarMaterias();
   }, [cargarMaterias]);
 
-  // Crear materia
+  // CRUD materias
   const handleCreate = async (nuevaMateria) => {
     try {
       const creadoResponse = await crearMateria(token, nuevaMateria);
@@ -146,11 +144,9 @@ export default function ListaMaterias() {
       cargarMaterias();
     } catch (error) {
       toast.error(error.message || 'Error creando materia');
-      console.error(error);
     }
   };
 
-  // Editar materia
   const handleUpdate = async (materiaEditada) => {
     try {
       const editResponse = await actualizarMateria(token, materiaEditada);
@@ -160,11 +156,9 @@ export default function ListaMaterias() {
       cargarMaterias();
     } catch (error) {
       toast.error(error.message || 'Error al actualizar materia');
-      console.error(error);
     }
   };
 
-  // Eliminar materia
   const handleDeleteClick = (materia) => {
     setMateriaSeleccionada(materia);
     setMostrarModalEliminar(true);
@@ -176,8 +170,8 @@ export default function ListaMaterias() {
       setMaterias(prev => prev.filter(m => m.id !== materiaSeleccionada.id));
       toast.success('Materia eliminada con éxito');
     } catch (error) {
-      toast.error('Error al eliminar materia');
       console.error(error);
+      toast.error('Error al eliminar materia');
     } finally {
       setMostrarModalEliminar(false);
     }
@@ -200,24 +194,13 @@ export default function ListaMaterias() {
 
   if (loading) return <p>Cargando materias...</p>;
 
+  // columnas ahora simples
   const columnasMaterias = [
-    { key: 'nombreMateria', label: 'Nombre de la materia' },
+    { key: 'nombreMateria', label: 'Materia' },
     { key: 'descripcion', label: 'Descripción' },
-    {
-      key: 'nivel',
-      label: 'Nivel',
-      render: (m) => m.nivel ?? 'Sin nivel',
-    },
-    {
-      key: 'curso',
-      label: 'Curso',
-      render: (m) => m.cursoNombre ?? "Sin curso",
-    },
-    {
-      key: 'docente',
-      label: 'Docente',
-      render: (m) => m.docente ? `${m.docente.nombre} ${m.docente.apellido}` : "Sin docente"
-    }
+    { key: 'nivel', label: 'Nivel', render: (m) => m.nivel ?? 'Sin nivel' },
+    { key: 'curso', label: 'Curso', render: (m) => m.cursoNombre },
+    { key: 'docente', label: 'Docente', render: (m) => m.docenteNombre }
   ];
 
   return (
@@ -229,9 +212,9 @@ export default function ListaMaterias() {
         onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDeleteClick}
-        camposFiltrado={['nombreMateria', 'descripcion']}
+        camposFiltrado={['nombreMateria', 'descripcion', 'cursoNombre', 'docenteNombre']}
         botonCrear={<BotonCrear texto="Crear materia" onClick={() => setModalCrearShow(true)} />}
-        placeholderBuscador="Buscar por nombre o descripción"
+        placeholderBuscador="Buscar por nombre, descripción o curso"
         extraButtons={(materia) => [
           {
             icon: <FaUserTie />,
@@ -257,7 +240,6 @@ export default function ListaMaterias() {
         tipo="materia"
       />
 
-      {/* Modal Editar */}
       {materiaSeleccionada && (
         <ModalEditarEntidad
           show={modalEditarShow}
@@ -270,7 +252,6 @@ export default function ListaMaterias() {
         />
       )}
 
-      {/* Modal Crear */}
       <ModalCrearEntidad
         show={modalCrearShow}
         onClose={() => setModalCrearShow(false)}
@@ -281,11 +262,11 @@ export default function ListaMaterias() {
         titulo="Crear Materia"
       />
 
-      {/* 🆕 Modal Asignar Docente */}
+      {/* Modal Asignar Docente */}
       <ModalSeleccionSimple
         show={modalAsignarDocenteShow}
         onClose={cerrarModalAsignarDocente}
-        titulo={`Asignar docente a ${materiaParaAsignar?.nombreMateria}`}
+        titulo={`Asignar docente a ${materiaParaAsignar?.nombreMateria} (${materiaParaAsignar?.cursoNombre})`}
         entidad={materiaParaAsignar}
         campoAsignado="docente"
         obtenerOpciones={async (token) => {

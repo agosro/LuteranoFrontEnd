@@ -50,7 +50,6 @@ export default function ListaAulas() {
           curso: cursosOptionsData.find(c => c.value === aula.cursoId) || null
         }));
 
-        console.log("Aulas cargadas con curso:", aulasConCurso);
         setAulas(aulasConCurso);
       } catch (error) {
         toast.error("Error cargando aulas: " + error.message);
@@ -98,7 +97,6 @@ export default function ListaAulas() {
       cursoId: datos.cursoId || null
     };
 
-    console.log("Payload crear aula:", payload);
 
     // Crear aula y obtener el objeto creado directamente
     const nuevaAula = await crearAula(token, payload);

@@ -14,7 +14,7 @@ import { listarMaterias } from "../Services/MateriaService";
 
 // 🆕 imports para asignar materias
 import ModalAsignacionGenerico from "../Components/Modals/ModalAsignar";
-import { asignarMateriasACurso, quitarMateriasDeCurso, listarMateriasDeCurso  } from "../Services/MateriaCursoService";
+import { asignarMateriasACurso, quitarMateriasDeCurso, listarMateriasDeCurso } from "../Services/MateriaCursoService";
 import { FaBook } from "react-icons/fa";
 
 export default function ListaCursos() {
@@ -36,79 +36,62 @@ export default function ListaCursos() {
 
   // 🆕 estado para el modal de asignar materias
   const [modalAsignarMateriasShow, setModalAsignarMateriasShow] = useState(false);
-  const [cursoParaAsignar, setCursoParaAsignar] = useState(null); // {id, anio, division, asignados: [{id,label}]}
+  const [cursoParaAsignar, setCursoParaAsignar] = useState(null);
 
-  // Función para mapear cursos (solo mapear dictados, aula ya viene del backend)
-  const mapCursos = (cursosData, materiasData) => {
-    const materiasMap = (materiasData || []).map(m => ({ value: m.id, label: m.nombreMateria }));
-
-    return (cursosData || []).map(curso => ({
-      ...curso,
-      dictados: (curso.dictados || []).map(d => {
-        const materia = materiasMap.find(m => m.value === d.materia?.id);
-        return { ...d, nombre: materia?.label || "Sin materia" };
-      })
-    }));
-  };
-
-  // 🆕 helper para recargar cursos (lo usamos después de asignar)
+  // helper para recargar cursos
   const recargarCursos = async () => {
-    const [cursosData, materiasData] = await Promise.all([listarCursos(token), listarMaterias(token)]);
-    setCursos(mapCursos(cursosData, materiasData));
+    const [cursosData, aulasData] = await Promise.all([
+      listarCursos(token),
+      listarAulas(token),
+      listarMaterias(token),
+    ]);
+
+    const cursosConMaterias = await Promise.all(
+      (cursosData || []).map(async (curso) => {
+        const materiasCurso = await listarMateriasDeCurso(token, curso.id);
+
+        const dictadosMapeados = materiasCurso.map(mc => ({
+          ...mc,
+          nombre: mc.materia?.nombreMateria || "Sin materia",
+        }));
+
+        const aulaMapeada = aulasData.find(a => a.id === curso.aula?.id);
+
+        return {
+          ...curso,
+          aula: aulaMapeada ? { value: aulaMapeada.id, label: aulaMapeada.nombre } : null,
+          dictados: dictadosMapeados,
+          aulaNombre: aulaMapeada?.nombre || "",
+          materiasNombres: dictadosMapeados.map(d => d.nombre).join(", ") || "",
+        };
+      })
+    );
+
+    setCursos(cursosConMaterias);
   };
 
-  // Cargar datos al montar componente
+  // cargar datos al montar componente
   useEffect(() => {
-  if (!token) return;
+    if (!token) return;
 
-  const cargarDatos = async () => {
-    setLoading(true);
-    try {
-      // Pedimos cursos, aulas y todas las materias
-      const [cursosData, aulasData, materiasData] = await Promise.all([
-        listarCursos(token),
-        listarAulas(token),
-        listarMaterias(token), // 👈 llena materiasOptions
-      ]);
+    const cargarDatos = async () => {
+      setLoading(true);
+      try {
+        await recargarCursos();
+        const aulasData = await listarAulas(token);
+        const materiasData = await listarMaterias(token);
 
-      // Guardamos aulas y materias como opciones para los formularios
-      setAulasOptions((aulasData || []).map(a => ({ value: a.id, label: a.nombre })));
-      setMateriasOptions((materiasData || []).map(m => ({ value: m.id, label: m.nombreMateria })));
+        setAulasOptions((aulasData || []).map(a => ({ value: a.id, label: a.nombre })));
+        setMateriasOptions((materiasData || []).map(m => ({ value: m.id, label: m.nombreMateria })));
+      } catch (error) {
+        toast.error("Error cargando cursos: " + error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      // Ahora completamos los cursos con las materias reales asignadas
-      const cursosConMaterias = await Promise.all(
-        (cursosData || []).map(async (curso) => {
-          const materiasCurso = await listarMateriasDeCurso(token, curso.id);
-
-          // Mapear materias de este curso
-          const dictadosMapeados = materiasCurso.map(mc => ({
-            ...mc,
-            nombre: mc.materia?.nombreMateria || "Sin materia",
-          }));
-
-          const aulaMapeada = aulasData.find(a => a.id === curso.aula?.id);
-
-          return {
-            ...curso,
-            aula: aulaMapeada ? { value: aulaMapeada.id, label: aulaMapeada.nombre } : null,
-            dictados: dictadosMapeados,
-            aulaNombre: aulaMapeada?.nombre || "",
-            materiasNombres: dictadosMapeados.map(d => d.nombre).join(", ") || "",
-          };
-        })
-      );
-
-      console.log("Lista de cursos cargada:", cursosConMaterias);
-      setCursos(cursosConMaterias);
-    } catch (error) {
-      toast.error("Error cargando cursos: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  cargarDatos();
-}, [token]);
+    cargarDatos();
+  }, [token]);
 
   const handleInputChange = (name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -119,10 +102,10 @@ export default function ListaCursos() {
     setCursoSeleccionado(curso);
     setFormData({
       id: curso.id,
-      anio: curso.anio,
+      anio: curso.anio, // ✅ ahora matchea porque las opciones son numéricas
       division: curso.division,
       nivel: curso.nivel,
-      aulaId: curso.aula?.id || "",
+      aulaId: curso.aula?.value || "",
       materias: curso.dictados?.map(d => d.materia?.id || d.value) || []
     });
     setModalEditarShow(true);
@@ -135,9 +118,8 @@ export default function ListaCursos() {
   const cerrarModalVer = () => { setCursoSeleccionado(null); setModalVerShow(false); };
   const cerrarModalEliminar = () => { setCursoSeleccionado(null); setModalEliminarShow(false); };
 
-  // 🆕 abrir/cerrar modal Asignar Materias (sin tocar los otros)
+  // abrir/cerrar modal Asignar Materias
   const abrirModalAsignarMaterias = (curso) => {
-    // adaptamos la entidad al formato que espera el modal: items con {id, label}
     const asignados = (curso.dictados || []).map(d => ({
       id: d.materia?.id,
       label: d.nombre || `Materia ${d.materia?.id || ""}`,
@@ -159,7 +141,7 @@ export default function ListaCursos() {
   const handleCreate = async (datos) => {
     try {
       const payload = {
-        anio: Number(datos.anio),
+        anio: datos.anio, // ✅ ya viene como número
         division: datos.division,
         nivel: datos.nivel,
         aulaId: datos.aulaId || null
@@ -168,9 +150,7 @@ export default function ListaCursos() {
       await crearCurso(token, payload);
       toast.success("Curso creado con éxito");
       cerrarModalCrear();
-
-      const [cursosData, materiasData] = await Promise.all([listarCursos(token), listarMaterias(token)]);
-      setCursos(mapCursos(cursosData, materiasData));
+      await recargarCursos();
     } catch (error) {
       toast.error(error.message || "Error creando curso");
     }
@@ -180,7 +160,7 @@ export default function ListaCursos() {
     try {
       const payload = {
         id: datos.id,
-        anio: Number(datos.anio),
+        anio: datos.anio, // ✅ ya viene como número
         division: datos.division,
         nivel: datos.nivel,
         aulaId: datos.aulaId || null,
@@ -190,9 +170,7 @@ export default function ListaCursos() {
       await editarCurso(token, payload);
       toast.success("Curso actualizado con éxito");
       cerrarModalEditar();
-
-      const [cursosData, materiasData] = await Promise.all([listarCursos(token), listarMaterias(token)]);
-      setCursos(mapCursos(cursosData, materiasData));
+      await recargarCursos();
     } catch (error) {
       toast.error(error.message || "Error actualizando curso");
     }
@@ -204,9 +182,7 @@ export default function ListaCursos() {
       await eliminarCurso(token, cursoSeleccionado.id);
       toast.success("Curso eliminado con éxito");
       cerrarModalEliminar();
-
-      const [cursosData, materiasData] = await Promise.all([listarCursos(token), listarMaterias(token)]);
-      setCursos(mapCursos(cursosData, materiasData));
+      await recargarCursos();
     } catch (error) {
       toast.error(error.message || "Error eliminando curso");
     }
@@ -227,13 +203,11 @@ export default function ListaCursos() {
         titulo="Lista de Cursos"
         columnas={columnasCursos}
         datos={cursos}
-        camposFiltrado={["anio", "division", "nivel", "aulaNombre", "materiasNombres"]} // prop auxiliar
+        camposFiltrado={["anio", "division", "nivel", "aulaNombre", "materiasNombres"]}
         onView={abrirModalVer}
         onEdit={abrirModalEditar}
         onDelete={abrirModalEliminar}
         botonCrear={<BotonCrear texto="Crear Curso" onClick={abrirModalCrear} />}
-
-        // 🆕 botón adicional en acciones (usa tu API extraButtons)
         extraButtons={(curso) => [
           {
             icon: <FaBook />,
@@ -279,13 +253,12 @@ export default function ListaCursos() {
         tipo="curso"
       />
 
-      {/* 🆕 Modal de asignar materias (no toca los otros modales) */}
       <ModalAsignacionGenerico
         show={modalAsignarMateriasShow}
         onClose={cerrarModalAsignarMaterias}
         titulo={`Asignar materias al curso ${cursoParaAsignar?.anio ?? ""} ${cursoParaAsignar?.division ?? ""}`}
         entidad={cursoParaAsignar}
-        campoAsignados="asignados" // usamos el array "asignados" que armamos arriba ({id,label})
+        campoAsignados="asignados"
         obtenerOpciones={async (token) => {
           const data = await listarMaterias(token);
           return data.map(m => ({ value: m.id, label: m.nombreMateria }));

@@ -10,7 +10,6 @@ import { useState } from 'react';
 export default function SidebarLayout() {
   const { user } = useAuth();
   const isAdmin = user?.rol === 'ROLE_ADMIN'; // 🔹 usamos siempre role
-  console.log("Usuario logueado:", user);
 
   const [openPersonas, setOpenPersonas] = useState(false);
   const [openAcademico, setOpenAcademico] = useState(false);

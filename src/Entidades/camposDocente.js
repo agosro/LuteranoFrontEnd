@@ -41,13 +41,20 @@ export const camposDocente = (usuariosOptions = [], modoVista = false, modoEdici
   ];
 
   const campoMateriasVista = {
-    name: 'materias',
-    label: 'Materias asignadas',
-    render: (d) =>
-      d.materias?.length
-        ? d.materias.map((m) => m.nombreMateria).join(', ')
-        : 'Sin materias asignadas',
-  };
+  name: 'dictados',
+  label: 'Materias asignadas',
+  render: (d) => {
+    if (!d.dictados || d.dictados.length === 0) return 'Sin materias asignadas';
+
+    const materiasCursos = d.dictados.map(m => {
+      const materia = m.materiaNombre || m.nombre;
+      const curso = m.cursoNombre || m.curso;
+      return `${materia} (${curso})`;
+    });
+
+    return materiasCursos.join(', ');
+  },
+};
 
   if (modoVista) return [...camposBase, campoMateriasVista];
 
