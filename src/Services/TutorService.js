@@ -13,7 +13,9 @@ export const listarTutores = async (token) => {
     });
 
     if (!response.ok) throw new Error("Error al listar tutores");
-    return await response.json();
+
+    const data = await response.json();
+    return data.tutores || []; // 👈 devolvemos siempre un array
   } catch (error) {
     console.error("Error al listar tutores:", error);
     throw error;

@@ -12,7 +12,10 @@ export const listarPreceptores = async (token) => {
     });
 
     if (!response.ok) throw new Error("Error al listar preceptores");
-    return await response.json();
+
+    const data = await response.json();
+    // 👇 aseguramos que siempre devuelva array
+    return Array.isArray(data.preceptores) ? data.preceptores : [];
   } catch (error) {
     console.error("Error al listar preceptores:", error);
     throw error;

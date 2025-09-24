@@ -46,10 +46,10 @@ export default function ListaPreceptores() {
     const cargarDatos = async () => {
       setLoading(true);
       try {
-        const preceptoresData = await listarPreceptores(token);
+        const preceptoresData = await listarPreceptores(token); // ya devuelve array
         const usuariosData = await obtenerUsuariosSinAsignarPorRol(token, "ROLE_PRECEPTOR");
 
-        setPreceptores(preceptoresData.preceptores || []);
+        setPreceptores(preceptoresData);
 
         const opcionesUsuarios = (usuariosData.usuarios || []).map((u) => ({
           value: u.id,
@@ -177,7 +177,7 @@ export default function ListaPreceptores() {
       toast.success(creadoResponse.mensaje || "Preceptor creado con éxito");
       cerrarModalCrear();
       const preceptoresActualizados = await listarPreceptores(token);
-      setPreceptores(preceptoresActualizados.preceptores || []);
+      setPreceptores(preceptoresActualizados);
     } catch (error) {
       toast.error(error.message || "Error creando preceptor");
       console.error("Error al crear preceptor:", error);
@@ -205,7 +205,7 @@ export default function ListaPreceptores() {
       toast.success(editResponse.mensaje || "Preceptor actualizado con éxito");
       cerrarModalEditar();
       const preceptoresActualizados = await listarPreceptores(token);
-      setPreceptores(preceptoresActualizados.preceptores || []);
+      setPreceptores(preceptoresActualizados);
     } catch (error) {
       toast.error(error.message || "Error al actualizar preceptor");
       console.error("Error al actualizar preceptor:", error);
@@ -220,7 +220,7 @@ export default function ListaPreceptores() {
       toast.success("Preceptor eliminado con éxito");
       cerrarModalEliminar();
       const preceptoresActualizados = await listarPreceptores(token);
-      setPreceptores(preceptoresActualizados.preceptores || []);
+      setPreceptores(preceptoresActualizados);
     } catch (error) {
       toast.error(error.message || "Error eliminando preceptor");
     }

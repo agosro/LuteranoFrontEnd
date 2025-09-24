@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../Context/AuthContext.jsx';
 
 import Login from '../Pages/Login.jsx';
@@ -34,12 +34,9 @@ function AppRoutes() {
 
   return (
     <Routes>
-
-      {/* Layout con sidebar + header + footer */}
       <Route path="/" element={<DashboardLayout />}>
         <Route index element={<Inicio />} />
         <Route path="inicio" element={<Inicio />} />
-
 
         {/* Solo ADMIN puede ver lista de alumnos */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
@@ -47,46 +44,52 @@ function AppRoutes() {
           <Route path="alumnos/lista" element={<AlumnosLista />} />
         </Route>
 
-        {/* Docentes */}
-        <Route path="docentes" element={<Docentes />} />
+        {/* Docentes -> SOLO ADMIN */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+          <Route path="docentes" element={<Docentes />} />
+        </Route>
 
-        {/* Usuarios solo ADMIN */}
+        {/* Usuarios -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="usuarios" element={<Usuarios />} />
         </Route>
 
-        {/* Materias y Cursos, acceso libre */}
-        <Route path="materias" element={<Materias />} />
-        <Route path="cursos" element={<Cursos />} />
+        {/* Materias y Cursos -> SOLO ADMIN */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+          <Route path="materias" element={<Materias />} />
+          <Route path="cursos" element={<Cursos />} />
+        </Route>
 
-        {/* Aulas */}
+        {/* Aulas -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="aulas" element={<Aulas />} />
         </Route>
 
-        {/* Tutores */}
+        {/* Tutores -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="tutores" element={<Tutores />} />
         </Route>
 
-        {/* Preceptores */}
+        {/* Preceptores -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="preceptores" element={<Preceptores />} />
         </Route>
 
-        {/* Mesas de examen solo ADMIN */}
+        {/* Mesas de examen -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="mesa-de-examen" element={<Mesas />} />
         </Route>
 
-        {/* Reportes solo ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        {/* Reportes -> ADMIN, DOCENTE, PRECEPTOR */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR']} />}>
           <Route path="reportes" element={<Reportes />} />
         </Route>
 
         {/* Espacios Áulicos */}
-        <Route path="espacios-aulicos/reservar" element={<ReservarEspacio />} />
-        <Route path="espacios-aulicos/mis-reservas" element={<MisReservas />} />
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR']} />}>
+          <Route path="espacios-aulicos/reservar" element={<ReservarEspacio />} />
+          <Route path="espacios-aulicos/mis-reservas" element={<MisReservas />} />
+        </Route>
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="espacios-aulicos/gestionar" element={<GestionarReservas />} />
         </Route>

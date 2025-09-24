@@ -1,3 +1,4 @@
+// src/Pages/ListaTutores.jsx
 import React, { useEffect, useState } from "react";
 import {
   listarTutores,
@@ -42,8 +43,8 @@ export default function ListaTutores() {
     const cargarDatos = async () => {
       setLoading(true);
       try {
-        const tutoresData = await listarTutores(token);
-        setTutores(tutoresData.tutores || []);
+        const tutoresData = await listarTutores(token); // ya devuelve array
+        setTutores(tutoresData);
       } catch (error) {
         toast.error("Error cargando tutores: " + error.message);
       } finally {
@@ -135,7 +136,7 @@ export default function ListaTutores() {
       toast.success(creadoResponse.mensaje || "Tutor creado con éxito");
       cerrarModalCrear();
       const tutoresActualizados = await listarTutores(token);
-      setTutores(tutoresActualizados.tutores || []);
+      setTutores(tutoresActualizados);
     } catch (error) {
       toast.error(error.message || "Error creando tutor");
       console.error("Error al crear tutor:", error);
@@ -162,7 +163,7 @@ export default function ListaTutores() {
       toast.success(editResponse.mensaje || "Tutor actualizado con éxito");
       cerrarModalEditar();
       const tutoresActualizados = await listarTutores(token);
-      setTutores(tutoresActualizados.tutores || []);
+      setTutores(tutoresActualizados);
     } catch (error) {
       toast.error(error.message || "Error al actualizar tutor");
       console.error("Error al actualizar tutor:", error);
@@ -177,7 +178,7 @@ export default function ListaTutores() {
       toast.success("Tutor eliminado con éxito");
       cerrarModalEliminar();
       const tutoresActualizados = await listarTutores(token);
-      setTutores(tutoresActualizados.tutores || []);
+      setTutores(tutoresActualizados);
     } catch (error) {
       toast.error(error.message || "Error eliminando tutor");
     }

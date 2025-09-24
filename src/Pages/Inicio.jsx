@@ -2,33 +2,39 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../Context/AuthContext";
 
-// 👇 importás tus services ya existentes
+// ✅ Services existentes
 import { listarAlumnos } from "../Services/AlumnoService";
 import { listarDocentes } from "../Services/DocenteService";
 import { listarCursos } from "../Services/CursoService";
+import { listarCursosPorDocente } from "../Services/CursoService"; 
+import { listarCursosPorPreceptor } from "../Services/CursoService";
 
 import "bootstrap/dist/css/bootstrap.min.css";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const role = user?.role || "ROLE_ADMIN"; 
+  const rol = user?.rol || "ROLE_ADMIN";
 
   return (
     <div className="container-fluid p-4">
       <h2 className="mb-4">Bienvenido/a, {user?.name || "Usuario"} 👋</h2>
 
-      {role === "ROLE_ADMIN" && <DashboardAdmin token={user?.token} />}
+      {rol === "ROLE_ADMIN" && <DashboardAdmin token={user?.token} />}
+      {rol === "ROLE_DOCENTE" && (
+        <DashboardDocente token={user?.token} idDocente={user?.id} />
+      )}
+      {rol === "ROLE_PRECEPTOR" && (
+        <DashboardPreceptor token={user?.token} idPreceptor={user?.id} />
+      )}
     </div>
   );
 }
 
-// 🔹 Dashboard del ADMIN conectado al backend
+//
+// 🔹 ADMIN
+//
 function DashboardAdmin({ token }) {
-  const [stats, setStats] = useState({
-    alumnos: 0,
-    docentes: 0,
-    cursos: 0,
-  });
+  const [stats, setStats] = useState({ alumnos: 0, docentes: 0, cursos: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,12 +50,11 @@ function DashboardAdmin({ token }) {
           cursos: cursos.length,
         });
       } catch (error) {
-        console.error("Error cargando dashboard:", error);
+        console.error("Error cargando dashboard Admin:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [token]);
 
@@ -71,7 +76,114 @@ function DashboardAdmin({ token }) {
   );
 }
 
-// 🔹 Reutilizables
+//
+// 🔹 DOCENTE
+//
+function DashboardDocente({ token, idDocente }) {
+  const [cursos, setCursos] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await listarCursosPorDocente(token, idDocente);
+        setCursos(data);
+      } catch (error) {
+        console.error("Error cargando dashboard Docente:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [idDocente, token]);
+
+  if (loading) return <p>Cargando datos...</p>;
+
+  return (
+    <>
+      <div className="row g-4 mb-4">
+        <Card titulo="Mis Cursos" valor={cursos.length} />
+        <Card titulo="Clases Hoy" valor="2" /> {/* ejemplo */}
+        <Card titulo="Exámenes por corregir" valor="5" /> {/* ejemplo */}
+      </div>
+      <div className="row g-4">
+        <div className="col-md-12">
+          <div className="card shadow-sm border-0">
+            <div className="card-header bg-info text-white">
+              Mis Cursos Asignados
+            </div>
+            <ul className="list-group list-group-flush">
+              {cursos.map((c, i) => (
+                <li key={i} className="list-group-item">
+                  {c.nombre} - {c.division}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+//
+// 🔹 PRECEPTOR
+//
+function DashboardPreceptor({ token, idPreceptor }) {
+  const [cursos, setCursos] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await listarCursosPorPreceptor(token, idPreceptor);
+        setCursos(data);
+      } catch (error) {
+        console.error("Error cargando dashboard Preceptor:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [idPreceptor, token]);
+
+  if (loading) return <p>Cargando datos...</p>;
+
+  const alumnosTotales = cursos.reduce(
+    (acc, c) => acc + (c.alumnos?.length || 0),
+    0
+  );
+
+  return (
+    <>
+      <div className="row g-4 mb-4">
+        <Card titulo="Cursos a cargo" valor={cursos.length} />
+        <Card titulo="Alumnos totales" valor={alumnosTotales} />
+        <Card titulo="Inasistencias hoy" valor="12" /> {/* ejemplo */}
+      </div>
+      <div className="row g-4">
+        <div className="col-md-12">
+          <div className="card shadow-sm border-0">
+            <div className="card-header bg-warning text-dark">
+              Cursos a mi cargo
+            </div>
+            <ul className="list-group list-group-flush">
+              {cursos.map((c, i) => (
+                <li key={i} className="list-group-item">
+                  {c.nombre} - {c.division} ({c.alumnos?.length || 0} alumnos)
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+//
+// 🔹 COMPONENTES REUTILIZABLES
+//
 function Card({ titulo, valor }) {
   return (
     <div className="col-md-3">
@@ -91,7 +203,6 @@ function Eventos() {
     { fecha: "2025-09-22", titulo: "Reunión Docente" },
     { fecha: "2025-09-25", titulo: "Entrega de Boletines" },
   ];
-
   return (
     <div className="col-md-6">
       <div className="card shadow-sm border-0">
@@ -116,7 +227,6 @@ function Reportes() {
     "Alumnos que llegan tarde regularmente",
     "Disponibilidad docente",
   ];
-
   return (
     <div className="col-md-6">
       <div className="card shadow-sm border-0">

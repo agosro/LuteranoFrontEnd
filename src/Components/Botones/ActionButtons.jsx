@@ -16,7 +16,7 @@ export default function ActionButtons({ onView, onEdit, onDelete, extraButtons =
        {extraButtons.map((btn, index) => (
         <button
           key={index}
-          className="btn btn-sm btn-outline-info"
+          className={`btn btn-sm ${btn.className || "btn-outline-info"}`} // 👈 ahora podés pasar className
           onClick={btn.onClick}
           title={btn.title}
         >
