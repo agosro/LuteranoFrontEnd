@@ -17,6 +17,12 @@ import ModalAsignacionGenerico from "../Components/Modals/ModalAsignar";
 import { asignarMateriasACurso, quitarMateriasDeCurso, listarMateriasDeCurso } from "../Services/MateriaCursoService";
 import { FaBook } from "react-icons/fa";
 
+// 🆕 imports para asignar preceptor
+import ModalSeleccionSimple from "../Components/Modals/ModalSeleccionSimple";
+import { listarPreceptores } from "../Services/PreceptorService";
+import { asignarPreceptorACurso, desasignarPreceptorDeCurso } from "../Services/PreceptorCursoService";
+import { FaUserTie } from "react-icons/fa";
+
 export default function ListaCursos() {
   const { user } = useAuth();
   const token = user?.token;
@@ -40,10 +46,10 @@ export default function ListaCursos() {
 
   // helper para recargar cursos
   const recargarCursos = async () => {
-    const [cursosData, aulasData] = await Promise.all([
+    const [cursosData, aulasData, preceptoresData] = await Promise.all([
       listarCursos(token),
       listarAulas(token),
-      listarMaterias(token),
+      listarPreceptores(token),
     ]);
 
     const cursosConMaterias = await Promise.all(
@@ -57,12 +63,15 @@ export default function ListaCursos() {
 
         const aulaMapeada = aulasData.find(a => a.id === curso.aula?.id);
 
+        const preceptorObj = preceptoresData.find(p => p.id === curso.preceptorId);
+
         return {
           ...curso,
           aula: aulaMapeada ? { value: aulaMapeada.id, label: aulaMapeada.nombre } : null,
           dictados: dictadosMapeados,
           aulaNombre: aulaMapeada?.nombre || "",
           materiasNombres: dictadosMapeados.map(d => d.nombre).join(", ") || "",
+          preceptor: preceptorObj || null, // 👈 guardamos el objeto
         };
       })
     );
@@ -137,6 +146,20 @@ export default function ListaCursos() {
     setModalAsignarMateriasShow(false);
   };
 
+  // 🆕 estado para el modal de asignar preceptor
+  const [modalAsignarPreceptorShow, setModalAsignarPreceptorShow] = useState(false);
+  const [cursoParaAsignarPreceptor, setCursoParaAsignarPreceptor] = useState(null);
+
+  const abrirModalAsignarPreceptor = (curso) => {
+    setCursoParaAsignarPreceptor(curso);
+    setModalAsignarPreceptorShow(true);
+  };
+
+  const cerrarModalAsignarPreceptor = () => {
+    setCursoParaAsignarPreceptor(null);
+    setModalAsignarPreceptorShow(false);
+  };
+
   // CRUD
   const handleCreate = async (datos) => {
     try {
@@ -194,7 +217,14 @@ export default function ListaCursos() {
     { key: "anioDivision", label: "Año/División", render: c => `${c.anio} ${c.division}` },
     { key: "nivel", label: "Nivel" },
     { key: "aula", label: "Aula", render: c => c.aulaNombre || "Sin aula" },
-    { key: "materias", label: "Materias", render: c => c.dictados?.map(d => d.nombre).join(", ") || "Sin materias asignadas" }
+    { key: "materias", label: "Materias", render: c => c.dictados?.map(d => d.nombre).join(", ") || "Sin materias asignadas" },
+    { 
+    key: "preceptor", 
+    label: "Preceptor", 
+    render: c => c.preceptor 
+      ? `${c.preceptor.nombre} ${c.preceptor.apellido}` 
+      : "Sin preceptor" 
+  }
   ];
 
   return (
@@ -213,6 +243,12 @@ export default function ListaCursos() {
             icon: <FaBook />,
             onClick: () => abrirModalAsignarMaterias(curso),
             title: "Asignar Materias",
+          },
+          {
+            icon: <FaUserTie />,
+            onClick: () => abrirModalAsignarPreceptor(curso),
+            title: "Asignar Preceptor",
+            className: "btn-outline-success" // verde
           }
         ]}
       />
@@ -268,6 +304,29 @@ export default function ListaCursos() {
         }
         onDesasignar={(token, materiaIds, cursoId) =>
           quitarMateriasDeCurso(token, cursoId, materiaIds)
+        }
+        token={token}
+        onActualizar={recargarCursos}
+      />
+
+      <ModalSeleccionSimple
+        show={modalAsignarPreceptorShow}
+        onClose={cerrarModalAsignarPreceptor}
+        titulo={`Asignar preceptor al curso ${cursoParaAsignarPreceptor?.anio ?? ""} ${cursoParaAsignarPreceptor?.division ?? ""}`}
+        entidad={cursoParaAsignarPreceptor}
+        campoAsignado="preceptor"
+        obtenerOpciones={async (token) => {
+          const preceptores = await listarPreceptores(token);
+          return preceptores.map(p => ({
+            value: p.id,
+            label: `${p.nombre} ${p.apellido}`,
+          }));
+        }}
+        onAsignar={(token, preceptorId, cursoId) =>
+          asignarPreceptorACurso(token, preceptorId, cursoId)
+        }
+        onDesasignar={(token, cursoId) =>
+          desasignarPreceptorDeCurso(token, cursoParaAsignarPreceptor?.preceptor?.id, cursoId)
         }
         token={token}
         onActualizar={recargarCursos}

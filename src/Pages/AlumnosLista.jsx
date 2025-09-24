@@ -9,11 +9,16 @@ import ConfirmarEliminar from "../Components/Modals/ConfirmarEliminar";
 import { camposAlumno } from "../Entidades/camposAlumno";
 import { toast } from "react-toastify";
 
+// 🆕 imports para asignar tutor
+import ModalSeleccionSimple from "../Components/Modals/ModalSeleccionSimple";
+import { listarTutores } from "../Services/TutorService";
+import { asignarTutorAAlumno, desasignarTutorDeAlumno } from "../Services/TutorAlumnoService";
+import { FaUserFriends } from "react-icons/fa";
+
 export default function ListaAlumnos() {
   const { user } = useAuth();
   const location = useLocation();
 
-  // Guardamos filtros en state para que React detecte cambios
   const filtrosIniciales = location.state?.filtros || {};
   const [filtros] = useState(filtrosIniciales);
 
@@ -26,7 +31,20 @@ export default function ListaAlumnos() {
   const [modalEliminarShow, setModalEliminarShow] = useState(false);
   const [formDataEditar, setFormDataEditar] = useState({});
 
-  // Cargar alumnos según filtros
+  // 🆕 estados para asignar tutor
+  const [modalAsignarTutorShow, setModalAsignarTutorShow] = useState(false);
+  const [alumnoParaAsignar, setAlumnoParaAsignar] = useState(null);
+
+  const abrirModalAsignarTutor = (alumno) => {
+    setAlumnoParaAsignar(alumno);
+    setModalAsignarTutorShow(true);
+  };
+  const cerrarModalAsignarTutor = () => {
+    setAlumnoParaAsignar(null);
+    setModalAsignarTutorShow(false);
+  };
+
+  // cargar alumnos
   const cargarAlumnos = async () => {
     setLoading(true);
     try {
@@ -42,9 +60,9 @@ export default function ListaAlumnos() {
 
   useEffect(() => {
     if (user?.token) cargarAlumnos();
-  }, [user, filtros]); // ✅ filtros está en el state
+  }, [user, filtros]);
 
-  // Modales
+  // editar alumno
   const abrirModalEditar = (alumno) => {
     setAlumnoSeleccionado(alumno);
     setFormDataEditar({
@@ -70,7 +88,7 @@ export default function ListaAlumnos() {
   const abrirModalEliminar = (alumno) => { setAlumnoSeleccionado(alumno); setModalEliminarShow(true); };
   const cerrarModalEliminar = () => { setAlumnoSeleccionado(null); setModalEliminarShow(false); };
 
-  // Actualizar alumno
+  // actualizar alumno
   const handleUpdate = async (datos) => {
     try {
       const editado = {
@@ -98,7 +116,7 @@ export default function ListaAlumnos() {
     }
   };
 
-  // Eliminar alumno
+  // eliminar alumno
   const handleDelete = async () => {
     if (!alumnoSeleccionado) return;
     try {
@@ -131,6 +149,14 @@ export default function ListaAlumnos() {
         onDelete={abrirModalEliminar}
         camposFiltrado={["nombre", "apellido", "dni"]}
         placeholderBuscador="Buscar por nombre o DNI"
+        // 🆕 botón extra para asignar tutor
+        extraButtons={(alumno) => [
+          {
+            icon: <FaUserFriends />,
+            onClick: () => abrirModalAsignarTutor(alumno),
+            title: "Asignar Tutor",
+          }
+        ]}
       />
 
       {alumnoSeleccionado && (
@@ -159,6 +185,27 @@ export default function ListaAlumnos() {
         onConfirm={handleDelete}
         item={alumnoSeleccionado}
         tipo="alumno"
+      />
+
+      {/* 🆕 Modal Asignar Tutor */}
+      <ModalSeleccionSimple
+        show={modalAsignarTutorShow}
+        onClose={cerrarModalAsignarTutor}
+        titulo={`Asignar tutor a ${alumnoParaAsignar?.nombre} ${alumnoParaAsignar?.apellido}`}
+        entidad={alumnoParaAsignar}
+        campoAsignado="tutor"
+        obtenerOpciones={async (token) => {
+          const lista = await listarTutores(token);
+          return lista.map(t => ({ value: t.id, label: `${t.nombre} ${t.apellido}` }));
+        }}
+        onAsignar={(token, tutorId, alumnoId) =>
+          asignarTutorAAlumno(token, tutorId, alumnoId)
+        }
+        onDesasignar={(token, alumnoId) =>
+          desasignarTutorDeAlumno(token, alumnoParaAsignar?.tutor?.id, alumnoId)
+        }
+        token={user.token}
+        onActualizar={cargarAlumnos}
       />
     </>
   );

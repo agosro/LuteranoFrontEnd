@@ -104,3 +104,43 @@ export const obtenerCursoPorId = async (token, id) => {
     throw error;
   }
 };
+
+// 🆕 📌 Listar cursos por docente
+export const listarCursosPorDocente = async (token, docenteId) => {
+  try {
+    const response = await fetch(`${API_URL}/curso/list/docente/${docenteId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) throw new Error("Error al listar cursos por docente");
+    const data = await response.json();
+    return data.cursoDtos || [];
+  } catch (error) {
+    console.error("Error al listar cursos por docente:", error);
+    throw error;
+  }
+};
+
+// 🆕 📌 Listar cursos por preceptor
+export const listarCursosPorPreceptor = async (token, preceptorId) => {
+  try {
+    const response = await fetch(`${API_URL}/curso/list/preceptor/${preceptorId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) throw new Error("Error al listar cursos por preceptor");
+    const data = await response.json();
+    return data.cursoDtos || [];
+  } catch (error) {
+    console.error("Error al listar cursos por preceptor:", error);
+    throw error;
+  }
+};
