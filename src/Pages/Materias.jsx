@@ -206,7 +206,7 @@ export default function ListaMaterias() {
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Materias"
+        titulo="Materias"
         columnas={columnasMaterias}
         datos={materias}
         onView={handleView}

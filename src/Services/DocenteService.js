@@ -84,3 +84,23 @@ export const eliminarDocente = async (token, id) => {
     throw error;
   }
 };
+
+export const obtenerDocentePorUserId = async (token, userId) => {
+  try {
+    const response = await fetch(`${API_URL}/docente/usuario/${userId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) throw new Error("Error al obtener docente por userId");
+
+    const data = await response.json();
+    return data.docente || null; // devuelve el objeto docente o null
+  } catch (error) {
+    console.error("Error en obtenerDocentePorUserId:", error);
+    throw error;
+  }
+};

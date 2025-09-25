@@ -175,7 +175,7 @@ export default function ListaAulas() {
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Aulas"
+        titulo="Aulas"
         columnas={columnasAulas}
         datos={aulas}
         onView={abrirModalVer}

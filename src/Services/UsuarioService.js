@@ -39,16 +39,27 @@ export async function actualizarUsuario(token, datos) {
   return await res.json();
 }
 
-// Buscar usuario por email (ojo, este endpoint usa GET con body, poco común)
-export async function obtenerUsuarioPorEmail(token, email) {
-  const res = await fetch(`${API_URL}/user/email`, {
-    method: 'GET',
-    headers: getHeaders(token),
-    body: JSON.stringify({ email })  // según tu backend
-  });
-  if (!res.ok) throw new Error('Error al buscar usuario');
-  return await res.json();
-}
+export const obtenerUsuarioPorEmail = async (token, email) => {
+  try {
+    const response = await fetch(`${API_URL}/user/email`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) throw new Error("Error al obtener usuario por email");
+
+    const data = await response.json();
+    console.log("Respuesta /user/email:", data); // 👈 log completo
+    return data; // 👈 devolvemos el objeto completo UserResponse
+  } catch (error) {
+    console.error("Error en obtenerUsuarioPorEmail:", error);
+    throw error;
+  }
+};
 
 // Eliminar usuario por email
 export async function eliminarUsuario(token, email) {

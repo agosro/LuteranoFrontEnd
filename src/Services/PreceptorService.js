@@ -80,3 +80,23 @@ export const eliminarPreceptor = async (id, token) => {
     throw error;
   }
 };
+
+export const obtenerPreceptorPorUserId = async (token, userId) => {
+  try {
+    const response = await fetch(`${API_URL}/preceptor/usuario/${userId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) throw new Error("Error al obtener preceptor por userId");
+
+    const data = await response.json();
+    return data.preceptor || null; // devuelve el objeto preceptor o null
+  } catch (error) {
+    console.error("Error en obtenerPreceptorPorUserId:", error);
+    throw error;
+  }
+};

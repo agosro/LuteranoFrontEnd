@@ -6,3 +6,29 @@
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     margin: 30px;
 }
+
+.btn-back {
+  background-color: #6c757d; /* gris tipo btn-secondary */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.btn-back:hover {
+  background-color: #5a6268; /* un poco más oscuro */
+  cursor: pointer;
+}
+
+.tabla-titulo {
+  margin-top: 0;       /* elimina espacio de arriba */
+  margin-bottom: 0.25rem; /* más compacto */
+}
+
+.tabla-subtitulo {
+  margin-top: 0;       /* elimina espacio innecesario */
+  margin-bottom: 1rem; /* controlás el espacio hacia abajo */
+}
+

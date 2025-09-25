@@ -208,7 +208,7 @@ export default function ListaTutores() {
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Tutores"
+        titulo="Tutores"
         columnas={columnasTutores}
         datos={tutores}
         onView={abrirModalVer}

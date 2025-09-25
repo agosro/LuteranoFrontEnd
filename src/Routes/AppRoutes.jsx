@@ -35,7 +35,6 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<DashboardLayout />}>
-        <Route index element={<Inicio />} />
         <Route path="inicio" element={<Inicio />} />
 
         {/* Solo ADMIN puede ver lista de alumnos */}

@@ -21,10 +21,10 @@ export default function Dashboard() {
 
       {rol === "ROLE_ADMIN" && <DashboardAdmin token={user?.token} />}
       {rol === "ROLE_DOCENTE" && (
-        <DashboardDocente token={user?.token} idDocente={user?.id} />
+        <DashboardDocente token={user?.token} idDocente={user?.docenteId} />
       )}
       {rol === "ROLE_PRECEPTOR" && (
-        <DashboardPreceptor token={user?.token} idPreceptor={user?.id} />
+        <DashboardPreceptor token={user?.token} idPreceptor={user?.preceptorId} />
       )}
     </div>
   );

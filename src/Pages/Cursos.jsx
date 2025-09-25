@@ -230,7 +230,7 @@ export default function ListaCursos() {
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Cursos"
+        titulo="Cursos"
         columnas={columnasCursos}
         datos={cursos}
         camposFiltrado={["anio", "division", "nivel", "aulaNombre", "materiasNombres"]}
