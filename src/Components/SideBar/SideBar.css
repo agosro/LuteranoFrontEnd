@@ -1,52 +1,60 @@
-/* Sidebar con scroll solo cuando desborda */
-nav.bg-dark {
+.sidebar {
+  min-height: 100vh;
   width: 250px;
-  margin-top: 100px;
-  height: calc(100vh - 100px); /* ocupa toda la pantalla menos el header */
-  overflow-y: auto;           /* activa scroll solo si es necesario */
 }
 
-/* Para los links normales */
-nav.bg-dark .nav-link:hover {
-  background-color: #117864;
-  border-radius: 4px; /* para que parezca recuadro */
-  color: white; /* asegurar texto visible */
+.user-header {
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  padding-bottom: 10px;
 }
 
-/* Para los botones (como el menú desplegable "Alumnos") */
-nav.bg-dark button.nav-link:hover,
-nav.bg-dark .btn.btn-toggle:hover {
-  background-color: #117864;
-  border-radius: 4px;
-  color: white;
-  cursor: pointer; /* que se vea clickeable */
+.profile-pic {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
-/* Scrollbar minimalista (opcional) */
-nav.bg-dark::-webkit-scrollbar {
-  width: 6px;
-}
-
-nav.bg-dark::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 10px;
-}
-
-nav.bg-dark::-webkit-scrollbar-thumb:hover {
-  background: #777;
-}
-
-.btn-toggle {
-  display: flex;
-  justify-content: space-between; /* texto a la izquierda, caret a la derecha */
-  align-items: center;            /* centra verticalmente */
-  padding: 0.375rem 0.75rem;      /* igual que nav-link */
+.menu-btn, .menu-link {
   background: none;
   border: none;
-  color: inherit;
-  font: inherit;
+  color: white;
+  padding: 8px 12px;
+  font-size: 15px;
+  text-decoration: none;
+  display: block;
+  transition: background 0.2s;
 }
 
-.btn-toggle:focus {
-  outline: none; /* saca borde feo */
+.menu-btn:hover, .menu-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.submenu {
+  display: flex;
+  flex-direction: column;
+}
+
+.submenu-link {
+  color: #ddd;
+  text-decoration: none;
+  padding: 5px 12px;
+  font-size: 14px;
+}
+
+.submenu-link:hover {
+  color: white;
+}
+
+.btn-logout {
+  background: none;
+  border: none;
+  color: #ff6b6b;
+}
+
+.user-role {
+  color: #27ca70; /* blanco, por ejemplo */
+  font-weight: bold;
+  font-size: 0.9rem;
 }

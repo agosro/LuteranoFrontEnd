@@ -258,7 +258,7 @@ export default function ListaPreceptores() {
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Preceptores"
+        titulo="Preceptores"
         columnas={columnasPreceptores}
         datos={preceptores}
         onView={abrirModalVer}

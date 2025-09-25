@@ -3,7 +3,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null); // { nombre, rol, token }
+  const [user, setUser] = useState(null); 
+  // user: { nombre, rol, token, userId, docenteId, preceptorId }
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -15,7 +16,7 @@ export function AuthProvider({ children }) {
   const login = (userData) => {
     const normalizedUser = {
       ...userData,
-      rol: userData.rol,   // dejamos "rol" tal cual viene del backend
+      rol: userData.rol,   
       token: userData.token,
     };
     localStorage.setItem('user', JSON.stringify(normalizedUser));

@@ -281,7 +281,7 @@ const handleUpdate = async (datos) => {
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Docentes"
+        titulo="Docentes"
         columnas={columnasDocentes}
         datos={docentes}
         onView={abrirModalVer}

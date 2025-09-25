@@ -141,7 +141,7 @@ export default function ListaAlumnos() {
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Alumnos"
+        titulo="Alumnos"
         columnas={columnasAlumnos}
         datos={alumnos}
         onView={abrirModalVer}

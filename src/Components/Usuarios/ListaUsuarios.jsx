@@ -257,7 +257,7 @@ export default function ListaUsuarios() {
   return (
     <>
       <TablaGenerica
-        titulo="Lista de Usuarios"
+        titulo="Usuarios"
         columnas={columnasUsuarios}
         datos={usuarios}
         onView={handleView}
