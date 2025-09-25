@@ -19,6 +19,7 @@ import MisReservas from '../Pages/MisReservas.jsx';
 import GestionarReservas from '../Pages/GestionarReservas.jsx';
 import DashboardLayout from '../Layout/DashboardLayout.jsx';
 import PrivateRoute from './PrivateRoute';
+import MiPerfil from '../Pages/MiPerfil.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -92,7 +93,14 @@ function AppRoutes() {
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="espacios-aulicos/gestionar" element={<GestionarReservas />} />
         </Route>
+        
+        {/* Mi perfil-> ADMIN, DOCENTE, PRECEPTOR */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR']} />}>
+          <Route path="mi-perfil" element={<MiPerfil />} />
+        </Route>
       </Route>
+
+      
 
       <Route path="*" element={<Navigate to="/inicio" />} />
     </Routes>
