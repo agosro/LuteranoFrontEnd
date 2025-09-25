@@ -23,6 +23,7 @@ export default function SidebarLayout() {
       case "ROLE_DOCENTE": return "Docente";
       case "ROLE_PRECEPTOR": return "Preceptor";
       case "ROLE_DIRECTOR": return "Director";
+      case "ROLE_TUTOR": return "Tutor";
       default: return rol.replace("ROLE_", "").toLowerCase();
     }
   };
@@ -35,7 +36,7 @@ export default function SidebarLayout() {
         <img
           src={
             user?.fotoPerfil ||
-            "https://ui-avatars.com/api/?name=" + (user?.nombre || "User")
+            "https://ui-avatars.com/api/?name=" + encodeURIComponent(`${user?.nombre || ""} ${user?.apellido || ""}`.trim())
           }
           alt="Perfil"
           className="profile-pic mb-2"
@@ -99,7 +100,7 @@ export default function SidebarLayout() {
 
       {/* 🔹 Perfil / Logout */}
       <div className="mt-auto pt-3 border-top">
-        <Link to="/perfil" className="menu-link d-flex align-items-center mb-2">
+        <Link to="/mi-perfil" className="menu-link d-flex align-items-center mb-2">
           <FaUserCircle className="me-2" /> Mi Perfil
         </Link>
         <button
