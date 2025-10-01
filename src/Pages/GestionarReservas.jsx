@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Table, Button, Badge } from "react-bootstrap";
+import { isoToDisplay } from "../utils/fechas";
 
 export default function GestionarReservas() {
   // 🔹 Datos de ejemplo (mock)
@@ -74,7 +75,7 @@ export default function GestionarReservas() {
               <tr key={reserva.id}>
                 <td>{reserva.usuario}</td>
                 <td>{reserva.espacio.nombre}</td>
-                <td>{reserva.fecha}</td>
+                <td>{isoToDisplay(reserva.fecha)}</td>
                 <td>{reserva.hora}</td>
                 <td>{renderEstado(reserva.estado)}</td>
                 <td>

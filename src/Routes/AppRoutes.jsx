@@ -20,6 +20,9 @@ import GestionarReservas from '../Pages/GestionarReservas.jsx';
 import DashboardLayout from '../Layout/DashboardLayout.jsx';
 import PrivateRoute from './PrivateRoute';
 import MiPerfil from '../Pages/MiPerfil.jsx';
+import AlumnoDetalle from '../Pages/AlumnoDetalle.jsx';
+import DocenteDetalle from '../Pages/DocenteDetalle.jsx';
+import PreceptorDetalle from '../Pages/PreceptorDetalle.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -42,11 +45,13 @@ function AppRoutes() {
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="alumnos" element={<AlumnosFiltro />} />
           <Route path="alumnos/lista" element={<AlumnosLista />} />
+          <Route path="alumnos/:id" element={<AlumnoDetalle />} />
         </Route>
 
         {/* Docentes -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="docentes" element={<Docentes />} />
+          <Route path="docentes/:id" element={<DocenteDetalle />} />
         </Route>
 
         {/* Usuarios -> SOLO ADMIN */}
@@ -73,6 +78,7 @@ function AppRoutes() {
         {/* Preceptores -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="preceptores" element={<Preceptores />} />
+          <Route path="preceptores/:id" element={<PreceptorDetalle />} />
         </Route>
 
         {/* Mesas de examen -> SOLO ADMIN */}

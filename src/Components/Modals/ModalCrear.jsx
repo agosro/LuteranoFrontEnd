@@ -1,5 +1,6 @@
 import React from "react";
 import Select from "react-select";
+import { isoToInputLocal } from "../../utils/fechas";
 
 export default function ModalCrearEntidad({
   show,
@@ -97,6 +98,17 @@ export default function ModalCrearEntidad({
                   classNamePrefix="react-select"
                   placeholder={`Seleccione ${label.toLowerCase()}...`}
                   isDisabled={disabled}
+                />
+              ) : type === "date" ? (
+                <input
+                  id={name}
+                  name={name}
+                  type="date"
+                  className="form-control"
+                  value={isoToInputLocal(formData[name])}
+                  onChange={handleChange}
+                  required={required}
+                  disabled={disabled}
                 />
               ) : (
                 <input

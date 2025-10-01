@@ -1,4 +1,5 @@
 import React from 'react';
+import { isoToDisplay } from '../utils/fechas';
 
 export default function VistaEntidad({ datos, campos }) {
   if (!datos) return <p>No hay datos para mostrar.</p>;
@@ -10,7 +11,7 @@ export default function VistaEntidad({ datos, campos }) {
 
         let contenido;
         if (render) {
-          contenido = render(datos);
+          contenido = render(valor);
         } else if (Array.isArray(valor)) {
           // Si es una lista (por ejemplo, materias)
           contenido = valor.length
@@ -23,11 +24,7 @@ export default function VistaEntidad({ datos, campos }) {
             : '-';
         } else if (type === "date" && valor) {
           // 🔥 Formatear fecha
-          contenido = new Date(valor).toLocaleDateString("es-AR", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          });
+          contenido = isoToDisplay(valor, "es-AR");
         } else {
           contenido = valor !== undefined && valor !== null ? valor : '-';
         }

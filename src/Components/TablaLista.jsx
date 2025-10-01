@@ -131,9 +131,9 @@ export default function TablaGenerica({
                     ))}
                     <td className="text-center">
                       <ActionButtons
-                        onView={() => onView(item)}
-                        onEdit={() => onEdit(item)}
-                        onDelete={() => onDelete(item)}
+                        onView={onView ? () => onView(item) : null}
+                        onEdit={onEdit ? () => onEdit(item) : null}
+                        onDelete={onDelete ? () => onDelete(item) : null}
                         extraButtons={extraButtons ? extraButtons(item) : []}
                       />
                     </td>

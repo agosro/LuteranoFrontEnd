@@ -3,19 +3,18 @@ import React, { useEffect, useState } from "react";
 import {
   listarPreceptores,
   crearPreceptor,
-  editarPreceptor,
   eliminarPreceptor,
 } from "../Services/PreceptorService";
 import { obtenerUsuariosSinAsignarPorRol } from "../Services/UsuarioService";
 import { camposPreceptor } from "../Entidades/camposPreceptor";
 import ModalVerEntidad from "../Components/Modals/ModalVerEntidad";
 import ModalCrearEntidad from "../Components/Modals/ModalCrear";
-import ModalEditarEntidad from "../Components/Modals/ModalEditarEntidad";
 import ConfirmarEliminar from "../Components/Modals/ConfirmarEliminar";
 import TablaGenerica from "../Components/TablaLista";
 import BotonCrear from "../Components/Botones/BotonCrear";
 import { toast } from "react-toastify";
 import { useAuth } from "../Context/AuthContext";
+import { inputLocalToBackendISO } from "../utils/fechas";
 
 export default function ListaPreceptores() {
   const { user } = useAuth();
@@ -28,16 +27,11 @@ export default function ListaPreceptores() {
   // Estados de modales
   const [preceptorSeleccionado, setPreceptorSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
-  const [modalEditarShow, setModalEditarShow] = useState(false);
   const [modalCrearShow, setModalCrearShow] = useState(false);
   const [modalEliminarShow, setModalEliminarShow] = useState(false);
 
   const [formData, setFormData] = useState({});
 
-  const formatearFechaISO = (fecha) => {
-    if (!fecha) return "";
-    return fecha.split("T")[0];
-  };
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -104,24 +98,7 @@ export default function ListaPreceptores() {
     setModalCrearShow(true);
   };
 
-  const abrirModalEditar = (preceptor) => {
-    setPreceptorSeleccionado(preceptor);
-    setFormData({
-      id: preceptor.id,
-      usuarioId: preceptor.user?.id || "",
-      nombre: preceptor.nombre,
-      apellido: preceptor.apellido,
-      genero: preceptor.genero,
-      tipoDoc: preceptor.tipoDoc || "DNI",
-      dni: preceptor.dni,
-      email: preceptor.email,
-      direccion: preceptor.direccion,
-      telefono: preceptor.telefono,
-      fechaNacimiento: formatearFechaISO(preceptor.fechaNacimiento),
-      fechaIngreso: formatearFechaISO(preceptor.fechaIngreso),
-    });
-    setModalEditarShow(true);
-  };
+
 
   const abrirModalVer = (preceptor) => {
     setPreceptorSeleccionado(preceptor);
@@ -139,11 +116,6 @@ export default function ListaPreceptores() {
     setModalCrearShow(false);
   };
 
-  const cerrarModalEditar = () => {
-    setPreceptorSeleccionado(null);
-    setFormData({});
-    setModalEditarShow(false);
-  };
 
   const cerrarModalVer = () => {
     setPreceptorSeleccionado(null);
@@ -168,8 +140,8 @@ export default function ListaPreceptores() {
         email: datos.email,
         direccion: datos.direccion,
         telefono: datos.telefono,
-        fechaNacimiento: new Date(datos.fechaNacimiento).toISOString(),
-        fechaIngreso: new Date(datos.fechaIngreso).toISOString(),
+        fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento),
+        fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso),
         cursos: [],
       };
 
@@ -184,34 +156,7 @@ export default function ListaPreceptores() {
     }
   };
 
-  const handleUpdate = async (datos) => {
-    try {
-      const preceptorEditado = {
-        id: datos.id,
-        user: { id: datos.usuarioId },
-        nombre: datos.nombre,
-        apellido: datos.apellido,
-        genero: datos.genero,
-        tipoDoc: datos.tipoDoc || "DNI",
-        dni: datos.dni,
-        email: datos.email,
-        direccion: datos.direccion,
-        telefono: datos.telefono,
-        fechaNacimiento: new Date(datos.fechaNacimiento).toISOString(),
-        fechaIngreso: new Date(datos.fechaIngreso).toISOString(),
-      };
-
-      const editResponse = await editarPreceptor(preceptorEditado, token);
-      toast.success(editResponse.mensaje || "Preceptor actualizado con éxito");
-      cerrarModalEditar();
-      const preceptoresActualizados = await listarPreceptores(token);
-      setPreceptores(preceptoresActualizados);
-    } catch (error) {
-      toast.error(error.message || "Error al actualizar preceptor");
-      console.error("Error al actualizar preceptor:", error);
-    }
-  };
-
+  
   const handleDelete = async () => {
     if (!preceptorSeleccionado) return;
 
@@ -247,13 +192,15 @@ export default function ListaPreceptores() {
     },
   ];
 
-  const preceptorVistaFormateado = preceptorSeleccionado
-    ? {
-        ...preceptorSeleccionado,
-        fechaNacimiento: formatearFechaISO(preceptorSeleccionado.fechaNacimiento),
-        fechaIngreso: formatearFechaISO(preceptorSeleccionado.fechaIngreso),
-      }
-    : null;
+  // Campos a mostrar en el modal de VER (vista resumida)
+  const camposPreceptorVistaModal = [
+    { name: "nombre", label: "Nombre", type: "text" },
+    { name: "apellido", label: "Apellido", type: "text" },
+    { name: "email", label: "Correo Electrónico", type: "email" },
+    { name: "telefono", label: "Teléfono", type: "text" },
+  ];
+
+  const preceptorVistaFormateado = preceptorSeleccionado || null;
 
   return (
     <>
@@ -262,7 +209,6 @@ export default function ListaPreceptores() {
         columnas={columnasPreceptores}
         datos={preceptores}
         onView={abrirModalVer}
-        onEdit={abrirModalEditar}
         onDelete={abrirModalEliminar}
         camposFiltrado={["nombreApellido", "email"]}
         botonCrear={<BotonCrear texto="Crear preceptor" onClick={abrirModalCrear} />}
@@ -280,23 +226,14 @@ export default function ListaPreceptores() {
         titulo="Crear Preceptor"
       />
 
-      <ModalEditarEntidad
-        show={modalEditarShow}
-        onClose={cerrarModalEditar}
-        campos={camposPreceptor(usuariosOptions, false, true, true)}
-        formData={formData}
-        onInputChange={handleInputChange}
-        onUsuarioChange={handleUsuarioChange}
-        onSubmit={handleUpdate}
-        titulo="Editar Preceptor"
-      />
 
       <ModalVerEntidad
         show={modalVerShow}
         onClose={cerrarModalVer}
         datos={preceptorVistaFormateado}
-        campos={camposPreceptor([], true)}
+        campos={camposPreceptorVistaModal}
         titulo={`Datos del preceptor: ${preceptorSeleccionado?.nombre} ${preceptorSeleccionado?.apellido}`}
+        detallePathBase="preceptores"
       />
 
       <ConfirmarEliminar

@@ -6,6 +6,7 @@ import { useAuth } from "../Context/AuthContext";
 import { crearAlumno } from "../Services/AlumnoService";
 import { camposAlumno } from "../Entidades/camposAlumno";
 import { toast } from "react-toastify";
+import { inputLocalToBackendISO } from "../utils/fechas";
 
 export default function FiltroAlumnosPage() {
   const { user } = useAuth();
@@ -30,8 +31,8 @@ export default function FiltroAlumnosPage() {
         email: datos.email,
         direccion: datos.direccion,
         telefono: datos.telefono,
-        fechaNacimiento: datos.fechaNacimiento ? new Date(datos.fechaNacimiento).toISOString() : undefined,
-        fechaIngreso: datos.fechaIngreso ? new Date(datos.fechaIngreso).toISOString() : undefined,
+  fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento) || undefined,
+  fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso) || undefined,
         ...(datos.tutor?.id && { tutor: { id: datos.tutor.id } }),
         ...(datos.cursoActual?.id && { cursoActual: { id: datos.cursoActual.id } }),
       };
@@ -78,7 +79,7 @@ export default function FiltroAlumnosPage() {
       <ModalCrearEntidad
         show={modalCrearShow}
         onClose={cerrarModalCrear}
-        campos={camposAlumno(false)}
+        campos={camposAlumno(false, true)}
         formData={formDataCrear}
         onInputChange={handleInputChangeCrear}
         onSubmit={handleCreate}
