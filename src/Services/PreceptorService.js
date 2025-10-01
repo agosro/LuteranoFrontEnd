@@ -43,7 +43,7 @@ export const crearPreceptor = async (preceptor, token) => {
 };
 
 // 📌 Actualizar preceptor
-export const editarPreceptor = async (preceptor, token) => {
+export const editarPreceptor = async (token, preceptor) => {
   try {
     const response = await fetch(`${API_URL}/preceptor/update`, {
       method: "PUT",

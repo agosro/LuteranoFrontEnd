@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   listarDocentes,
   crearDocente,
-  editarDocente,
   eliminarDocente,
 } from '../Services/DocenteService';
 import { obtenerUsuariosSinAsignarPorRol } from '../Services/UsuarioService';
@@ -10,12 +9,12 @@ import { camposDocente } from '../Entidades/camposDocente';
 import { listarCursos } from '../Services/CursoService';
 import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
 import ModalCrearEntidad from '../Components/Modals/ModalCrear';
-import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad';
 import ConfirmarEliminar from '../Components/Modals/ConfirmarEliminar';
 import TablaGenerica from '../Components/TablaLista';
 import BotonCrear from '../Components/Botones/BotonCrear';
 import { toast } from 'react-toastify';
 import { useAuth } from '../Context/AuthContext';
+import { inputLocalToBackendISO } from "../utils/fechas";
 
 
 export default function ListaDocentes() {
@@ -29,17 +28,11 @@ export default function ListaDocentes() {
   // Estados separados para cada modal
   const [docenteSeleccionado, setDocenteSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
-  const [modalEditarShow, setModalEditarShow] = useState(false);
   const [modalCrearShow, setModalCrearShow] = useState(false);
   const [modalEliminarShow, setModalEliminarShow] = useState(false);
 
   const [formData, setFormData] = useState({});
 
-  // Función para extraer solo la parte YYYY-MM-DD de la fecha ISO
-  const formatearFechaISO = (fecha) => {
-    if (!fecha) return '';
-    return fecha.split('T')[0];
-  };
 
   useEffect(() => {
     if (!token) return;
@@ -115,25 +108,6 @@ export default function ListaDocentes() {
     setModalCrearShow(true);
   };
 
-  const abrirModalEditar = (docente) => {
-    setDocenteSeleccionado(docente);
-    setFormData({
-      id: docente.id,
-      usuarioId: docente.user?.id || '',
-      nombre: docente.nombre,
-      apellido: docente.apellido,
-      genero: docente.genero,
-      tipoDoc: docente.tipoDoc || '',
-      dni: docente.dni,
-      email: docente.email,
-      direccion: docente.direccion,
-      telefono: docente.telefono,
-      fechaNacimiento: formatearFechaISO(docente.fechaNacimiento),
-      fechaIngreso: formatearFechaISO(docente.fechaIngreso),
-    });
-    setModalEditarShow(true);
-  };
-
   const abrirModalVer = (docente) => {
     setDocenteSeleccionado(docente);
     setModalVerShow(true);
@@ -151,11 +125,6 @@ export default function ListaDocentes() {
     setModalCrearShow(false);
   };
 
-  const cerrarModalEditar = () => {
-    setDocenteSeleccionado(null);
-    setFormData({});
-    setModalEditarShow(false);
-  };
 
   const cerrarModalVer = () => {
     setDocenteSeleccionado(null);
@@ -171,10 +140,6 @@ export default function ListaDocentes() {
 
 
 const handleCreate = async (datos) => {
-  console.log('Enviar fechas:', datos.fechaNacimiento, datos.fechaIngreso);
-console.log('Tipo fechaNacimiento:', typeof datos.fechaNacimiento);
-console.log('Tipo fechaIngreso:', typeof datos.fechaIngreso);
-
   try {
     const nuevoDocente = {
       user: { id: datos.usuarioId },
@@ -186,8 +151,8 @@ console.log('Tipo fechaIngreso:', typeof datos.fechaIngreso);
       email: datos.email,
       direccion: datos.direccion,
       telefono: datos.telefono,
-      fechaNacimiento: new Date(datos.fechaNacimiento).toISOString(),
-      fechaIngreso: new Date(datos.fechaIngreso).toISOString(),
+      fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento),
+      fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso),
       materias: [],
     };
 
@@ -203,33 +168,6 @@ console.log('Tipo fechaIngreso:', typeof datos.fechaIngreso);
   }
 };
 
-const handleUpdate = async (datos) => {
-  try {
-    const docenteEditado = {
-      id: datos.id,
-      user: { id: datos.usuarioId },
-      nombre: datos.nombre,
-      apellido: datos.apellido,
-      genero: datos.genero,
-      tipoDoc: datos.tipoDoc || "DNI",
-      dni: datos.dni,
-      email: datos.email,
-      direccion: datos.direccion,
-      telefono: datos.telefono,
-      fechaNacimiento: new Date(datos.fechaNacimiento).toISOString(),
-      fechaIngreso: new Date(datos.fechaIngreso).toISOString(),
-    };
-
-    const editResponse = await editarDocente(token, docenteEditado);
-    toast.success(editResponse.mensaje || "Docente actualizado con éxito");
-    cerrarModalEditar();
-    const docentesActualizados = await listarDocentes(token);
-    setDocentes(docentesActualizados);
-  } catch (error) {
-    toast.error(error.message || "Error al actualizar docente");
-    console.error("Error al actualizar docente:", error);
-  }
-};
 
   const handleDelete = async () => {
     if (!docenteSeleccionado) return;
@@ -269,14 +207,24 @@ const handleUpdate = async (datos) => {
 }
   ];
 
-  // Aquí usamos la función para formatear las fechas antes de enviar a la vista
-  const docenteVistaFormateado = docenteSeleccionado
-    ? {
-        ...docenteSeleccionado,
-        fechaNacimiento: formatearFechaISO(docenteSeleccionado.fechaNacimiento),
-        fechaIngreso: formatearFechaISO(docenteSeleccionado.fechaIngreso),
-      }
-    : null;
+  // En vista usamos el formateo centralizado (VistaEntidad/RenderCampos -> isoToDisplay)
+  const docenteVistaFormateado = docenteSeleccionado || null;
+
+  // Campos a mostrar en el modal de VER (vista resumida) para Docentes
+  const camposDocenteVistaModal = [
+    { name: 'nombre', label: 'Nombre', type: 'text' },
+    { name: 'apellido', label: 'Apellido', type: 'text' },
+    { name: 'email', label: 'Email', type: 'email' },
+    { name: 'telefono', label: 'Teléfono', type: 'text' },
+    {
+      name: 'dictados',
+      label: 'Materias asignadas',
+      render: (d) => {
+        if (!d?.dictados || d.dictados.length === 0) return 'Sin materias asignadas';
+        return d.dictados.map(m => `${m.materiaNombre} (${m.cursoNombre})`).join(', ');
+      },
+    },
+  ];
 
   return (
     <>
@@ -285,7 +233,6 @@ const handleUpdate = async (datos) => {
         columnas={columnasDocentes}
         datos={docentes}
         onView={abrirModalVer}
-        onEdit={abrirModalEditar}
         onDelete={abrirModalEliminar}
         camposFiltrado={['nombreApellido', 'email']}
         botonCrear={<BotonCrear texto="Crear docente" onClick={abrirModalCrear} />}
@@ -303,23 +250,13 @@ const handleUpdate = async (datos) => {
         titulo="Crear Docente"
       />
 
-      <ModalEditarEntidad
-        show={modalEditarShow}
-        onClose={cerrarModalEditar}
-        campos={camposDocente(usuariosOptions, false, true, true)}
-        formData={formData}
-        onInputChange={handleInputChange}
-        onUsuarioChange={handleUsuarioChange}
-        onSubmit={handleUpdate}
-        titulo="Editar Docente"
-      />
-
       <ModalVerEntidad
         show={modalVerShow}
         onClose={cerrarModalVer}
         datos={docenteVistaFormateado}
-        campos={camposDocente([], true)} // modoVista = true para campos solo lectura
+        campos={camposDocenteVistaModal}
         titulo={`Datos del docente: ${docenteSeleccionado?.nombre} ${docenteSeleccionado?.apellido}`}
+        detallePathBase="docentes"
       />
 
       <ConfirmarEliminar

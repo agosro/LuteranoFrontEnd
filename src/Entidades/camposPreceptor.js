@@ -1,5 +1,3 @@
-// src/Entidades/camposPreceptor.js
-
 export const camposPreceptor = (
   usuariosOptions = [],
   modoVista = false,

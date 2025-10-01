@@ -1,6 +1,7 @@
 import React from "react";
 import { Modal, Button, Form } from "react-bootstrap";
 import Select from "react-select";
+import { isoToInputLocal } from "../../utils/fechas";
 
 export default function ModalEditarEntidad({
   show,
@@ -98,6 +99,21 @@ export default function ModalEditarEntidad({
                     classNamePrefix="react-select"
                     placeholder={`Seleccione ${label.toLowerCase()}...`}
                     isDisabled={disabled}
+                  />
+                </Form.Group>
+              );
+            }
+            if (type === "date") {
+              return (
+                <Form.Group key={name} className="mb-3" controlId={name}>
+                  <Form.Label>{label}</Form.Label>
+                  <Form.Control
+                    type="date"
+                    name={name}
+                    value={isoToInputLocal(formData[name])}
+                    onChange={handleChange}
+                    required={required && name !== "password"}
+                    disabled={disabled}
                   />
                 </Form.Group>
               );

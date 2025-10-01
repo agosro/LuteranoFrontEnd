@@ -15,6 +15,7 @@ import TablaGenerica from "../Components/TablaLista";
 import BotonCrear from "../Components/Botones/BotonCrear";
 import { toast } from "react-toastify";
 import { useAuth } from "../Context/AuthContext";
+import { inputLocalToBackendISO, isoToInputLocal } from "../utils/fechas";
 
 export default function ListaTutores() {
   const { user } = useAuth();
@@ -32,10 +33,6 @@ export default function ListaTutores() {
 
   const [formData, setFormData] = useState({});
 
-  const formatearFechaISO = (fecha) => {
-    if (!fecha) return "";
-    return fecha.split("T")[0];
-  };
 
   useEffect(() => {
     if (!token) return;
@@ -78,8 +75,8 @@ export default function ListaTutores() {
       email: tutor.email,
       direccion: tutor.direccion,
       telefono: tutor.telefono,
-      fechaNacimiento: formatearFechaISO(tutor.fechaNacimiento),
-      fechaIngreso: formatearFechaISO(tutor.fechaIngreso),
+      fechaNacimiento: isoToInputLocal(tutor.fechaNacimiento),
+      fechaIngreso: isoToInputLocal(tutor.fechaIngreso),
     });
     setModalEditarShow(true);
   };
@@ -128,8 +125,8 @@ export default function ListaTutores() {
         email: datos.email,
         direccion: datos.direccion,
         telefono: datos.telefono,
-        fechaNacimiento: new Date(datos.fechaNacimiento).toISOString(),
-        fechaIngreso: new Date(datos.fechaIngreso).toISOString(),
+        fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento),
+        fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso),
       };
 
       const creadoResponse = await crearTutor(nuevoTutor, token);
@@ -155,8 +152,8 @@ export default function ListaTutores() {
         email: datos.email,
         direccion: datos.direccion,
         telefono: datos.telefono,
-        fechaNacimiento: new Date(datos.fechaNacimiento).toISOString(),
-        fechaIngreso: new Date(datos.fechaIngreso).toISOString(),
+        fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento),
+        fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso),
       };
 
       const editResponse = await editarTutor(tutorEditado, token);
@@ -197,13 +194,7 @@ export default function ListaTutores() {
     { key: "telefono", label: "Teléfono" },
   ];
 
-  const tutorVistaFormateado = tutorSeleccionado
-    ? {
-        ...tutorSeleccionado,
-        fechaNacimiento: formatearFechaISO(tutorSeleccionado.fechaNacimiento),
-        fechaIngreso: formatearFechaISO(tutorSeleccionado.fechaIngreso),
-      }
-    : null;
+  const tutorVistaFormateado = tutorSeleccionado || null;
 
   return (
     <>

@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
-import { listarAlumnosConFiltros, editarAlumno, eliminarAlumno } from "../Services/AlumnoService";
+import { listarAlumnosConFiltros, eliminarAlumno } from "../Services/AlumnoService";
 import TablaGenerica from "../Components/TablaLista";
 import ModalVerEntidad from "../Components/Modals/ModalVerEntidad";
-import ModalEditarEntidad from "../Components/Modals/ModalEditarEntidad";
 import ConfirmarEliminar from "../Components/Modals/ConfirmarEliminar";
-import { camposAlumno } from "../Entidades/camposAlumno";
 import { toast } from "react-toastify";
 
 // 🆕 imports para asignar tutor
@@ -27,9 +25,7 @@ export default function ListaAlumnos() {
 
   const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
-  const [modalEditarShow, setModalEditarShow] = useState(false);
   const [modalEliminarShow, setModalEliminarShow] = useState(false);
-  const [formDataEditar, setFormDataEditar] = useState({});
 
   // 🆕 estados para asignar tutor
   const [modalAsignarTutorShow, setModalAsignarTutorShow] = useState(false);
@@ -45,10 +41,10 @@ export default function ListaAlumnos() {
   };
 
   // cargar alumnos
-  const cargarAlumnos = async () => {
+  const cargarAlumnos = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listarAlumnosConFiltros(user.token, filtros);
+      const data = await listarAlumnosConFiltros(user?.token, filtros);
       setAlumnos(data || []);
     } catch (error) {
       toast.error("Error cargando alumnos: " + error.message);
@@ -56,65 +52,18 @@ export default function ListaAlumnos() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.token, filtros]);
 
   useEffect(() => {
     if (user?.token) cargarAlumnos();
-  }, [user, filtros]);
+  }, [user?.token, filtros, cargarAlumnos]);
 
-  // editar alumno
-  const abrirModalEditar = (alumno) => {
-    setAlumnoSeleccionado(alumno);
-    setFormDataEditar({
-      id: alumno.id,
-      nombre: alumno.nombre || "",
-      apellido: alumno.apellido || "",
-      genero: alumno.genero || "",
-      tipoDoc: alumno.tipoDoc || "",
-      dni: alumno.dni || "",
-      email: alumno.email || "",
-      direccion: alumno.direccion || "",
-      telefono: alumno.telefono || "",
-      fechaNacimiento: alumno.fechaNacimiento?.split("T")[0] || "",
-      fechaIngreso: alumno.fechaIngreso?.split("T")[0] || "",
-    });
-    setModalEditarShow(true);
-  };
-  const cerrarModalEditar = () => { setFormDataEditar({}); setAlumnoSeleccionado(null); setModalEditarShow(false); };
 
   const abrirModalVer = (alumno) => { setAlumnoSeleccionado(alumno); setModalVerShow(true); };
   const cerrarModalVer = () => { setAlumnoSeleccionado(null); setModalVerShow(false); };
 
   const abrirModalEliminar = (alumno) => { setAlumnoSeleccionado(alumno); setModalEliminarShow(true); };
   const cerrarModalEliminar = () => { setAlumnoSeleccionado(null); setModalEliminarShow(false); };
-
-  // actualizar alumno
-  const handleUpdate = async (datos) => {
-    try {
-      const editado = {
-        id: datos.id,
-        nombre: datos.nombre,
-        apellido: datos.apellido,
-        genero: datos.genero,
-        tipoDoc: datos.tipoDoc,
-        dni: datos.dni,
-        email: datos.email,
-        direccion: datos.direccion,
-        telefono: datos.telefono,
-        fechaNacimiento: datos.fechaNacimiento ? new Date(datos.fechaNacimiento).toISOString() : undefined,
-        fechaIngreso: datos.fechaIngreso ? new Date(datos.fechaIngreso).toISOString() : undefined,
-        ...(datos.tutor?.id && { tutor: { id: datos.tutor.id } }),
-        ...(datos.cursoActual?.id && { cursoActual: { id: datos.cursoActual.id } }),
-      };
-
-      await editarAlumno(user.token, editado);
-      toast.success("Alumno actualizado con éxito");
-      cerrarModalEditar();
-      cargarAlumnos();
-    } catch (error) {
-      toast.error(error.message || "Error actualizando alumno");
-    }
-  };
 
   // eliminar alumno
   const handleDelete = async () => {
@@ -138,6 +87,24 @@ export default function ListaAlumnos() {
     { key: "telefono", label: "Teléfono" },
   ];
 
+  // Campos a mostrar en el modal de VER (vista resumida) para Alumnos
+  const camposAlumnoVistaModal = [
+    { name: 'nombre', label: 'Nombre', type: 'text' },
+    { name: 'apellido', label: 'Apellido', type: 'text' },
+    { name: 'email', label: 'Email', type: 'email' },
+    { name: 'telefono', label: 'Teléfono', type: 'text' },
+    {
+      name: 'tutor',
+      label: 'Tutor',
+      render: (t) => t ? `${t.nombre} ${t.apellido}` : '-',
+    },
+    {
+      name: 'cursoActual',
+      label: 'Curso Actual',
+      render: (c) => c ? (c.nombre || `${c.anio ?? ''} ${c.division ?? ''}`.trim()) : '-',
+    },
+  ];
+
   return (
     <>
       <TablaGenerica
@@ -145,7 +112,6 @@ export default function ListaAlumnos() {
         columnas={columnasAlumnos}
         datos={alumnos}
         onView={abrirModalVer}
-        onEdit={abrirModalEditar}
         onDelete={abrirModalEliminar}
         camposFiltrado={["nombre", "apellido", "dni"]}
         placeholderBuscador="Buscar por nombre o DNI"
@@ -159,24 +125,13 @@ export default function ListaAlumnos() {
         ]}
       />
 
-      {alumnoSeleccionado && (
-        <ModalEditarEntidad
-          show={modalEditarShow}
-          onClose={cerrarModalEditar}
-          formData={formDataEditar}
-          campos={camposAlumno(false)}
-          onInputChange={(name, value) => setFormDataEditar(prev => ({ ...prev, [name]: value }))}
-          onSubmit={handleUpdate}
-          titulo="Editar Alumno"
-        />
-      )}
-
       <ModalVerEntidad
         show={modalVerShow}
         onClose={cerrarModalVer}
         datos={alumnoSeleccionado}
-        campos={camposAlumno(true)}
+        campos={camposAlumnoVistaModal}
         titulo={`Datos del alumno: ${alumnoSeleccionado?.nombre} ${alumnoSeleccionado?.apellido}`}
+        detallePathBase="alumnos"
       />
 
       <ConfirmarEliminar

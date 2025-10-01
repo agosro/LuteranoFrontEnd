@@ -1,11 +1,18 @@
-export const camposDocente = (usuariosOptions = [], modoVista = false, modoEdicion = false,  emailDisabled = false) => {
+// ✅ Entidades/camposDocente.js
+export const camposDocente = (
+  usuariosOptions = [],
+  modoVista = false,
+  modoEdicion = false,
+  emailDisabled = false,
+  incluirMateriasEnVista = true
+) => {
   const campoUsuario = {
     name: 'usuarioId',
     label: 'Usuario',
     type: 'select',
     opciones: usuariosOptions,
     required: false,
-    disabled: modoEdicion,  // deshabilita seleccionar otro usuario en edición
+    disabled: modoEdicion,
   };
 
   const camposBase = [
@@ -26,14 +33,11 @@ export const camposDocente = (usuariosOptions = [], modoVista = false, modoEdici
       name: 'tipoDoc',
       label: 'Tipo Documento',
       type: 'select',
-      opciones: [
-        { value: 'DNI', label: 'DNI' },
-
-      ],
+      opciones: [{ value: 'DNI', label: 'DNI' }],
       required: true,
     },
     { name: 'dni', label: 'DNI', type: 'text', required: true },
-    { name: 'email', label: 'Email', type: 'email', required: true, disabled: emailDisabled},
+    { name: 'email', label: 'Email', type: 'email', required: true, disabled: emailDisabled },
     { name: 'direccion', label: 'Dirección', type: 'text', required: true },
     { name: 'telefono', label: 'Teléfono', type: 'text', required: true },
     { name: 'fechaNacimiento', label: 'Fecha de Nacimiento', type: 'date', required: true },
@@ -41,22 +45,23 @@ export const camposDocente = (usuariosOptions = [], modoVista = false, modoEdici
   ];
 
   const campoMateriasVista = {
-  name: 'dictados',
-  label: 'Materias asignadas',
-  render: (d) => {
-    if (!d.dictados || d.dictados.length === 0) return 'Sin materias asignadas';
+    name: 'dictados',
+    label: 'Materias asignadas',
+    render: (d) => {
+      if (!d.dictados || d.dictados.length === 0) return 'Sin materias asignadas';
+      return d.dictados.map(m => {
+        const materia = m.materiaNombre || m.nombre;
+        const curso = m.cursoNombre || m.curso;
+        return `${materia} (${curso})`;
+      }).join(', ');
+    },
+  };
 
-    const materiasCursos = d.dictados.map(m => {
-      const materia = m.materiaNombre || m.nombre;
-      const curso = m.cursoNombre || m.curso;
-      return `${materia} (${curso})`;
-    });
+  // Solo se agrega en modo vista si lo pedimos explícitamente
+  if (modoVista) {
+    return incluirMateriasEnVista ? [...camposBase, campoMateriasVista] : camposBase;
+  }
 
-    return materiasCursos.join(', ');
-  },
-};
-
-  if (modoVista) return [...camposBase, campoMateriasVista];
-
+  // En edición/creación nunca incluimos dictados → nunca editable
   return [campoUsuario, ...camposBase];
 };

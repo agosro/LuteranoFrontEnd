@@ -1,5 +1,6 @@
 // src/Pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
+import { isoToDisplay } from "../utils/fechas";
 import { useAuth } from "../Context/AuthContext";
 
 // ✅ Services existentes
@@ -212,7 +213,7 @@ function Eventos() {
         <ul className="list-group list-group-flush">
           {eventos.map((evento, i) => (
             <li key={i} className="list-group-item">
-              <strong>{evento.fecha}</strong> - {evento.titulo}
+              <strong>{isoToDisplay(evento.fecha)}</strong> - {evento.titulo}
             </li>
           ))}
         </ul>

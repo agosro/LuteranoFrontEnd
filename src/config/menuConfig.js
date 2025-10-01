@@ -19,6 +19,7 @@ export const menuConfig = [
       { label: "Alumnos", path: "/alumnos", roles: ["ROLE_ADMIN", "ROLE_PRECEPTOR"] },
       { label: "Docentes", path: "/docentes", roles: ["ROLE_ADMIN"] },
       { label: "Tutores", path: "/tutores", roles: ["ROLE_ADMIN", "ROLE_PRECEPTOR"] },
+      { label: "Preceptores", path: "/preceptores", roles: ["ROLE_ADMIN"] },
     ],
   },
   {
