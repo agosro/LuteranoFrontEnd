@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Nav, Tab, Container, Button } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
+import Breadcrumbs from "./Botones/Breadcrumbs";
 
 export default function TablaDetalle({
   titulo,
@@ -10,6 +12,7 @@ export default function TablaDetalle({
 }) {
   const [activeKey, setActiveKey] = useState(tabs[0]?.id || "");
   const [modoEditar, setModoEditar] = useState(false);
+  const navigate = useNavigate();
 
   const handleSave = () => {
     if (onSave) onSave();
@@ -23,6 +26,11 @@ export default function TablaDetalle({
 
   return (
     <Container className="p-4 bg-white rounded shadow-sm">
+      {/* Migas de pan */}
+      <div className="mb-3">
+        <Breadcrumbs />
+      </div>
+
       {/* Encabezado */}
       <div className="d-flex justify-content-between align-items-center mb-2">
         <div>
@@ -31,6 +39,11 @@ export default function TablaDetalle({
         </div>
 
         <div>
+          {/* Botón volver atrás */}
+          <Button variant="outline-secondary" className="me-2" onClick={() => navigate(-1)}>
+            ← Volver
+          </Button>
+
           {!modoEditar ? (
             <Button variant="primary" onClick={() => setModoEditar(true)}>
               Editar
