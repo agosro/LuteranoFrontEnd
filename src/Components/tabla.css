@@ -7,6 +7,14 @@
     margin: 30px;
 }
 
+/* Sticky header suggestion */
+.table thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
 .btn-back {
   background-color: #6c757d; /* gris tipo btn-secondary */
   color: white;

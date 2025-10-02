@@ -116,3 +116,33 @@ export const listarAlumnosConFiltros = async (token, filtros) => {
     throw error;
   }
 };
+
+export const asignarCursoAlumno = async (token, request) => {
+	try {
+		const resp = await fetch(`${API_URL}/alumno/asignarCursoAlumno`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify(request),
+		});
+
+		const text = await resp.text();
+		const data = text ? JSON.parse(text) : null;
+
+		if (!resp.ok) {
+			const base = data?.mensaje || `Error ${resp.status}`;
+			// Mensaje más claro para 403
+			if (resp.status === 403) {
+				throw new Error(`${base}: no autorizado para asignar curso (403)`);
+			}
+			throw new Error(base);
+		}
+		// Backend respondió AlumnoResponse
+		return data; // { code, mensaje, alumnoDto? }
+	} catch (error) {
+		console.error('Error al asignar curso a alumno:', error);
+		throw error;
+	}
+};

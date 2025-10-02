@@ -1,5 +1,4 @@
 import ActionButtons from "../Components/Botones/ActionButtons";
-import Buscador from "./Botones/Buscador";
 import ExportarCSV from "./Botones/ExportarCSV";
 import Paginacion from "./Botones/Paginacion";
 import OrdenableHeader from "./Botones/OrdenarColumnas";
@@ -17,53 +16,39 @@ export default function TablaGenerica({
   onEdit,
   onDelete,
   botonCrear,
-  placeholderBuscador,
-  camposFiltrado = [] ,
   extraButtons,
+  loading = false,
 }) {
-  const [busqueda, setBusqueda] = useState("");
-  const [orden, setOrden] = useState({ columna: null, asc: true });
+  // filtros por columna
+  const [filtrosColumnas, setFiltrosColumnas] = useState(() => (
+    columnas.reduce((acc, c) => ({ ...acc, [c.key]: "" }), { id: "" })
+  ));
   const [paginaActual, setPaginaActual] = useState(1);
-  const itemsPorPagina = 10;
+  const [itemsPorPagina, setItemsPorPagina] = useState(10);
 
-  // Filtrar datos
+  // Filtrar datos (solo filtros por columna)
   const datosFiltrados = useMemo(() => {
-    const termino = busqueda.toLowerCase();
-    return datos.filter((item) =>
-      camposFiltrado.some((campo) => 
-        (item[campo]?.toString().toLowerCase() || "").includes(termino)
-      )
-    );
-  }, [datos, busqueda, camposFiltrado]);
-
-  // Ordenar datos
-  const datosOrdenados = useMemo(() => {
-    if (!orden.columna) return datosFiltrados;
-    return [...datosFiltrados].sort((a, b) => {
-      const valA = a[orden.columna];
-      const valB = b[orden.columna];
-      if (valA == null) return 1;
-      if (valB == null) return -1;
-      if (typeof valA === "string") {
-        return orden.asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    return datos.filter((item) => {
+      // filtros por columna (AND)
+      for (const [k, fv] of Object.entries(filtrosColumnas)) {
+        if (!fv) continue;
+        const val = (k === 'id' ? item.id : item[k]);
+        const txt = (val ?? '').toString().toLowerCase();
+        if (!txt.includes(fv.toLowerCase())) return false;
       }
-      return orden.asc ? valA - valB : valB - valA;
+      return true;
     });
-  }, [datosFiltrados, orden]);
+  }, [datos, filtrosColumnas]);
 
   // Paginación
-  const totalPaginas = Math.ceil(datosOrdenados.length / itemsPorPagina);
-  const datosPaginados = datosOrdenados.slice(
+  const totalPaginas = Math.ceil(datosFiltrados.length / itemsPorPagina);
+  const datosPaginados = datosFiltrados.slice(
     (paginaActual - 1) * itemsPorPagina,
     paginaActual * itemsPorPagina
   );
 
-  const handleOrdenar = (key) => {
-    if (orden.columna === key) {
-      setOrden({ columna: key, asc: !orden.asc });
-    } else {
-      setOrden({ columna: key, asc: true });
-    }
+  const handleFiltroColumna = (key, value) => {
+    setFiltrosColumnas((prev) => ({ ...prev, [key]: value }));
     setPaginaActual(1);
   };
 
@@ -90,66 +75,126 @@ export default function TablaGenerica({
       {/* 🔹 Card de tabla */}
       <div className="tabla-visual-externa">
         
-        {/* Buscador y botones */}
+        {/* Controles superiores */}
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <div style={{ width: "300px" }}>
-            <Buscador valor={busqueda} onCambio={setBusqueda} placeholder={placeholderBuscador} />
-          </div>
+          <div />
 
           <div className="d-flex gap-2 align-items-center">
+            <div className="d-flex align-items-center me-2">
+              <span className="me-2 text-muted">Mostrar</span>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 80 }}
+                value={itemsPorPagina}
+                onChange={(e) => {
+                  setItemsPorPagina(Number(e.target.value));
+                  setPaginaActual(1);
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
             {botonCrear}
             <ExportarCSV 
-              datos={datosOrdenados} 
+              datos={datosFiltrados} 
               columnas={columnas} 
               nombreArchivo={`${titulo}.csv`} 
             />
           </div>
         </div>
 
-        {/* Tabla responsiva */}
-        <div className="table-responsive">
-          <table className="table table-bordered table-hover">
-            <thead>
-              <tr>
-                <OrdenableHeader columnas={columnas} orden={orden} onOrdenar={handleOrdenar} />
-              </tr>
-            </thead>
-            <tbody>
-              {datosPaginados.length === 0 ? (
-                <tr>
-                  <td colSpan={columnas.length + 2} className="text-center text-muted p-4">
-                    <FaInbox size={32} className="mb-2" />
-                    <div>No se encontraron registros de {titulo.toLowerCase()}.</div>
-                  </td>
-                </tr>
-              ) : (
-                datosPaginados.map((item, index) => (
-                  <tr key={`${item.id}-${index}`}>
-                    <td>{item.id}</td>
-                    {columnas.map((col) => (
-                      <td key={col.key}>{col.render ? col.render(item) : item[col.key]}</td>
-                    ))}
-                    <td className="text-center">
-                      <ActionButtons
-                        onView={onView ? () => onView(item) : null}
-                        onEdit={onEdit ? () => onEdit(item) : null}
-                        onDelete={onDelete ? () => onDelete(item) : null}
-                        extraButtons={extraButtons ? extraButtons(item) : []}
-                      />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Barra de filtros por columna */}
+        <div className="card card-body mb-3" style={{ background: '#fff' }}>
+          <div className="row g-2">
+            <div className="col-2">
+              <input
+                className="form-control form-control-sm"
+                placeholder="Filtrar ID"
+                value={filtrosColumnas.id}
+                onChange={(e) => handleFiltroColumna('id', e.target.value)}
+              />
+            </div>
+            {columnas.map((col) => (
+              <div className="col" key={`filter-${col.key}`}>
+                <input
+                  className="form-control form-control-sm"
+                  placeholder={`Filtrar ${col.label}`}
+                  value={filtrosColumnas[col.key]}
+                  onChange={(e) => handleFiltroColumna(col.key, e.target.value)}
+                />
+              </div>
+            ))}
+            <div className="col-auto d-flex align-items-center">
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => setFiltrosColumnas(columnas.reduce((acc, c) => ({ ...acc, [c.key]: '' }), { id: '' }))}
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          </div>
         </div>
 
+        {/* Tabla o loader */}
+        {loading ? (
+          <div className="d-flex justify-content-center align-items-center py-5">
+            <div className="spinner-border text-primary me-2" role="status" aria-hidden="true"></div>
+            <span className="text-muted">Cargando {titulo.toLowerCase()}...</span>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-bordered table-hover table-striped">
+              <thead>
+                <tr>
+                  <OrdenableHeader columnas={columnas} />
+                </tr>
+              </thead>
+              <tbody>
+                {datosPaginados.length === 0 ? (
+                  <tr>
+                    <td colSpan={columnas.length + 2} className="text-center text-muted p-4">
+                      <FaInbox size={32} className="mb-2" />
+                      <div>No se encontraron registros de {titulo.toLowerCase()}.</div>
+                    </td>
+                  </tr>
+                ) : (
+                  datosPaginados.map((item, index) => (
+                    <tr key={`${item.id}-${index}`}>
+                      <td>{String(item.id)}</td>
+                      {columnas.map((col) => {
+                        const content = col.render ? col.render(item) : item[col.key];
+                        return (
+                          <td key={col.key}>
+                            {content}
+                          </td>
+                        );
+                      })}
+                      <td className="text-center">
+                        <ActionButtons
+                          onView={onView ? () => onView(item) : null}
+                          onEdit={onEdit ? () => onEdit(item) : null}
+                          onDelete={onDelete ? () => onDelete(item) : null}
+                          extraButtons={extraButtons ? extraButtons(item) : []}
+                        />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Paginación */}
-        <Paginacion
-          paginaActual={paginaActual}
-          totalPaginas={totalPaginas}
-          onPaginaChange={(pagina) => setPaginaActual(pagina)}
-        />
+        {!loading && (
+          <Paginacion
+            paginaActual={paginaActual}
+            totalPaginas={totalPaginas}
+            onPaginaChange={(pagina) => setPaginaActual(pagina)}
+          />
+        )}
       </div>
     </div>
   );
