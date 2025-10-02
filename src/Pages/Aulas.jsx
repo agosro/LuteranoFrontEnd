@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import { camposAula } from "../Entidades/camposAula";
 import { listarAulas, crearAula, editarAula, eliminarAula } from "../Services/AulaService";
 import { listarCursos } from "../Services/CursoService";
+import { getTituloCurso } from "../utils/cursos";
 
 export default function ListaAulas() {
   const { user } = useAuth();
@@ -37,7 +38,7 @@ export default function ListaAulas() {
         const cursosData = await listarCursos(token);
         const cursosOptionsData = (cursosData || []).map(c => ({
           value: c.id,
-          label: `${c.anio} ${c.division}`
+          label: getTituloCurso(c)
         }));
         setCursosOptions(cursosOptionsData);
 

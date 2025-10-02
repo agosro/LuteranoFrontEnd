@@ -9,8 +9,12 @@ import { toast } from "react-toastify";
 import RenderCamposEditable from "../Components/RenderCamposEditables";
 import { inputLocalToBackendISO, isoToDisplay } from "../utils/fechas";
 import { listarHistorialAlumnoFiltrado, obtenerHistorialActualAlumno } from "../Services/HistorialCursoService";
+import { asignarCursoAlumno } from "../Services/AlumnoService";
+import ModalSeleccionSimple from "../Components/Modals/ModalSeleccionSimple";
+import { listarCursos } from "../Services/CursoService";
+import { getTituloCurso } from "../utils/cursos";
 
-export default function AlumnoDetalle() {
+function AlumnoDetalle() {
   const location = useLocation();
   const alumno = location.state;
   const { user } = useAuth();
@@ -23,25 +27,36 @@ export default function AlumnoDetalle() {
   const [histActualLoading, setHistActualLoading] = useState(true);
   const [histActualError, setHistActualError] = useState("");
 
-  // Filtros opcionales que respeta el backend: cicloLectivoId y cursoId
-  const [cicloLectivoId, setCicloLectivoId] = useState("");
-  const [cursoId, setCursoId] = useState("");
+  // cicloLectivoId fijo en 1 por ahora; no se usa estado
+  const [cursoId] = useState(null);
 
-  // Historial completo (lista), con filtros opcionales
+  const [showAsignarCurso, setShowAsignarCurso] = useState(false);
+
+  // Historial completo
   useEffect(() => {
     const fetchHistorial = async () => {
       if (!user?.token || !alumno?.id) return;
       setHistLoading(true);
       setHistError("");
       try {
-        const filtros = {
-          cicloLectivoId: cicloLectivoId || undefined,
-          cursoId: cursoId || undefined,
-        };
-        const data = await listarHistorialAlumnoFiltrado(user.token, alumno.id, filtros);
-        // Esperamos un objeto tipo { code, mensaje, historialCursoDtos }
-        const lista = Array.isArray(data?.historialCursoDtos) ? data.historialCursoDtos : [];
+        const ciclo = 1; // hardcode temporal
+        const data = await listarHistorialAlumnoFiltrado(
+          user.token,
+          alumno.id,
+          { cicloLectivoId: ciclo, cursoId: cursoId || null }
+        );
+
+        const lista = Array.isArray(data?.historialCursos) ? data.historialCursos : [];
         setHistorial(lista);
+
+        if (!histActual && lista.length) {
+          const vigenteDerivado =
+            lista.find((h) => (h.estado?.toUpperCase?.() === "VIGENTE") || (!h.fechaHasta))
+            || lista.sort((a, b) => new Date(b.fechaDesde || 0) - new Date(a.fechaDesde || 0))[0];
+          if (vigenteDerivado) {
+            setHistActual(vigenteDerivado);
+          }
+        }
       } catch (e) {
         console.error(e);
         setHistError(e.message || "Error cargando historial");
@@ -50,9 +65,10 @@ export default function AlumnoDetalle() {
       }
     };
     fetchHistorial();
-  }, [user?.token, alumno?.id, cicloLectivoId, cursoId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.token, alumno?.id, cursoId]);
 
-  // Historial actual (curso vigente)
+  // Curso vigente
   useEffect(() => {
     const fetchActual = async () => {
       if (!user?.token || !alumno?.id) return;
@@ -60,8 +76,7 @@ export default function AlumnoDetalle() {
       setHistActualError("");
       try {
         const data = await obtenerHistorialActualAlumno(user.token, alumno.id);
-        // Esperamos { code, mensaje, historialCursoDto }
-        setHistActual(data?.historialCursoDto || null);
+        setHistActual(data?.historialCurso ?? null);
       } catch (e) {
         console.error(e);
         setHistActualError(e.message || "Error cargando curso vigente");
@@ -71,6 +86,12 @@ export default function AlumnoDetalle() {
     };
     fetchActual();
   }, [user?.token, alumno?.id]);
+
+  useEffect(() => {
+    if (histActual) {
+      setFormData((prev) => ({ ...prev, cursoActual: histActual }));
+    }
+  }, [histActual]);
 
   if (!alumno) return <p>Cargando...</p>;
 
@@ -98,145 +119,152 @@ export default function AlumnoDetalle() {
   };
 
   const handleCancel = () => {
-    setFormData(alumno); // descartar cambios
+    setFormData(alumno);
   };
 
   return (
-    <TablaDetalle
-      titulo={`${alumno.nombre} ${alumno.apellido}`}
-      subtitulo={`DNI: ${alumno.dni}`}
-      onSave={handleSave}
-      onCancel={handleCancel}
-      tabs={[
-        {
-          id: "datos",
-          label: "Datos personales",
-          content: (modoEditar) =>
-            !modoEditar ? (
-              <RenderCampos campos={camposAlumno(true)} data={formData} />
-            ) : (
-              <RenderCamposEditable
-                campos={camposAlumno(false, true)} // 👈 modo edición
-                formData={formData}
-                setFormData={setFormData}
-              />
-            ),
-        },
-        {
-          id: "historial",
-          label: "Historial",
-          content: () => (
-            <div>
-              {/* Curso vigente */}
-              <div className="mb-3">
-                <h6 className="mb-2">Curso vigente</h6>
-                {histActualLoading && <p>Cargando curso vigente...</p>}
-                {histActualError && <p className="text-danger">{histActualError}</p>}
-                {!histActualLoading && !histActualError && (
-                  histActual ? (
-                    <div className="card">
-                      <div className="card-body p-2">
-                        <div className="d-flex justify-content-between align-items-center">
-                          <div>
-                            <strong>{histActual.cursoNombre || histActual.nombreCurso || `Curso ${histActual.cursoId || ""}`}</strong>
-                            {" "}
-                            <span className="text-muted">({histActual.cicloLectivoNombre || histActual.cicloLectivo || ""})</span>
-                            <div className="small text-muted">
-                              {histActual.division ? `División: ${histActual.division}` : ""}
-                              {histActual.turno ? `${histActual.division ? " • " : ""}Turno: ${histActual.turno}` : ""}
+    <>
+      <TablaDetalle
+        titulo={`${alumno.nombre} ${alumno.apellido}`}
+        subtitulo={`DNI: ${alumno.dni}`}
+        onSave={handleSave}
+        onCancel={handleCancel}
+        tabs={[
+          {
+            id: "datos",
+            label: "Datos personales",
+            content: (modoEditar) =>
+              !modoEditar ? (
+                <RenderCampos campos={camposAlumno(true)} data={formData} />
+              ) : (
+                <RenderCamposEditable
+                  campos={camposAlumno(false, true)}
+                  formData={formData}
+                  setFormData={setFormData}
+                />
+              ),
+          },
+          {
+            id: "historial",
+            label: "Historial",
+            content: () => (
+              <div>
+                {/* Curso vigente */}
+                <div className="mb-3">
+                  <h6 className="mb-2">Curso vigente</h6>
+                  {histActualLoading && <p>Cargando curso vigente...</p>}
+                  {histActualError && <p className="text-danger">{histActualError}</p>}
+                  {!histActualLoading && !histActualError && (
+                    histActual ? (
+                      <div className="card">
+                        <div className="card-body p-2">
+                          <div className="d-flex justify-content-between align-items-center">
+                            <div>
+                              <strong>{getTituloCurso(histActual.curso)}</strong>{" "}
+                              <span className="text-muted">
+                                ({histActual.cicloLectivo?.nombre || ""})
+                              </span>
                             </div>
-                          </div>
-                          <div className="text-end small">
-                            {histActual.fechaInicio ? `Inicio: ${isoToDisplay(histActual.fechaInicio)}` : ""}
-                            {histActual.fechaFin ? ` • Fin: ${isoToDisplay(histActual.fechaFin)}` : ""}
-                            <div className="fw-semibold">{histActual.estado || ""}</div>
+                            <div className="text-end small">
+                              {histActual.fechaDesde ? `Inicio: ${isoToDisplay(histActual.fechaDesde)}` : ""}
+                              {histActual.fechaHasta ? ` • Fin: ${isoToDisplay(histActual.fechaHasta)}` : ""}
+                              <div className="fw-semibold">{histActual.estado || ""}</div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <p>No tiene curso vigente</p>
+                    )
+                  )}
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={() => setShowAsignarCurso(true)}
+                    >
+                      {histActual ? "Cambiar curso actual" : "Asignar curso"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Historial completo */}
+                {histLoading && <p>Cargando historial...</p>}
+                {histError && <p className="text-danger">{histError}</p>}
+                {!histLoading && !histError && (
+                  historial.length ? (
+                    <ul className="list-group">
+                      {historial.map((h) => {
+                        const titulo = getTituloCurso(h.curso);
+                        const sub = h.cicloLectivo?.nombre || "";
+                        const fechas = [
+                          h.fechaDesde ? `Inicio: ${isoToDisplay(h.fechaDesde)}` : null,
+                          h.fechaHasta ? `Fin: ${isoToDisplay(h.fechaHasta)}` : null,
+                        ].filter(Boolean).join(" • ");
+                        return (
+                          <li key={h.id}
+                              className="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                              <div><strong>{titulo}</strong>{" "}<span className="text-muted">({sub})</span></div>
+                            </div>
+                            <div className="text-end">
+                              {fechas && <div className="small text-muted">{fechas}</div>}
+                              <div className="fw-semibold">{h.estado || ""}</div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   ) : (
-                    <p>No tiene curso vigente</p>
+                    <p>No tiene historial</p>
                   )
                 )}
               </div>
-
-              {/* Filtros */}
-              <div className="card mb-3">
-                <div className="card-body py-2">
-                  <div className="row g-2 align-items-end">
-                    <div className="col-12 col-md-4">
-                      <label className="form-label mb-1">Ciclo Lectivo ID</label>
-                      <input
-                        type="number"
-                        className="form-control form-control-sm"
-                        placeholder="Ej: 2025"
-                        value={cicloLectivoId}
-                        onChange={(e) => setCicloLectivoId(e.target.value)}
-                      />
-                    </div>
-                    <div className="col-12 col-md-4">
-                      <label className="form-label mb-1">Curso ID</label>
-                      <input
-                        type="number"
-                        className="form-control form-control-sm"
-                        placeholder="Ej: 3"
-                        value={cursoId}
-                        onChange={(e) => setCursoId(e.target.value)}
-                      />
-                    </div>
-                    <div className="col-12 col-md-4 d-flex gap-2">
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-secondary"
-                        onClick={() => { setCicloLectivoId(""); setCursoId(""); }}
-                      >
-                        Limpiar filtros
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Historial completo */}
-              {histLoading && <p>Cargando historial...</p>}
-              {histError && <p className="text-danger">{histError}</p>}
-              {!histLoading && !histError && (
-                historial.length ? (
-                  <ul className="list-group">
-                    {historial.map((h) => {
-                      const titulo = h.cursoNombre || h.nombreCurso || `Curso ${h.cursoId || ""}`;
-                      const sub = h.cicloLectivoNombre || h.cicloLectivo || "";
-                      const detalleIzq = [
-                        h.division ? `División: ${h.division}` : null,
-                        h.turno ? `Turno: ${h.turno}` : null,
-                      ].filter(Boolean).join(" • ");
-                      const fechas = [
-                        h.fechaInicio ? `Inicio: ${isoToDisplay(h.fechaInicio)}` : null,
-                        h.fechaFin ? `Fin: ${isoToDisplay(h.fechaFin)}` : null,
-                      ].filter(Boolean).join(" • ");
-                      return (
-                        <li key={h.id || `${h.cursoId}-${sub}`}
-                            className="list-group-item d-flex justify-content-between align-items-center">
-                          <div>
-                            <div><strong>{titulo}</strong>{" "}<span className="text-muted">({sub})</span></div>
-                            {detalleIzq && <div className="small text-muted">{detalleIzq}</div>}
-                          </div>
-                          <div className="text-end">
-                            {fechas && <div className="small text-muted">{fechas}</div>}
-                            <div className="fw-semibold">{h.estado || ""}</div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <p>No tiene historial</p>
-                )
-              )}
-            </div>
-          ),
-        },
-      ]}
-    />
+            ),
+          },
+        ]}
+      />
+      <ModalSeleccionSimple
+        show={showAsignarCurso}
+        onClose={() => setShowAsignarCurso(false)}
+        titulo={`Asignar curso a ${alumno?.nombre} ${alumno?.apellido}`}
+        entidad={{ id: alumno?.id, cursoActual: histActual }}
+        campoAsignado="cursoActual"
+        obtenerOpciones={async (token) => {
+          const lista = await listarCursos(token);
+          return lista.map(c => ({
+            value: c.id,
+            label: getTituloCurso(c)
+          }));
+        }}
+        onAsignar={async (token, cursoIdSeleccionado, alumnoId) => {
+          const req = { alumnoId, cursoId: cursoIdSeleccionado, cicloLectivoId: 1 };
+          await asignarCursoAlumno(token, req);
+          toast.success("Curso asignado correctamente");
+          try {
+            const dataActual = await obtenerHistorialActualAlumno(token, alumnoId);
+            const vigente = dataActual?.historialCurso ?? null;
+            setHistActual(vigente);
+            if (vigente) {
+              setFormData((prev) => ({ ...prev, cursoActual: vigente }));
+            }
+            const dataLista = await listarHistorialAlumnoFiltrado(
+              token,
+              alumnoId,
+              { cicloLectivoId: 1, cursoId: cursoId || null }
+            );
+            const listaRef = Array.isArray(dataLista?.historialCursos) ? dataLista.historialCursos : [];
+            setHistorial(listaRef);
+          } catch (err) {
+            console.error(err);
+          }
+        }}
+        onDesasignar={async () => { toast.info("Para desasignar, reasigná a otro curso"); }}
+        token={user?.token}
+        onActualizar={() => {}}
+      />
+    </>
   );
 }
+
+export default AlumnoDetalle;
