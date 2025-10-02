@@ -1,4 +1,6 @@
 // camposAlumno.js
+import { getTituloCurso } from "../utils/cursos";
+
 export const camposAlumno = (modoVista = false, esCreacion = false) => {
   const camposBase = [
     { name: "nombre", label: "Nombre", type: "text", required: true, readOnly: modoVista },
@@ -23,7 +25,24 @@ export const camposAlumno = (modoVista = false, esCreacion = false) => {
   if (!esCreacion) {
     camposBase.push(
       { name: "tutor", label: "Tutor", type: "custom", required: false, readOnly: true, render: (val) => val ? `${val.nombre} ${val.apellido}` : "-" },
-      { name: "cursoActual", label: "Curso Actual", type: "custom", required: false, readOnly: true, render: (val) => val ? val.nombre || val.id : "-" }
+      {
+        name: "cursoActual",
+        label: "Curso Actual",
+        type: "custom",
+        required: false,
+        readOnly: true,
+        render: (val) => {
+          if (!val) return "-";
+          return (
+            val.cursoNombre
+            || val.nombreCurso
+            || val.nombre
+            || getTituloCurso({ anio: (val.anio ?? val.anioCurso), division: (val.division ?? undefined) })
+            || getTituloCurso(val.curso)
+            || (val.cursoId ? `Curso ${val.cursoId}` : (val.id ?? "-"))
+          );
+        }
+      }
     );
   }
 

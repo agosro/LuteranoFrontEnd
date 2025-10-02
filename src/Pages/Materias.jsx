@@ -22,6 +22,7 @@ import { camposMateria } from '../Entidades/camposMateria';
 import ModalSeleccionSimple from '../Components/Modals/ModalSeleccionSimple';
 import { listarDocentes } from '../Services/DocenteService';
 import { asignarDocente, desasignarDocente, listarCursosDeMateria } from '../Services/MateriaCursoService';
+import { getTituloCurso } from "../utils/cursos";
 
 export default function ListaMaterias() {
   const [materias, setMaterias] = useState([]);
@@ -83,7 +84,7 @@ export default function ListaMaterias() {
                 return cursosDeMateria.map((mc) => {
                   const cursoEncontrado = cursosData.find(c => c.id === mc.cursoId);
                   const cursoNombre = cursoEncontrado
-                    ? `${cursoEncontrado.anio} ${cursoEncontrado.division}`
+                    ? getTituloCurso(cursoEncontrado)
                     : `Curso ${mc.cursoId}`;
 
                   const docenteNombre = mc.docente
