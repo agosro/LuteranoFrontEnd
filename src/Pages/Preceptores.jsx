@@ -99,7 +99,6 @@ export default function ListaPreceptores() {
   };
 
 
-
   const abrirModalVer = (preceptor) => {
     setPreceptorSeleccionado(preceptor);
     setModalVerShow(true);
@@ -115,7 +114,6 @@ export default function ListaPreceptores() {
     setFormData({});
     setModalCrearShow(false);
   };
-
 
   const cerrarModalVer = () => {
     setPreceptorSeleccionado(null);

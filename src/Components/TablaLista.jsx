@@ -28,17 +28,30 @@ export default function TablaGenerica({
 
   // Filtrar datos (solo filtros por columna)
   const datosFiltrados = useMemo(() => {
-    return datos.filter((item) => {
-      // filtros por columna (AND)
-      for (const [k, fv] of Object.entries(filtrosColumnas)) {
-        if (!fv) continue;
-        const val = (k === 'id' ? item.id : item[k]);
-        const txt = (val ?? '').toString().toLowerCase();
-        if (!txt.includes(fv.toLowerCase())) return false;
+  return datos.filter((item) => {
+    // filtros por columna (AND)
+    for (const [k, fv] of Object.entries(filtrosColumnas)) {
+      if (!fv) continue;
+
+      let val;
+
+      // 🔹 Casos especiales
+      if (k === "nombreApellido") {
+        // Concatenar nombre + apellido para el filtro
+        val = `${item.nombre ?? ""} ${item.apellido ?? ""}`;
+      } else if (k === "id") {
+        val = item.id;
+      } else {
+        val = item[k];
       }
-      return true;
-    });
-  }, [datos, filtrosColumnas]);
+
+      const txt = (val ?? "").toString().toLowerCase();
+      if (!txt.includes(fv.toLowerCase())) return false;
+    }
+
+    return true;
+  });
+}, [datos, filtrosColumnas]);
 
   // Paginación
   const totalPaginas = Math.ceil(datosFiltrados.length / itemsPorPagina);
