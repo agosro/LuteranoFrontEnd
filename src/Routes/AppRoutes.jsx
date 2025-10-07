@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../Context/AuthContext.jsx';
-import Loading from '../Components/Loading/Loading.jsx';
 
 import Login from '../Pages/Login.jsx';
 import Inicio from '../Pages/Inicio.jsx';
@@ -28,11 +27,7 @@ import CursoHorarios from '../Pages/CursoHorario.jsx';
 import RoutePersistence from './RoutePersistance.jsx';
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <Loading text="Cargando aplicación" />;
-  }
+  const { user } = useAuth();
 
   if (!user) {
     return (

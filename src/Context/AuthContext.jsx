@@ -1,9 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // Inicializar user sincrónicamente desde localStorage
+  // Inicializar user sincrónicamente desde localStorage para evitar redirect al inicio
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem('user');
@@ -12,13 +12,7 @@ export function AuthProvider({ children }) {
       return null;
     }
   });
-  const [loading, setLoading] = useState(true);
-
-  // Simular un pequeño delay para permitir mostrar spinner (y dar tiempo a futuras validaciones de token)
-  useEffect(() => {
-    const id = setTimeout(() => setLoading(false), 180); // 180ms => perceptible pero rápido
-    return () => clearTimeout(id);
-  }, []);
+  // user: { nombre, rol, token, userId, docenteId, preceptorId }
 
   const login = (userData) => {
     const normalizedUser = {
@@ -37,7 +31,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
