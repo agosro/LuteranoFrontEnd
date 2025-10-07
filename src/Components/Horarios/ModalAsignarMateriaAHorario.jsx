@@ -15,7 +15,7 @@ export default function ModalAsignarMateriaAHorario({
   materias,
   onHorarioAsignado,
 }) {
-  const [materiaId, setMateriaId] = useState("");
+  const [materiaId, setMateriaId] = useState(""); // siempre corresponde al ID real de la entidad Materia
   const [modulosSeleccionados, setModulosSeleccionados] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -47,12 +47,30 @@ export default function ModalAsignarMateriaAHorario({
         moduloId: m.value,
       }));
 
-      await asignarHorario(token, cursoId, materiaId, slots);
+  const respAsignacion = await asignarHorario(token, cursoId, materiaId, slots);
+
+      // Manejo de conflictos: si no se asignó nada avisar y NO disparar callback
+      if (!respAsignacion?.slotsModificados || respAsignacion.slotsModificados.length === 0) {
+        const detalleConflictos = (respAsignacion?.slotsConConflicto || []).join(" | ");
+        toast.warn(
+          respAsignacion?.mensaje ||
+            "No se pudo asignar el horario (conflicto)." +
+            (detalleConflictos ? ` Detalles: ${detalleConflictos}` : "")
+        );
+        setLoading(false);
+        return; // salimos sin update optimista
+      }
 
       // Buscar materia seleccionada (ya normalizada por el service)
       const materiaSeleccionada = materias.find(
-        (m) => m.id === parseInt(materiaId)
+        (m) => m.materiaId === parseInt(materiaId)
       );
+
+      if (!materiaSeleccionada) {
+        toast.error("No se encontró la materia seleccionada (lista desactualizada)");
+        setLoading(false);
+        return;
+      }
 
       const nombreMateria = materiaSeleccionada?.nombreMateria || "Sin nombre";
       const docente = materiaSeleccionada?.docente
@@ -76,7 +94,15 @@ export default function ModalAsignarMateriaAHorario({
         `✅ ${nombreMateria} (${docente}) asignada el ${diaSeleccionado} ${mensajeHorario}`
       );
 
-      onHorarioAsignado(diaSeleccionado, modulosSeleccionados[0].value);
+      // Pasamos info rica para update optimista
+      onHorarioAsignado({
+        dia: diaSeleccionado,
+        primerModuloId: modulosSeleccionados[0].value,
+        moduloIds: modulosSeleccionados.map(m => m.value),
+        materia: materiaSeleccionada,
+        response: respAsignacion,
+        slots
+      });
       setMateriaId("");
       setModulosSeleccionados([]);
       onClose();
@@ -90,7 +116,7 @@ export default function ModalAsignarMateriaAHorario({
 
   // 🔹 Opciones de materias (ya normalizadas)
   const materiaOptions = materias.map((m) => ({
-    value: m.id,
+    value: m.materiaId, // usar siempre materiaId real
     label: `${m.nombreMateria}${
       m.docente ? ` – ${m.docente.nombre} ${m.docente.apellido}` : ""
     }`,
@@ -120,8 +146,7 @@ export default function ModalAsignarMateriaAHorario({
             <Select
               options={materiaOptions}
               value={
-                materiaOptions.find((opt) => opt.value === parseInt(materiaId)) ||
-                null
+                materiaOptions.find((opt) => opt.value === parseInt(materiaId)) || null
               }
               onChange={(opt) => setMateriaId(opt ? opt.value : "")}
               placeholder="Seleccionar materia..."

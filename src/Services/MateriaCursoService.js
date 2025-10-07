@@ -64,20 +64,27 @@ export const listarMateriasDeCurso = async (token, cursoId) => {
       ? data.materiaCursoDtoLis
       : [];
 
-    // 🧠 Normalizar: si no hay materia o docente, crear estructura consistente
-    return lista.map((m) => ({
-      id: m.materia?.id || m.id,
-      nombreMateria: m.materia?.nombreMateria || m.nombreMateria || "Sin nombre",
-      nivel: m.materia?.nivel || m.nivel || "No especificado",
-      docente: m.docente
-        ? {
-            id: m.docente.id,
-            nombre: m.docente.nombre,
-            apellido: m.docente.apellido,
-          }
-        : null, // si no hay docente, queda null
-      cursoId: m.cursoId,
-    }));
+    // 🧠 Normalizar: exponer siempre ambos IDs (materiaId y materiaCursoId) pero el front SOLO usará materiaId para horarios.
+    // Mantenemos un alias id (igual a materiaId) para no romper componentes antiguos.
+    return lista.map((m) => {
+      const materiaId = m.materia?.id ?? null;
+      const materiaCursoId = m.id ?? m.materiaCursoId ?? null;
+      return {
+        id: materiaId, // alias legacy
+        materiaId,
+        materiaCursoId,
+        nombreMateria: m.materia?.nombreMateria || m.nombreMateria || "Sin nombre",
+        nivel: m.materia?.nivel || m.nivel || "No especificado",
+        docente: m.docente
+          ? {
+              id: m.docente.id,
+              nombre: m.docente.nombre,
+              apellido: m.docente.apellido,
+            }
+          : null,
+        cursoId: m.cursoId,
+      };
+    });
   } catch (error) {
     console.error("Error en listarMateriasDeCurso:", error);
     throw error;

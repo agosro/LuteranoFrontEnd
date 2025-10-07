@@ -38,7 +38,7 @@ export const menuConfig = [
     icon: FaChalkboardTeacher,
     roles: ["ROLE_ADMIN", "ROLE_PRECEPTOR"],
     subItems: [
-      { label: "Horarios", path: "/horarios", roles: ["ROLE_PRECEPTOR"] },
+      { label: "Horarios", path: "/horarios", roles: ["ROLE_ADMIN"] },
       { label: "Aulas", path: "/aulas", roles: ["ROLE_ADMIN"] },
     ],
   },

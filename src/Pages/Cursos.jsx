@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../Context/AuthContext";
 import TablaGenerica from "../Components/TablaLista";
 import ModalVerEntidad from "../Components/Modals/ModalVerEntidad";
@@ -45,7 +45,13 @@ export default function ListaCursos() {
   const [modalAsignarMateriasShow, setModalAsignarMateriasShow] = useState(false);
   const [cursoParaAsignar, setCursoParaAsignar] = useState(null);
 
-  // helper para recargar cursos
+  // 🆕 estado para el modal de asignar preceptor
+  const [modalAsignarPreceptorShow, setModalAsignarPreceptorShow] = useState(false);
+  const [cursoParaAsignarPreceptor, setCursoParaAsignarPreceptor] = useState(null);
+
+  const [ordenAsc, setOrdenAsc] = useState(true); // nuevo estado para ordering
+
+  // Helper para recargar cursos (usado por CRUD y modales)
   const recargarCursos = async () => {
     const [cursosData, aulasData, preceptoresData] = await Promise.all([
       listarCursos(token),
@@ -57,9 +63,10 @@ export default function ListaCursos() {
       (cursosData || []).map(async (curso) => {
         const materiasCurso = await listarMateriasDeCurso(token, curso.id);
 
+        // El service ya normaliza y devuelve { id, nombreMateria, nivel, docente, cursoId }
         const dictadosMapeados = materiasCurso.map(mc => ({
           ...mc,
-          nombre: mc.materia?.nombreMateria || "Sin materia",
+          nombre: mc.nombreMateria || "Sin materia",
         }));
 
         const aulaMapeada = aulasData.find(a => a.id === curso.aula?.id);
@@ -72,7 +79,7 @@ export default function ListaCursos() {
           dictados: dictadosMapeados,
           aulaNombre: aulaMapeada?.nombre || "",
           materiasNombres: dictadosMapeados.map(d => d.nombre).join(", ") || "",
-          preceptor: preceptorObj || null, // 👈 guardamos el objeto
+          preceptor: preceptorObj || null,
         };
       })
     );
@@ -101,6 +108,7 @@ export default function ListaCursos() {
     };
 
     cargarDatos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const handleInputChange = (name, value) => {
@@ -110,9 +118,22 @@ export default function ListaCursos() {
   const abrirModalCrear = () => { setFormData({}); setCursoSeleccionado(null); setModalCrearShow(true); };
   const abrirModalEditar = (curso) => {
     setCursoSeleccionado(curso);
+    // Calcular aulas disponibles incluyendo el aula actual aunque esté ocupada
+    setAulasOptions(prev => {
+      // aulasOptions original viene de la carga general pero regeneramos a partir de aulas + cursos
+      // Necesitamos listarAulas y filtrar contra 'cursos' en memoria.
+      // Para simplicidad asumimos que 'cursos' ya está actualizado.
+      const aulasUsadasPorOtros = new Set(
+        cursos
+          .filter(c => c.id !== curso.id && c.aula?.value)
+          .map(c => c.aula.value)
+      );
+      const actuales = prev.filter(a => !aulasUsadasPorOtros.has(a.value) || a.value === curso.aula?.value);
+      return actuales;
+    });
     setFormData({
       id: curso.id,
-      anio: curso.anio, // ✅ ahora matchea porque las opciones son numéricas
+      anio: curso.anio,
       division: curso.division,
       nivel: curso.nivel,
       aulaId: curso.aula?.value || "",
@@ -146,10 +167,6 @@ export default function ListaCursos() {
     setCursoParaAsignar(null);
     setModalAsignarMateriasShow(false);
   };
-
-  // 🆕 estado para el modal de asignar preceptor
-  const [modalAsignarPreceptorShow, setModalAsignarPreceptorShow] = useState(false);
-  const [cursoParaAsignarPreceptor, setCursoParaAsignarPreceptor] = useState(null);
 
   const abrirModalAsignarPreceptor = (curso) => {
     setCursoParaAsignarPreceptor(curso);
@@ -212,7 +229,18 @@ export default function ListaCursos() {
     }
   };
 
-  if (loading) return <p>Cargando cursos...</p>;
+  // memo para cursos ordenados
+  const cursosOrdenados = useMemo(() => {
+    const copia = [...cursos];
+    copia.sort((a, b) => {
+      if (a.anio !== b.anio) return ordenAsc ? a.anio - b.anio : b.anio - a.anio;
+      // division puede ser numerica o letra; usar localeCompare como fallback
+      const divA = a.division?.toString() || "";
+      const divB = b.division?.toString() || "";
+      return ordenAsc ? divA.localeCompare(divB, 'es', { numeric: true }) : divB.localeCompare(divA, 'es', { numeric: true });
+    });
+    return copia;
+  }, [cursos, ordenAsc]);
 
   const columnasCursos = [
     { key: "anioDivision", label: "Año/División", render: c => `${c.anio} ${c.division}` },
@@ -230,36 +258,45 @@ export default function ListaCursos() {
   
   return (
     <>
-      <TablaGenerica
-        titulo="Cursos"
-        columnas={columnasCursos}
-        datos={cursos}
-        camposFiltrado={["anio", "division", "nivel", "aulaNombre", "materiasNombres"]}
-        onView={abrirModalVer}
-        onEdit={abrirModalEditar}
-        onDelete={abrirModalEliminar}
-        botonCrear={<BotonCrear texto="Crear Curso" onClick={abrirModalCrear} />}
-        extraButtons={(curso) => [
-          {
-            icon: <FaBook />,
-            onClick: () => abrirModalAsignarMaterias(curso),
-            title: "Asignar Materias",
-          },
-          {
-            icon: <FaUserTie />,
-            onClick: () => abrirModalAsignarPreceptor(curso),
-            title: "Asignar Preceptor",
-            className: "btn-outline-success" // verde
-          },
-          {
-            icon: <FaClock />,
-            onClick: () =>
-              navigate(`/cursos/${curso.id}/horarios`, { state: curso }),
-            title: "Ver Horarios",
-            className: "btn-outline-primary", // azul
-          },
-        ]}
-      />
+      {loading ? (
+        <p>Cargando cursos...</p>
+      ) : (
+        <TablaGenerica
+          titulo="Cursos"
+          columnas={columnasCursos}
+          datos={cursosOrdenados}
+          camposFiltrado={["anio", "division", "nivel", "aulaNombre", "materiasNombres"]}
+          onView={abrirModalVer}
+          onEdit={abrirModalEditar}
+          onDelete={abrirModalEliminar}
+          botonCrear={<div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <BotonCrear texto="Crear Curso" onClick={abrirModalCrear} />
+            <button type="button" className="btn btn-outline-secondary" onClick={() => setOrdenAsc(o => !o)}>
+              Ordenar {ordenAsc ? '↓' : '↑'}
+            </button>
+          </div>}
+          extraButtons={(curso) => [
+            {
+              icon: <FaBook />,
+              onClick: () => abrirModalAsignarMaterias(curso),
+              title: "Asignar Materias",
+            },
+            {
+              icon: <FaUserTie />,
+              onClick: () => abrirModalAsignarPreceptor(curso),
+              title: "Asignar Preceptor",
+              className: "btn-outline-success" // verde
+            },
+            {
+              icon: <FaClock />,
+              onClick: () =>
+                navigate(`/cursos/${curso.id}/horarios`, { state: curso }),
+              title: "Ver Horarios",
+              className: "btn-outline-primary", // azul
+            },
+          ]}
+        />
+      )}
 
       <ModalCrearEntidad
         show={modalCrearShow}
@@ -331,10 +368,10 @@ export default function ListaCursos() {
           }));
         }}
         onAsignar={(token, preceptorId, cursoId) =>
-          asignarPreceptorACurso(token, preceptorId, cursoId)
+          asignarPreceptorACurso(token, cursoId, preceptorId)
         }
         onDesasignar={(token, cursoId) =>
-          desasignarPreceptorDeCurso(token, cursoParaAsignarPreceptor?.preceptor?.id, cursoId)
+          desasignarPreceptorDeCurso(token, cursoId)
         }
         token={token}
         onActualizar={recargarCursos}

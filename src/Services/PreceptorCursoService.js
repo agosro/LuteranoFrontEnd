@@ -1,10 +1,27 @@
 const API_URL = "http://localhost:8080";
 
+// Nuevo mapeo según el controlador backend:
+// POST /preceptorCurso/{cursoId}/preceptor/{preceptorId}
+// DELETE /preceptorCurso/{cursoId}/preceptor
+
+const parseCursoResponse = async (response, defaultErrorMsg) => {
+  let body = null;
+  try { body = await response.json(); } catch { /* ignorar parse json */ }
+  if (!response.ok) {
+    const msg = body?.mensaje || defaultErrorMsg;
+    throw new Error(msg);
+  }
+  if (body && typeof body.code !== 'undefined' && body.code < 0) {
+    throw new Error(body.mensaje || defaultErrorMsg);
+  }
+  return body;
+};
+
 // 📌 Asignar preceptor a curso
-export const asignarPreceptorACurso = async (token, preceptorId, cursoId) => {
+export const asignarPreceptorACurso = async (token, cursoId, preceptorId) => {
   try {
     const response = await fetch(
-      `${API_URL}/preceptorCurso/asignarPreceptor/${preceptorId}/${cursoId}`,
+      `${API_URL}/preceptorCurso/${cursoId}/preceptor/${preceptorId}`,
       {
         method: "POST",
         headers: {
@@ -13,9 +30,7 @@ export const asignarPreceptorACurso = async (token, preceptorId, cursoId) => {
         },
       }
     );
-
-    if (!response.ok) throw new Error("Error al asignar preceptor al curso");
-    return await response.json();
+    return await parseCursoResponse(response, "Error al asignar preceptor al curso");
   } catch (error) {
     console.error("Error en asignarPreceptorACurso:", error);
     throw error;
@@ -23,21 +38,19 @@ export const asignarPreceptorACurso = async (token, preceptorId, cursoId) => {
 };
 
 // 📌 Desasignar preceptor de curso
-export const desasignarPreceptorDeCurso = async (token, preceptorId, cursoId) => {
+export const desasignarPreceptorDeCurso = async (token, cursoId) => {
   try {
     const response = await fetch(
-      `${API_URL}/preceptorCurso/desasignarPreceptor/${preceptorId}/${cursoId}`,
+      `${API_URL}/preceptorCurso/${cursoId}/preceptor`,
       {
-        method: "POST",
+        method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       }
     );
-
-    if (!response.ok) throw new Error("Error al desasignar preceptor del curso");
-    return await response.json();
+    return await parseCursoResponse(response, "Error al desasignar preceptor del curso");
   } catch (error) {
     console.error("Error en desasignarPreceptorDeCurso:", error);
     throw error;

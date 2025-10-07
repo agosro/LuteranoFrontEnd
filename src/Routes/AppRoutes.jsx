@@ -25,6 +25,7 @@ import DocenteDetalle from '../Pages/DocenteDetalle.jsx';
 import PreceptorDetalle from '../Pages/PreceptorDetalle.jsx';
 import CursoHorarios from '../Pages/CursoHorario.jsx';
 import RoutePersistence from './RoutePersistance.jsx';
+import Horarios from '../Pages/Horarios.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -69,6 +70,7 @@ function AppRoutes() {
           <Route path="materias" element={<Materias />} />
           <Route path="cursos" element={<Cursos />} />
           <Route path="/cursos/:id/horarios" element={<CursoHorarios />} />
+          <Route path="/horarios" element={<Horarios />} />
         </Route>
 
         {/* Aulas -> SOLO ADMIN */}
