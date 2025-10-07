@@ -23,6 +23,8 @@ import MiPerfil from '../Pages/MiPerfil.jsx';
 import AlumnoDetalle from '../Pages/AlumnoDetalle.jsx';
 import DocenteDetalle from '../Pages/DocenteDetalle.jsx';
 import PreceptorDetalle from '../Pages/PreceptorDetalle.jsx';
+import CursoHorarios from '../Pages/CursoHorario.jsx';
+import RoutePersistence from './RoutePersistance.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -37,6 +39,9 @@ function AppRoutes() {
   }
 
   return (
+    <>
+    <RoutePersistence />
+
     <Routes>
       <Route path="/" element={<DashboardLayout />}>
         <Route path="inicio" element={<Inicio />} />
@@ -63,6 +68,7 @@ function AppRoutes() {
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="materias" element={<Materias />} />
           <Route path="cursos" element={<Cursos />} />
+          <Route path="/cursos/:id/horarios" element={<CursoHorarios />} />
         </Route>
 
         {/* Aulas -> SOLO ADMIN */}
@@ -106,10 +112,9 @@ function AppRoutes() {
         </Route>
       </Route>
 
-      
-
       <Route path="*" element={<Navigate to="/inicio" />} />
     </Routes>
+  </>
   );
 }
 

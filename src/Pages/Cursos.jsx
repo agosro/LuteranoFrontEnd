@@ -15,15 +15,16 @@ import { listarMaterias } from "../Services/MateriaService";
 // 🆕 imports para asignar materias
 import ModalAsignacionGenerico from "../Components/Modals/ModalAsignar";
 import { asignarMateriasACurso, quitarMateriasDeCurso, listarMateriasDeCurso } from "../Services/MateriaCursoService";
-import { FaBook } from "react-icons/fa";
+import { FaBook, FaUserTie, FaClock } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 // 🆕 imports para asignar preceptor
 import ModalSeleccionSimple from "../Components/Modals/ModalSeleccionSimple";
 import { listarPreceptores } from "../Services/PreceptorService";
 import { asignarPreceptorACurso, desasignarPreceptorDeCurso } from "../Services/PreceptorCursoService";
-import { FaUserTie } from "react-icons/fa";
 
 export default function ListaCursos() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const token = user?.token;
 
@@ -226,7 +227,7 @@ export default function ListaCursos() {
       : "Sin preceptor" 
   }
   ];
-
+  
   return (
     <>
       <TablaGenerica
@@ -249,7 +250,14 @@ export default function ListaCursos() {
             onClick: () => abrirModalAsignarPreceptor(curso),
             title: "Asignar Preceptor",
             className: "btn-outline-success" // verde
-          }
+          },
+          {
+            icon: <FaClock />,
+            onClick: () =>
+              navigate(`/cursos/${curso.id}/horarios`, { state: curso }),
+            title: "Ver Horarios",
+            className: "btn-outline-primary", // azul
+          },
         ]}
       />
 

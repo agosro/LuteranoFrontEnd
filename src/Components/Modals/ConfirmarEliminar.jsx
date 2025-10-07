@@ -17,6 +17,10 @@ export default function ConfirmarEliminar({ show, onClose, onConfirm, item, tipo
     case 'materia':
       textoNombre = item?.nombre || item?.name || '';
       break;
+    case 'horario':
+      textoNombre = `${item?.nombre || ''} (${item?.dia || ''})`;
+      break;
+
     default:
       textoNombre = item?.nombre || item?.name || item?.email || '';
   }

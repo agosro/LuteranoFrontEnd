@@ -1,17 +1,18 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null); 
-  // user: { nombre, rol, token, userId, docenteId, preceptorId }
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+  // Inicializar user sincrónicamente desde localStorage para evitar redirect al inicio
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
     }
-  }, []);
+  });
+  // user: { nombre, rol, token, userId, docenteId, preceptorId }
 
   const login = (userData) => {
     const normalizedUser = {
@@ -25,6 +26,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('ultimaRuta');
     setUser(null);
   };
 
@@ -35,6 +37,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(AuthContext);
 }

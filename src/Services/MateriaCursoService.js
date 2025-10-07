@@ -46,16 +46,38 @@ export const quitarMateriasDeCurso = async (token, cursoId, materiaIds) => {
 // Listar materias de un curso
 export const listarMateriasDeCurso = async (token, cursoId) => {
   try {
-    const response = await fetch(`${API_URL}/materiasCurso/listarMateriasDeCurso/${cursoId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await fetch(
+      `${API_URL}/materiasCurso/listarMateriasDeCurso/${cursoId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
     const data = await response.json();
- 
-    if (!response.ok) throw new Error(data.mensaje || "Error al listar materias de curso");
-    return Array.isArray(data.materiaCursoDtoLis) ? data.materiaCursoDtoLis : [];
+
+    if (!response.ok)
+      throw new Error(data.mensaje || "Error al listar materias de curso");
+
+    const lista = Array.isArray(data.materiaCursoDtoLis)
+      ? data.materiaCursoDtoLis
+      : [];
+
+    // 🧠 Normalizar: si no hay materia o docente, crear estructura consistente
+    return lista.map((m) => ({
+      id: m.materia?.id || m.id,
+      nombreMateria: m.materia?.nombreMateria || m.nombreMateria || "Sin nombre",
+      nivel: m.materia?.nivel || m.nivel || "No especificado",
+      docente: m.docente
+        ? {
+            id: m.docente.id,
+            nombre: m.docente.nombre,
+            apellido: m.docente.apellido,
+          }
+        : null, // si no hay docente, queda null
+      cursoId: m.cursoId,
+    }));
   } catch (error) {
     console.error("Error en listarMateriasDeCurso:", error);
     throw error;
