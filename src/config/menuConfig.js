@@ -73,6 +73,8 @@ export const menuConfig = [
     roles: ["ROLE_ADMIN"],
     subItems: [
       { label: "Parámetros", path: "/configuracion", roles: ["ROLE_ADMIN"] },
+      { label: "Importar Alumnos", path: "/configuracion/importar-alumnos", roles: ["ROLE_ADMIN"] },
+
     ],
   },
 ];
