@@ -26,6 +26,7 @@ import PreceptorDetalle from '../Pages/PreceptorDetalle.jsx';
 import CursoHorarios from '../Pages/CursoHorario.jsx';
 import RoutePersistence from './RoutePersistance.jsx';
 import Horarios from '../Pages/Horarios.jsx';
+import ImportarAlumnos from '../Pages/ImportarAlumnos.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -45,6 +46,8 @@ function AppRoutes() {
 
     <Routes>
       <Route path="/" element={<DashboardLayout />}>
+        {/* Ruta index: cuando estamos exactamente en '/' redirigimos a /inicio */}
+        <Route index element={<Navigate to="inicio" replace />} />
         <Route path="inicio" element={<Inicio />} />
 
         {/* Solo ADMIN puede ver lista de alumnos */}
@@ -52,6 +55,7 @@ function AppRoutes() {
           <Route path="alumnos" element={<AlumnosFiltro />} />
           <Route path="alumnos/lista" element={<AlumnosLista />} />
           <Route path="alumnos/:id" element={<AlumnoDetalle />} />
+          <Route path="configuracion/importar-alumnos" element={<ImportarAlumnos />} />
         </Route>
 
         {/* Docentes -> SOLO ADMIN */}
