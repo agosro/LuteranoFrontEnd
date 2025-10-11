@@ -14,9 +14,17 @@ const reportes = [
   },
   {
     id: 3,
-    titulo: "Notas de Alumnos",
-    descripcion: "Consultá las calificaciones por materia y período, con promedios claros y comparativos.",
-    categoria: "Alumnos"
+    titulo: "Notas por Curso/Materia",
+    descripcion: "Calificaciones por curso y materia (E1/E2, PG y estado) con filtros y exportación.",
+    categoria: "Alumnos",
+    ruta: "/reportes/notas-por-curso"
+  },
+  {
+    id: 16,
+    titulo: "Notas de un Alumno",
+    descripcion: "Notas de un alumno individual: por materia o informe completo del año.",
+    categoria: "Alumnos",
+    ruta: "/reportes/notas-alumnos"
   },
   {
     id: 4,

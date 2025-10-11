@@ -1,12 +1,17 @@
 import React from "react";
 import { Card, Button, Row, Col } from "react-bootstrap";
+// import { useNavigate } from "react-router-dom";
 import reportes from "../Components/Reportes/reportesData";
+import Breadcrumbs from "../Components/Botones/Breadcrumbs";
+import BackButton from "../Components/Botones/BackButton";
 
 export default function Reportes() {
   const categorias = ["Alumnos", "Docentes"];
 
   return (
     <div className="container mt-5">
+      <div className="mb-1"><Breadcrumbs /></div>
+      <div className="mb-3"><BackButton /></div>
       <h2 className="mb-4 text-center">Reportes del Sistema</h2>
 
       {categorias.map((categoria) => (
@@ -22,7 +27,20 @@ export default function Reportes() {
                       <Card.Title>{reporte.titulo}</Card.Title>
                       <Card.Text className="flex-grow-1">{reporte.descripcion}</Card.Text>
                       <div className="mt-auto">
-                        <Button variant="primary" size="sm">Ver más</Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            const ruta = reporte.ruta
+                              || (reporte.titulo === "Notas por Curso/Materia" ? "/reportes/notas-por-curso" : null)
+                              || (reporte.titulo === "Notas de un Alumno" ? "/reportes/notas-alumnos" : null);
+                            if (ruta) {
+                              window.open(ruta, "_blank", "noopener,noreferrer");
+                            }
+                          }}
+                        >
+                          Ver más
+                        </Button>
                       </div>
                     </Card.Body>
                   </Card>
