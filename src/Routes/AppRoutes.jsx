@@ -31,6 +31,7 @@ import Calificaciones from '../Pages/Calificaciones.jsx';
 import ImportarCalificaciones from '../Pages/ImportarCalificaciones.jsx';
 import ReporteNotasAlumnos from '../Pages/ReporteNotasAlumnos.jsx';
 import ReporteNotasCursoMateria from '../Pages/ReporteNotasCursoMateria.jsx';
+import ReporteLegajoAlumno from '../Pages/ReporteLegajoAlumno.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -104,6 +105,7 @@ function AppRoutes() {
         {/* Reportes -> ADMIN, DOCENTE, PRECEPTOR */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR']} />}>
           <Route path="reportes" element={<Reportes />} />
+          <Route path="reportes/legajo-alumno" element={<ReporteLegajoAlumno />} />
           <Route path="reportes/notas-alumnos" element={<ReporteNotasAlumnos />} />
           <Route path="reportes/notas-por-curso" element={<ReporteNotasCursoMateria />} />
         </Route>
