@@ -120,7 +120,7 @@ export default function ImportarAlumnos() {
     <Container className="mt-4">
       <Card className="shadow-sm">
         <Card.Body>
-          <h3 className="mb-4">📂 Importar Alumnos desde CSV</h3>
+          <h3 className="mb-4">Importar Alumnos desde CSV</h3>
 
           <Row className="align-items-end g-3 mb-2">
             <Col md={7} lg={6}>
