@@ -64,3 +64,39 @@ export const obtenerHistorialActualAlumno  = async (token, alumnoId) => {
     throw error;
   }
 };
+
+
+// Lista los alumnos del curso (usa ciclo lectivo activo si no se especifica)
+export const listarAlumnosPorCurso = async (token, cursoId, cicloLectivoId = null) => {
+  try {
+    // Alinear con lo que funciona en Postman: /historial-curso/{cursoId}/alumnos?cicloLectivoId=1
+    const cl = cicloLectivoId ?? 1;
+    const url = `${API_URL}/historial-curso/${cursoId}/alumnos?cicloLectivoId=${cl}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+
+    if (!response.ok) {
+      const base = data?.mensaje || `Error ${response.status}`;
+      if (response.status === 403) throw new Error(`${base}: no autorizado (403)`);
+      throw new Error(base || "Error al obtener alumnos del curso");
+    }
+
+    // Devuelve solo el array limpio, tolerando distintos formatos de respuesta
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.alumnos)) return data.alumnos;
+    if (Array.isArray(data?.alumnosDtoList)) return data.alumnosDtoList;
+    return [];
+  } catch (error) {
+    console.error("Error en listarAlumnosPorCurso:", error);
+    throw error;
+  }
+};

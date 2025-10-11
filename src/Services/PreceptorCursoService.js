@@ -1,9 +1,5 @@
 const API_URL = "http://localhost:8080";
 
-// Nuevo mapeo según el controlador backend:
-// POST /preceptorCurso/{cursoId}/preceptor/{preceptorId}
-// DELETE /preceptorCurso/{cursoId}/preceptor
-
 const parseCursoResponse = async (response, defaultErrorMsg) => {
   let body = null;
   try { body = await response.json(); } catch { /* ignorar parse json */ }
@@ -17,7 +13,7 @@ const parseCursoResponse = async (response, defaultErrorMsg) => {
   return body;
 };
 
-// 📌 Asignar preceptor a curso
+// Asignar preceptor a curso
 export const asignarPreceptorACurso = async (token, cursoId, preceptorId) => {
   try {
     const response = await fetch(
@@ -37,7 +33,7 @@ export const asignarPreceptorACurso = async (token, cursoId, preceptorId) => {
   }
 };
 
-// 📌 Desasignar preceptor de curso
+// Desasignar preceptor de curso
 export const desasignarPreceptorDeCurso = async (token, cursoId) => {
   try {
     const response = await fetch(
