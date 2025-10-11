@@ -74,6 +74,7 @@ export const menuConfig = [
     subItems: [
       { label: "Parámetros", path: "/configuracion", roles: ["ROLE_ADMIN"] },
       { label: "Importar Alumnos", path: "/configuracion/importar-alumnos", roles: ["ROLE_ADMIN"] },
+      { label: "Importar Calificaciones", path: "/configuracion/importar-calificaciones", roles: ["ROLE_ADMIN"] },
 
     ],
   },
