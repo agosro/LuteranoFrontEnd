@@ -4,7 +4,8 @@ const reportes = [
     id: 1,
     titulo: "Legajo de Alumnos",
     descripcion: "Accedé a toda la información personal y académica de cada alumno en un solo lugar.",
-    categoria: "Alumnos"
+    categoria: "Alumnos",
+    ruta: "/reportes/legajo-alumno"
   },
   {
     id: 2,

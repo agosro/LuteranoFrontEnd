@@ -9,7 +9,10 @@ import BackButton from "../Components/Botones/BackButton";
 import Estadisticas from "../Components/Reportes/Estadisticas";
 
 // Contract expected from backend (approx):
-// CalificacionesAlumnoAnioResponse { code, mensaje, alumno?, anio, resumenMaterias: [{ materiaId, materiaNombre, e1Promedio, e2Promedio, promedioGeneral }] }
+// Contrato backend confirmado:
+// CalificacionesAlumnoAnioResponse { code, mensaje, calificacionesAlumnoResumenDto }
+// calificacionesAlumnoResumenDto: { alumnoId, dni, apellido, nombre, anio, materias: CalificacionesMateriaResumenDto[] }
+// CalificacionesMateriaResumenDto: { materiaId, materiaNombre, e1Notas: int[], e2Notas: int[], e1: number, e2: number, pg: number, estado: string }
 
 export default function ReporteNotasAlumnos() {
   const { user } = useAuth();
@@ -105,13 +108,13 @@ export default function ReporteNotasAlumnos() {
       "PG","Estado"
     ];
     const rows = resumen.map(r => {
-      const e1arr = r.e1Notas || [];
-      const e2arr = r.e2Notas || [];
+      const e1arr = Array.isArray(r.e1Notas) ? r.e1Notas : [];
+      const e2arr = Array.isArray(r.e2Notas) ? r.e2Notas : [];
       return [
-        (r.materiaNombre ?? r.materia ?? ""),
-        e1arr[0] ?? "", e1arr[1] ?? "", e1arr[2] ?? "", e1arr[3] ?? "", (r.e1 ?? r.e1Promedio ?? ""),
-        e2arr[0] ?? "", e2arr[1] ?? "", e2arr[2] ?? "", e2arr[3] ?? "", (r.e2 ?? r.e2Promedio ?? ""),
-        (r.pg ?? r.promedioGeneral ?? ""), (r.estado ?? "")
+        r.materiaNombre || "",
+        e1arr[0] ?? "", e1arr[1] ?? "", e1arr[2] ?? "", e1arr[3] ?? "", (r.e1 ?? ""),
+        e2arr[0] ?? "", e2arr[1] ?? "", e2arr[2] ?? "", e2arr[3] ?? "", (r.e2 ?? ""),
+        (r.pg ?? ""), (r.estado ?? "")
       ];
     });
     const csv = [header, ...rows]
@@ -133,9 +136,9 @@ export default function ReporteNotasAlumnos() {
   };
 
   // Stats globales
-  const pgList = resumen.map(r => r.pg ?? r.promedioGeneral).filter(v => typeof v === 'number');
+  const pgList = resumen.map(r => r.pg).filter(v => typeof v === 'number');
   const totalMaterias = resumen.length;
-  const aprobadas = resumen.filter(r => (r.estado || '').toLowerCase() === 'aprobado' || (r.pg ?? r.promedioGeneral) >= 6).length;
+  const aprobadas = resumen.filter(r => (r.estado || '').toLowerCase() === 'aprobado' || (r.pg ?? 0) >= 6).length;
   const desaprobadas = totalMaterias - aprobadas;
   const promedioGeneralAlumno = pgList.length ? Math.round((pgList.reduce((a,b)=>a+b,0)/pgList.length)*10)/10 : null;
 
@@ -280,14 +283,14 @@ export default function ReporteNotasAlumnos() {
                     </thead>
                     <tbody>
                       {resumen.map((r, idx) => {
-                        const e1 = r.e1Notas || [];
-                        const e2 = r.e2Notas || [];
+                        const e1 = Array.isArray(r.e1Notas) ? r.e1Notas : [];
+                        const e2 = Array.isArray(r.e2Notas) ? r.e2Notas : [];
                         return (
                           <tr key={r.materiaId ?? idx}>
-                            <td>{r.materiaNombre ?? r.materia}</td>
-                            <td>{e1[0] ?? '-'}</td><td>{e1[1] ?? '-'}</td><td>{e1[2] ?? '-'}</td><td>{e1[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e1 ?? r.e1Promedio ?? '-'}</Badge></td>
-                            <td>{e2[0] ?? '-'}</td><td>{e2[1] ?? '-'}</td><td>{e2[2] ?? '-'}</td><td>{e2[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e2 ?? r.e2Promedio ?? '-'}</Badge></td>
-                            <td><Badge bg={(r.pg ?? r.promedioGeneral) >= 6 ? 'success' : 'danger'}>{r.pg ?? r.promedioGeneral ?? '-'}</Badge></td>
+                            <td>{r.materiaNombre}</td>
+                            <td>{e1[0] ?? '-'}</td><td>{e1[1] ?? '-'}</td><td>{e1[2] ?? '-'}</td><td>{e1[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e1 ?? '-'}</Badge></td>
+                            <td>{e2[0] ?? '-'}</td><td>{e2[1] ?? '-'}</td><td>{e2[2] ?? '-'}</td><td>{e2[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e2 ?? '-'}</Badge></td>
+                            <td><Badge bg={(r.pg ?? 0) >= 6 ? 'success' : 'danger'}>{r.pg ?? '-'}</Badge></td>
                             <td>{r.estado ?? '-'}</td>
                           </tr>
                         );

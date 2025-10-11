@@ -148,14 +148,14 @@ export default function ReporteNotasCursoMateria() {
 
   const exportCSV = () => {
     if (!alumnos || alumnos.length === 0) return;
-    const header = ["Nro Doc","Apellido","Nombre","Materia","E1 N1","E1 N2","E1 N3","E1 N4","E1","E2 N1","E2 N2","E2 N3","E2 N4","E2","PG","Estado"];
+  const header = ["Nro Doc","Apellido","Nombre","Materia","E1 N1","E1 N2","E1 N3","E1 N4","E1","E2 N1","E2 N2","E2 N3","E2 N4","E2","PG","Estado"]; 
     const rows = [];
     for (const a of alumnos) {
       const mats = a.materias || [];
       if (mats.length === 0) rows.push([a.dni||"", a.apellido||"", a.nombre||"", "", "","","","","","","","","","","",""]);
       for (const m of mats) {
-        const e1 = m.e1Notas || [];
-        const e2 = m.e2Notas || [];
+  const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : [];
+  const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
         rows.push([
           a.dni||"", a.apellido||"", a.nombre||"",
           m.materiaNombre||"",
@@ -306,8 +306,8 @@ export default function ReporteNotasCursoMateria() {
                     );
                   }
                   return mats.map((m, idxM) => {
-                    const e1 = m.e1Notas || [];
-                    const e2 = m.e2Notas || [];
+                    const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : [];
+                    const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
                     return (
                       <tr key={`a-${idxA}-m-${idxM}`}>
                         <td>{a.dni||""}</td>
