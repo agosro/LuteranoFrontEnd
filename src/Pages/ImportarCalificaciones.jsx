@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { Container, Card, Button, Form, Spinner, Alert, Table, Badge, Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useAuth } from "../Context/AuthContext";
-import { importarNotasCidi } from "../Services/ImportService";
+import { importarNotas } from "../Services/ImportService";
+import { normalizeCsvHeaders } from "../utils/csvHeaders";
 
 export default function ImportarCalificaciones() {
 	const { user } = useAuth();
@@ -12,7 +13,6 @@ export default function ImportarCalificaciones() {
 	const [result, setResult] = useState(null);
 	const [headerPreview, setHeaderPreview] = useState("");
 	const [normalized, setNormalized] = useState(false);
-	const [charset, setCharset] = useState("utf-8");
 	const fileInputRef = useRef(null);
 
 	// Headers que lee el backend (según ImportsController docstring)
@@ -91,13 +91,6 @@ export default function ImportarCalificaciones() {
 		"n4 e2": "Nota 4 Etapa 2",
 	};
 
-	const normalizeKey = (h) => h
-		.replace("\uFEFF", "")
-		.normalize("NFD").replace(/\p{M}+/gu, "")
-		.toLowerCase()
-		.replace(/[.]/g, "")
-		.replace(/\s+/g, " ")
-		.trim();
 
 	const handleFileChange = (e) => {
 		const f = e.target.files?.[0];
@@ -107,30 +100,23 @@ export default function ImportarCalificaciones() {
 		setNormalized(false);
 		if (!f) return;
 
-		const reader = new FileReader();
-		reader.onload = (evt) => {
-			const text = evt.target.result || "";
-			const firstLine = (text.split(/\r?\n/)[0] || "").trim();
-			setHeaderPreview(firstLine);
-
-			const delimiter = firstLine.includes(";") ? ";" : ",";
-			const cols = firstLine.split(delimiter).map((c) => c.trim());
-			const replaced = cols.map((col) => {
-				const key = normalizeKey(col);
-				return HEADER_ALIASES[key] || col;
-			});
-
-			if (JSON.stringify(cols) !== JSON.stringify(replaced)) {
-				setNormalized(true);
-				toast.info("Se normalizaron los encabezados para coincidir con el backend");
-				const rest = text.split(/\r?\n/).slice(1).join("\n");
-				const newContent = replaced.join(delimiter) + "\n" + rest;
-				const newFile = new File([newContent], f.name, { type: f.type || "text/csv" });
+		normalizeCsvHeaders(f, HEADER_ALIASES)
+			.then(({ file: newFile, headerPreview, normalized }) => {
+				if (normalized) toast.info("Se normalizaron los encabezados para coincidir con el backend");
 				setFile(newFile);
-				setHeaderPreview(replaced.join(delimiter));
-			}
-		};
-		reader.readAsText(f, charset || "UTF-8");
+				setHeaderPreview(headerPreview);
+				setNormalized(normalized);
+			})
+			.catch((err) => {
+				console.warn("No se pudo normalizar encabezados", err);
+				const reader = new FileReader();
+				reader.onload = (evt) => {
+					const text = evt.target.result || "";
+					const firstLine = (String(text).split(/\r?\n/)[0] || "").trim();
+					setHeaderPreview(firstLine);
+				};
+				reader.readAsText(f, "UTF-8");
+			});
 	};
 
 	const handleImport = async () => {
@@ -140,7 +126,7 @@ export default function ImportarCalificaciones() {
 		}
 		setLoading(true);
 		try {
-			const data = await importarNotasCidi(user.token, file, { dryRun, charset });
+			const data = await importarNotas(file, dryRun, user.token);
 			setResult(data);
 			toast.success(
 				dryRun ? "Prueba completada correctamente (dry run)" : "Importación de notas finalizada"
@@ -235,17 +221,7 @@ export default function ImportarCalificaciones() {
 					</Row>
 
 					<Row className="g-3 mb-3">
-						<Col sm={6} md={4} lg={3}>
-							<Form.Group controlId="charsetSelect">
-								<Form.Label>Codificación</Form.Label>
-								<Form.Select value={charset} onChange={(e) => setCharset(e.target.value)} disabled={loading}>
-									<option value="utf-8">UTF-8 (recomendado)</option>
-									<option value="windows-1252">Windows-1252</option>
-									<option value="iso-8859-1">ISO-8859-1</option>
-								</Form.Select>
-							</Form.Group>
-						</Col>
-						<Col sm={6} md={8} lg={9} className="d-flex align-items-end">
+						<Col className="d-flex align-items-end">
 							<Form.Check
 								type="checkbox"
 								id="dryRunCheckNotas"
