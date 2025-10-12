@@ -7,11 +7,14 @@ import AlumnosLista from '../Pages/AlumnosLista.jsx';
 import AlumnosFiltro from '../Pages/AlumnosFiltro.jsx';
 import Docentes from '../Pages/Docentes.jsx';
 import Usuarios from '../Pages/Usuarios.jsx';
+import UsuarioDetalle from '../Pages/UsuarioDetalle.jsx';
 import Preceptores from '../Pages/Preceptores.jsx';
 import Materias from '../Pages/Materias.jsx';
+import MateriaDetalle from '../Pages/MateriaDetalle.jsx';
 import Cursos from '../Pages/Cursos.jsx';
 import Aulas from '../Pages/Aulas.jsx';
 import Tutores from '../Pages/Tutores.jsx';
+import TutorDetalle from '../Pages/TutorDetalle.jsx';
 import Mesas from '../Pages/Mesas.jsx';
 import Reportes from '../Pages/Reportes.jsx';
 import ReservarEspacio from '../Pages/Reservar.jsx';
@@ -24,6 +27,7 @@ import AlumnoDetalle from '../Pages/AlumnoDetalle.jsx';
 import DocenteDetalle from '../Pages/DocenteDetalle.jsx';
 import PreceptorDetalle from '../Pages/PreceptorDetalle.jsx';
 import CursoHorarios from '../Pages/CursoHorario.jsx';
+import CursoDetalle from '../Pages/CursoDetalle.jsx';
 import RoutePersistence from './RoutePersistance.jsx';
 import Horarios from '../Pages/Horarios.jsx';
 import ImportarAlumnos from '../Pages/ImportarAlumnos.jsx';
@@ -71,12 +75,15 @@ function AppRoutes() {
         {/* Usuarios -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="usuarios" element={<Usuarios />} />
+          <Route path="usuarios/:id" element={<UsuarioDetalle />} />
         </Route>
 
         {/* Materias y Cursos -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="materias" element={<Materias />} />
+          <Route path="materias/:id" element={<MateriaDetalle />} />
           <Route path="cursos" element={<Cursos />} />
+          <Route path="cursos/:id" element={<CursoDetalle />} />
           <Route path="/cursos/:id/horarios" element={<CursoHorarios />} />
           <Route path="/horarios" element={<Horarios />} />
         </Route>
@@ -89,6 +96,7 @@ function AppRoutes() {
         {/* Tutores -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="tutores" element={<Tutores />} />
+          <Route path="tutores/:id" element={<TutorDetalle />} />
         </Route>
 
         {/* Preceptores -> SOLO ADMIN */}

@@ -102,7 +102,26 @@ export const listarCursosDeMateria = async (token, materiaId) => {
 
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || "Error al listar cursos de materia");
-    return Array.isArray(data.materiaCursoDtoLis) ? data.materiaCursoDtoLis : [];
+
+    const lista = Array.isArray(data.materiaCursoDtoLis)
+      ? data.materiaCursoDtoLis
+      : [];
+
+    // Normalizar forma de salida para el front
+    // Queremos asegurar: cursoId y (docente | docentes[])
+    return lista.map((mc) => {
+      const cursoId = mc.cursoId ?? mc.curso?.id ?? null;
+      // Algunos backends devuelven 'docente', otros 'docentes' (array)
+      const docentesArr = Array.isArray(mc.docentes) ? mc.docentes : (mc.docente ? [mc.docente] : []);
+      const docente = docentesArr[0] || null; // compatibilidad con código existente
+
+      return {
+        ...mc,
+        cursoId,
+        docente,
+        docentes: docentesArr.length ? docentesArr.map(d => ({ id: d.id, nombre: d.nombre, apellido: d.apellido })) : [],
+      };
+    });
   } catch (error) {
     console.error("Error en listarCursosDeMateria:", error);
     throw error;

@@ -44,14 +44,24 @@ export const camposCurso = (
     readOnly: modoVista 
   },
 
-  { 
-    name: "aulaId", 
-    label: "Aula asignada", 
-    type: "select", 
-    opciones: aulasOptions, 
-    required: false, 
-    readOnly: modoVista 
-  },
+  // Aula: en vista mostramos el nombre (texto); en edición usamos select por id
+  ...(modoVista
+    ? [{
+        name: "aulaNombre",
+        label: "Aula asignada",
+        type: "text",
+        required: false,
+        readOnly: true,
+      }]
+    : [{
+        name: "aulaId",
+        label: "Aula asignada",
+        type: "select",
+        opciones: aulasOptions,
+        required: false,
+        readOnly: false,
+      }]
+  ),
 
   ...(incluirMaterias ? [{
     name: "materias", 

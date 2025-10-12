@@ -15,6 +15,8 @@ import BotonCrear from "../Components/Botones/BotonCrear";
 import { toast } from "react-toastify";
 import { useAuth } from "../Context/AuthContext";
 import { inputLocalToBackendISO } from "../utils/fechas";
+import { listarCursosPorPreceptor } from "../Services/CursoService";
+import { getTituloCurso } from "../utils/cursos";
 
 export default function ListaPreceptores() {
   const { user } = useAuth();
@@ -43,7 +45,19 @@ export default function ListaPreceptores() {
         const preceptoresData = await listarPreceptores(token); // ya devuelve array
         const usuariosData = await obtenerUsuariosSinAsignarPorRol(token, "ROLE_PRECEPTOR");
 
-        setPreceptores(preceptoresData);
+        // Enriquecer cada preceptor con sus cursos a cargo
+        const preceptoresConCursos = await Promise.all(
+          (preceptoresData || []).map(async (p) => {
+            try {
+              const cursos = await listarCursosPorPreceptor(token, p.id);
+              return { ...p, cursos: Array.isArray(cursos) ? cursos : [] };
+            } catch {
+              return { ...p, cursos: p.cursos || [] };
+            }
+          })
+        );
+
+        setPreceptores(preceptoresConCursos);
 
         const opcionesUsuarios = (usuariosData.usuarios || []).map((u) => ({
           value: u.id,
@@ -185,7 +199,7 @@ export default function ListaPreceptores() {
       label: "Cursos asignados",
       render: (p) =>
         p.cursos && p.cursos.length > 0
-          ? p.cursos.map((c) => c.nombre || c.nombreCurso).join(", ")
+          ? p.cursos.map((c) => getTituloCurso(c)).join(", ")
           : "Sin cursos asignados",
     },
   ];

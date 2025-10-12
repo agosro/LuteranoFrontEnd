@@ -4,7 +4,8 @@ export const camposPreceptor = (
   modoEditar = false,
   tieneUsuario = false
 ) => [
-  {
+  // En modo vista no mostramos el usuario asignado
+  ...(!modoVista ? [{
     name: "usuarioId",
     label: "Usuario asignado",
     type: "select",
@@ -12,7 +13,7 @@ export const camposPreceptor = (
     required: !modoVista && !modoEditar, // requerido solo al crear
     disabled: modoEditar || modoVista || tieneUsuario,
     readOnly: modoVista,
-  },
+  }] : []),
   {
     name: "nombre",
     label: "Nombre",

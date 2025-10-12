@@ -87,15 +87,20 @@ export default function ListaMaterias() {
                     ? getTituloCurso(cursoEncontrado)
                     : `Curso ${mc.cursoId}`;
 
-                  const docenteNombre = mc.docente
-                    ? `${mc.docente.nombre} ${mc.docente.apellido}`
+                  // Puede venir 'docente' (objeto) o 'docentes' (array normalizado)
+                  const docentes = Array.isArray(mc.docentes) && mc.docentes.length
+                    ? mc.docentes
+                    : (mc.docente ? [mc.docente] : []);
+                  const docenteNombre = docentes.length
+                    ? docentes.map(d => `${d.nombre} ${d.apellido}`).join(", ")
                     : "Sin docente";
 
                   return {
                     ...m,
                     cursoId: mc.cursoId,
                     cursoNombre,
-                    docente: mc.docente,
+                    docente: mc.docente || null,
+                    docentes,
                     docenteNombre,
                   };
                 });
@@ -201,7 +206,7 @@ export default function ListaMaterias() {
     { key: 'descripcion', label: 'Descripción' },
     { key: 'nivel', label: 'Nivel', render: (m) => m.nivel ?? 'Sin nivel' },
     { key: 'curso', label: 'Curso', render: (m) => m.cursoNombre },
-    { key: 'docente', label: 'Docente', render: (m) => m.docenteNombre }
+    { key: 'docente', label: 'Docente(s)', render: (m) => m.docenteNombre }
   ];
 
   return (
@@ -229,8 +234,9 @@ export default function ListaMaterias() {
         show={modalVerShow}
         onClose={() => setModalVerShow(false)}
         datos={materiaSeleccionada}
-        campos={camposMateria(true)}
+        campos={camposMateria(true).filter(c => c.name !== 'cursoNombre' && c.name !== 'docenteNombre')}
         titulo="Detalle de la Materia"
+        detallePathBase="materias"
       />
 
       <ConfirmarEliminar

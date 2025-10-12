@@ -6,8 +6,9 @@ export const camposUsuarioVista = [
   {
     name: 'role',
     label: 'Rol',
-    render: (datos) => {
-      const roleName = datos.role?.name || '';
+    render: (valor) => {
+      // En el modal se pasa el valor del campo ('role'), no el objeto completo
+      const roleName = typeof valor === 'string' ? valor : (valor?.name || '');
       switch (roleName) {
         case 'ROLE_ADMIN': return 'Admin';
         case 'ROLE_DIRECTOR': return 'Director';
