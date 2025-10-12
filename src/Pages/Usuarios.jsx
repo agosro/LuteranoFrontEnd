@@ -274,6 +274,7 @@ export default function Usuarios() {
         datos={usuarioSeleccionado}
         campos={camposUsuarioVista}
         titulo="Detalle del Usuario"
+        detallePathBase="usuarios"
       />
 
       <ConfirmarEliminar

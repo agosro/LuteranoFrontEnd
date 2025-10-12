@@ -7,6 +7,7 @@ import AlumnosLista from '../Pages/AlumnosLista.jsx';
 import AlumnosFiltro from '../Pages/AlumnosFiltro.jsx';
 import Docentes from '../Pages/Docentes.jsx';
 import Usuarios from '../Pages/Usuarios.jsx';
+import UsuarioDetalle from '../Pages/UsuarioDetalle.jsx';
 import Preceptores from '../Pages/Preceptores.jsx';
 import Materias from '../Pages/Materias.jsx';
 import Cursos from '../Pages/Cursos.jsx';
@@ -72,6 +73,7 @@ function AppRoutes() {
         {/* Usuarios -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="usuarios" element={<Usuarios />} />
+          <Route path="usuarios/:id" element={<UsuarioDetalle />} />
         </Route>
 
         {/* Materias y Cursos -> SOLO ADMIN */}
