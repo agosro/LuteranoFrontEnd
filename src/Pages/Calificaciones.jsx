@@ -10,7 +10,7 @@ import {
   eliminarCalificacion,
 } from "../Services/CalificacionesService";
 import TablaCalificaciones from "../Components/Calificaciones/TablaCalificaciones";
-import { Container, Row, Col, Form, Button, Spinner, Modal } from "react-bootstrap";
+import { Container, Row, Col, Form, Button, Spinner, Modal, Card } from "react-bootstrap";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -202,73 +202,77 @@ export default function Calificaciones() {
         <Button variant="outline-secondary" className="mt-2" onClick={() => navigate(-1)}>← Volver</Button>
       </div>
 
-      <h3 className="mb-4">Carga de Calificaciones</h3>
+      <Card className="shadow-sm">
+        <Card.Body>
+          <h3 className="mb-4">Carga de Calificaciones</h3>
 
-      {/* FILTROS */}
-      <Row className="mb-3">
-        <Col md={4}>
-          <Form.Select
-            value={cursoSeleccionado}
-            onChange={(e) => setCursoSeleccionado(e.target.value)}
-          >
-            <option value="">Seleccione curso</option>
-            {cursos.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.anio}° {c.division} - {c.nivel}
-              </option>
-            ))}
-          </Form.Select>
-        </Col>
-        <Col md={4}>
-          <Form.Select
-            value={materiaSeleccionada}
-            onChange={(e) => setMateriaSeleccionada(e.target.value)}
-            disabled={!cursoSeleccionado}
-          >
-            <option value="">Seleccione materia</option>
-            {materias.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nombreMateria || m.nombre || "Sin nombre"}
-              </option>
-            ))}
-          </Form.Select>
-        </Col>
-        <Col md={2}>
-          <Form.Select value={etapa} onChange={(e) => setEtapa(e.target.value)}>
-            <option value="1">Etapa 1</option>
-            <option value="2">Etapa 2</option>
-          </Form.Select>
-        </Col>
-        <Col md={2}>
-          <Button onClick={handleBuscar} disabled={loading}>
-            {loading ? <Spinner size="sm" /> : "Buscar"}
-          </Button>
-        </Col>
-      </Row>
+          {/* FILTROS */}
+          <Row className="mb-3">
+            <Col md={4}>
+              <Form.Select
+                value={cursoSeleccionado}
+                onChange={(e) => setCursoSeleccionado(e.target.value)}
+              >
+                <option value="">Seleccione curso</option>
+                {cursos.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.anio}° {c.division} - {c.nivel}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+            <Col md={4}>
+              <Form.Select
+                value={materiaSeleccionada}
+                onChange={(e) => setMateriaSeleccionada(e.target.value)}
+                disabled={!cursoSeleccionado}
+              >
+                <option value="">Seleccione materia</option>
+                {materias.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombreMateria || m.nombre || "Sin nombre"}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+            <Col md={2}>
+              <Form.Select value={etapa} onChange={(e) => setEtapa(e.target.value)}>
+                <option value="1">Etapa 1</option>
+                <option value="2">Etapa 2</option>
+              </Form.Select>
+            </Col>
+            <Col md={2}>
+              <Button onClick={handleBuscar} disabled={loading}>
+                {loading ? <Spinner size="sm" /> : "Buscar"}
+              </Button>
+            </Col>
+          </Row>
 
-      {alumnosError && (
-        <Row className="mb-3">
-          <Col>
-            <div className="text-danger small">{alumnosError}</div>
-          </Col>
-        </Row>
-      )}
+          {alumnosError && (
+            <Row className="mb-3">
+              <Col>
+                <div className="text-danger small">{alumnosError}</div>
+              </Col>
+            </Row>
+          )}
 
-      {/* TABLA */}
-      {datos.length > 0 && (
-        <TablaCalificaciones
-          datos={datos}
-          materiaId={materiaSeleccionada}
-          materiaCursoId={(() => {
-            const sel = materias.find((m) => Number(m.id) === Number(materiaSeleccionada));
-            return sel?.materiaCursoId;
-          })()}
-          etapa={etapa}
-          onGuardar={handleGuardar}
-          onEliminar={handleEliminar}
-          onGuardarTodos={handleGuardarTodos}
-        />
-      )}
+          {/* TABLA */}
+          {datos.length > 0 && (
+            <TablaCalificaciones
+              datos={datos}
+              materiaId={materiaSeleccionada}
+              materiaCursoId={(() => {
+                const sel = materias.find((m) => Number(m.id) === Number(materiaSeleccionada));
+                return sel?.materiaCursoId;
+              })()}
+              etapa={etapa}
+              onGuardar={handleGuardar}
+              onEliminar={handleEliminar}
+              onGuardarTodos={handleGuardarTodos}
+            />
+          )}
+        </Card.Body>
+      </Card>
 
       {/* Modal de éxito (solo para guardado masivo) */}
       <Modal show={mostrarExito} onHide={() => setMostrarExito(false)} centered>
