@@ -194,7 +194,12 @@ export default function ListaTutores() {
     { key: "telefono", label: "Teléfono" },
   ];
 
-  const tutorVistaFormateado = tutorSeleccionado || null;
+  const tutorVistaFormateado = tutorSeleccionado ? {
+    id: tutorSeleccionado.id,
+    nombre: tutorSeleccionado.nombre || "",
+    apellido: tutorSeleccionado.apellido || "",
+    telefono: tutorSeleccionado.telefono || "",
+  } : null;
 
   return (
     <>
@@ -234,8 +239,13 @@ export default function ListaTutores() {
         show={modalVerShow}
         onClose={cerrarModalVer}
         datos={tutorVistaFormateado}
-        campos={camposTutor(true)}  // modo vista
+        campos={[
+          { name: 'nombre', label: 'Nombre' },
+          { name: 'apellido', label: 'Apellido' },
+          { name: 'telefono', label: 'Teléfono' },
+        ]}
         titulo={`Datos del tutor: ${tutorSeleccionado?.nombre} ${tutorSeleccionado?.apellido}`}
+        detallePathBase="tutores"
       />
 
       <ConfirmarEliminar
