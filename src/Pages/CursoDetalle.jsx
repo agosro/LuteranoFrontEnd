@@ -28,6 +28,7 @@ export default function CursoDetalle() {
   const [formData, setFormData] = useState(cursoState || {});
   const [aulasOptions, setAulasOptions] = useState([]);
   const [preceptor, setPreceptor] = useState(cursoState?.preceptor || null);
+  const [preceptorLoading, setPreceptorLoading] = useState(false);
 
   const [alumnos, setAlumnos] = useState([]);
   const [alumnosLoading, setAlumnosLoading] = useState(true);
@@ -70,6 +71,7 @@ export default function CursoDetalle() {
           });
           // Resolver preceptor si viene el id
           try {
+            setPreceptorLoading(true);
             const preceptorId = c?.preceptorId || c?.preceptor?.id;
             if (preceptorId) {
               const lista = await listarPreceptores(token);
@@ -80,6 +82,8 @@ export default function CursoDetalle() {
             }
           } catch {
             // silencioso
+          } finally {
+            setPreceptorLoading(false);
           }
         } else if (cursoState) {
           setCurso(cursoState);
@@ -98,11 +102,33 @@ export default function CursoDetalle() {
             setPreceptor(cursoState.preceptor);
           } else if (cursoState.preceptorId) {
             try {
+              setPreceptorLoading(true);
               const lista = await listarPreceptores(token);
               const p = (lista || []).find(x => x.id === cursoState.preceptorId) || null;
               setPreceptor(p);
             } catch {
               // silencioso
+            } finally {
+              setPreceptorLoading(false);
+            }
+          } else {
+            // Si no vino preceptor en el state, obtener curso completo y resolver
+            try {
+              setPreceptorLoading(true);
+              const data = await obtenerCursoPorId(token, id);
+              const cFull = data?.cursoDto || data;
+              const preceptorId = cFull?.preceptorId || cFull?.preceptor?.id;
+              if (preceptorId) {
+                const lista = await listarPreceptores(token);
+                const p = (lista || []).find(x => x.id === preceptorId) || cFull?.preceptor || null;
+                setPreceptor(p);
+              } else {
+                setPreceptor(cFull?.preceptor || null);
+              }
+            } catch {
+              // silencioso
+            } finally {
+              setPreceptorLoading(false);
             }
           }
         }
@@ -223,7 +249,10 @@ export default function CursoDetalle() {
           content: (modoEditar) =>
             !modoEditar ? (
               <>
-                <RenderCampos
+                {!curso ? (
+                  <p>Cargando datos del curso...</p>
+                ) : (
+                  <RenderCampos
                   campos={camposCurso(true, aulasOptions, [], false)}
                   data={{
                     anio: curso?.anio,
@@ -237,13 +266,16 @@ export default function CursoDetalle() {
                     })(),
                   }}
                 />
+                )}
 
                 {/* Preceptor a cargo */}
                 <div className="card p-3 shadow-sm mt-3">
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
                       <div className="fw-bold mb-1">Preceptor a cargo</div>
-                      {preceptor ? (
+                      {preceptorLoading ? (
+                        <div className="text-muted">Cargando preceptor...</div>
+                      ) : preceptor ? (
                         <div>
                           {preceptor.nombre} {preceptor.apellido}
                         </div>
@@ -252,7 +284,7 @@ export default function CursoDetalle() {
                       )}
                     </div>
                     <div>
-                      {preceptor && (
+                      {!preceptorLoading && preceptor && (
                         <Link
                           to={`/preceptores/${preceptor.id}`}
                           state={preceptor}
