@@ -11,11 +11,14 @@ import {
 } from "../Services/CalificacionesService";
 import TablaCalificaciones from "../Components/Calificaciones/TablaCalificaciones";
 import { Container, Row, Col, Form, Button, Spinner, Modal } from "react-bootstrap";
+import Breadcrumbs from "../Components/Botones/Breadcrumbs";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 export default function Calificaciones() {
   const { user } = useAuth();
   const token = user?.token;
+  const navigate = useNavigate();
 
   const [cursos, setCursos] = useState([]);
   const [materias, setMaterias] = useState([]);
@@ -193,6 +196,12 @@ export default function Calificaciones() {
 
   return (
     <Container className="py-4">
+      {/* Migas de pan y botón volver debajo */}
+      <div className="mb-3">
+        <Breadcrumbs />
+        <Button variant="outline-secondary" className="mt-2" onClick={() => navigate(-1)}>← Volver</Button>
+      </div>
+
       <h3 className="mb-4">Carga de Calificaciones</h3>
 
       {/* FILTROS */}

@@ -4,9 +4,12 @@ import { importarAlumnos } from "../Services/ImportService";
 import { Container, Card, Button, Form, Spinner, Alert, Table, Badge, Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { normalizeCsvHeaders } from "../utils/csvHeaders";
+import Breadcrumbs from "../Components/Botones/Breadcrumbs";
+import { useNavigate } from "react-router-dom";
 
 export default function ImportarAlumnos() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [file, setFile] = useState(null);
   const [dryRun, setDryRun] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -118,6 +121,12 @@ export default function ImportarAlumnos() {
 
   return (
     <Container className="mt-4">
+      {/* Migas de pan y botón volver debajo */}
+      <div className="mb-3">
+        <Breadcrumbs />
+        <Button variant="outline-secondary" className="mt-2" onClick={() => navigate(-1)}>← Volver</Button>
+      </div>
+
       <Card className="shadow-sm">
         <Card.Body>
           <h3 className="mb-4">Importar Alumnos desde CSV</h3>
