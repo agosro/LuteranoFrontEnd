@@ -246,7 +246,6 @@ export default function ListaCursos() {
     { key: "anioDivision", label: "Año/División", render: c => `${c.anio} ${c.division}` },
     { key: "nivel", label: "Nivel" },
     { key: "aula", label: "Aula", render: c => c.aulaNombre || "Sin aula" },
-    { key: "materias", label: "Materias", render: c => c.dictados?.map(d => d.nombre).join(", ") || "Sin materias asignadas" },
     { 
     key: "preceptor", 
     label: "Preceptor", 
@@ -311,7 +310,7 @@ export default function ListaCursos() {
       <ModalEditarEntidad
         show={modalEditarShow}
         onClose={cerrarModalEditar}
-        campos={camposCurso(false, aulasOptions, materiasOptions, true)}
+        campos={camposCurso(false, aulasOptions, [], false)}
         formData={formData}
         onInputChange={handleInputChange}
         onSubmit={handleUpdate}
@@ -321,9 +320,13 @@ export default function ListaCursos() {
       <ModalVerEntidad
         show={modalVerShow}
         onClose={cerrarModalVer}
-        datos={cursoSeleccionado}
-        campos={camposCurso(true, aulasOptions, materiasOptions, true)}
+        datos={{
+          ...cursoSeleccionado,
+          aulaNombre: cursoSeleccionado?.aulaNombre || aulasOptions.find(a => a.value === (cursoSeleccionado?.aula?.value || cursoSeleccionado?.aula?.id))?.label || "",
+        }}
+        campos={camposCurso(true, [], [], false)}
         titulo={`Datos del curso: ${cursoSeleccionado?.anio} ${cursoSeleccionado?.division}`}
+        detallePathBase="cursos"
       />
 
       <ConfirmarEliminar

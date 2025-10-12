@@ -24,6 +24,7 @@ import AlumnoDetalle from '../Pages/AlumnoDetalle.jsx';
 import DocenteDetalle from '../Pages/DocenteDetalle.jsx';
 import PreceptorDetalle from '../Pages/PreceptorDetalle.jsx';
 import CursoHorarios from '../Pages/CursoHorario.jsx';
+import CursoDetalle from '../Pages/CursoDetalle.jsx';
 import RoutePersistence from './RoutePersistance.jsx';
 import Horarios from '../Pages/Horarios.jsx';
 import ImportarAlumnos from '../Pages/ImportarAlumnos.jsx';
@@ -77,6 +78,7 @@ function AppRoutes() {
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="materias" element={<Materias />} />
           <Route path="cursos" element={<Cursos />} />
+          <Route path="cursos/:id" element={<CursoDetalle />} />
           <Route path="/cursos/:id/horarios" element={<CursoHorarios />} />
           <Route path="/horarios" element={<Horarios />} />
         </Route>
