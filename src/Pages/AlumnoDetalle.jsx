@@ -332,7 +332,6 @@ function AlumnoDetalle() {
         onAsignar={async (token, cursoIdSeleccionado, alumnoId) => {
           const req = { alumnoId, cursoId: cursoIdSeleccionado, cicloLectivoId: 1 };
           await asignarCursoAlumno(token, req);
-          toast.success("Curso asignado correctamente");
           try {
             const dataActual = await obtenerHistorialActualAlumno(token, alumnoId);
             const vigente = dataActual?.historialCurso ?? null;

@@ -3,21 +3,6 @@ import Select from "react-select";
 import { Modal, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 
-/**
- * Modal genérico de selección simple.
- *
- * Props:
- * - show: boolean → controla visibilidad
- * - onClose: función → cierra modal
- * - titulo: string → título del modal
- * - entidad: objeto → entidad actual con su asignación { id, ... }
- * - campoAsignado: string → nombre del campo (ej: "docente", "preceptor")
- * - obtenerOpciones: función async (token) → lista [{value,label}]
- * - onAsignar: función async (token, idSeleccionado, entidadId) → asigna
- * - onDesasignar: función async (token, entidadId) → desasigna
- * - token: string → JWT
- * - onActualizar: función → refresca lista
- */
 export default function ModalSeleccionSimple({
   show,
   onClose,
@@ -29,6 +14,7 @@ export default function ModalSeleccionSimple({
   onDesasignar,
   token,
   onActualizar,
+  toastOnSuccess = true,
 }) {
   const [opciones, setOpciones] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
@@ -39,16 +25,38 @@ export default function ModalSeleccionSimple({
     setLoading(true);
     try {
       const data = await obtenerOpciones(token);
-      setOpciones(data);
+      setOpciones(Array.isArray(data) ? data : []);
 
+      // Preselección determinística
       if (entidad?.[campoAsignado]) {
-        setSeleccionado({
-          value: entidad[campoAsignado].id,
-          label:
-            entidad[campoAsignado].nombre
-              ? `${entidad[campoAsignado].nombre} ${entidad[campoAsignado].apellido || ""}`.trim()
-              : entidad[campoAsignado].label || entidad[campoAsignado].descripcion || entidad[campoAsignado].id,
-        });
+        const esCurso = campoAsignado.toLowerCase().includes("curso");
+        const fuente = entidad[campoAsignado];
+        const curso = esCurso ? (fuente?.curso ?? fuente) : null;
+        const selectedId = esCurso ? (curso?.id ?? null) : (fuente?.id ?? fuente?.value ?? null);
+
+        if (selectedId != null) {
+          const match = (data || []).find((o) => String(o.value) === String(selectedId));
+          if (match) {
+            setSeleccionado(match);
+          } else {
+            // Fallback: construir label aproximado
+            let labelGenerado;
+            if (esCurso && curso) {
+              const anio = curso.anio ?? "";
+              const division = curso.division ?? "";
+              const nivel = curso.nivel ?? "";
+              labelGenerado = `${anio}° ${division} - ${nivel}`.trim();
+            } else {
+              labelGenerado =
+                fuente?.nombre
+                  ? `${fuente.nombre} ${fuente.apellido || ""}`.trim()
+                  : fuente?.label || fuente?.descripcion || String(selectedId);
+            }
+            setSeleccionado({ value: selectedId, label: labelGenerado });
+          }
+        } else {
+          setSeleccionado(null);
+        }
       } else {
         setSeleccionado(null);
       }
@@ -70,13 +78,13 @@ export default function ModalSeleccionSimple({
       // si deseleccionás algo que ya tenía
       if (!seleccionado && entidad[campoAsignado]) {
         await onDesasignar(token, entidad.id);
-        toast.success("Desasignado correctamente");
+        if (toastOnSuccess) toast.success("Desasignado correctamente");
       }
 
       // si seleccionás algo distinto
-      if (seleccionado && seleccionado.value !== entidad[campoAsignado]?.id) {
+      if (seleccionado && String(seleccionado.value) !== String(entidad[campoAsignado]?.id)) {
         await onAsignar(token, seleccionado.value, entidad.id);
-        toast.success("Asignado correctamente");
+        if (toastOnSuccess) toast.success("Asignado correctamente");
       }
 
       onActualizar();
