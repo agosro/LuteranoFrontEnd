@@ -31,7 +31,8 @@ const reportes = [
     id: 4,
     titulo: "Alumnos que rinden en Diciembre y Febrero",
     descripcion: "Revisá qué alumnos deben presentarse a mesas de examen final.",
-    categoria: "Alumnos"
+    categoria: "Alumnos",
+    ruta: "/reportes/rinden"
   },
   {
     id: 5,
