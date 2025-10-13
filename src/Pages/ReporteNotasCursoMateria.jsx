@@ -19,6 +19,9 @@ export default function ReporteNotasCursoMateria() {
   const [periodo, setPeriodo] = useState("Todos"); // E1, E2, Todos
   const [cursoId, setCursoId] = useState("");
   const [materiaId, setMateriaId] = useState("");
+  const [vista, setVista] = useState("materia"); // materia | alumno | plana
+  const [busqueda, setBusqueda] = useState("");
+  const [estado, setEstado] = useState("Todos"); // Todos | Aprobado | Desaprobado
   const [cursos, setCursos] = useState([]);
   const [materias, setMaterias] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -104,20 +107,54 @@ export default function ReporteNotasCursoMateria() {
 
   const materiasCurso = materias.map(m => ({ id: m.materiaId ?? m.id, nombre: m.nombreMateria ?? m.nombre }));
 
-  // Estadísticas rápidas del curso (sobre filas visibles)
+  // Filas planas alumno-materia y filtros
   const filas = useMemo(() => {
     const list = [];
     for (const a of alumnos) {
       for (const m of a.materias || []) {
-        list.push({ alumno: a, m });
+        list.push({
+          alumno: a,
+          m,
+          alumnoNombre: `${a.apellido || ''} ${a.nombre || ''}`.trim(),
+          alumnoDni: a.dni || "",
+          materiaNombre: m.materiaNombre || "",
+        });
       }
     }
     return list;
   }, [alumnos]);
 
-  const pgList = filas.map(f => f.m.pg).filter(v => typeof v === 'number');
-  const totalFilas = filas.length; // alumno-materia visibles
-  const aprobadas = filas.filter(f => (f.m.pg ?? 0) >= 6).length;
+  const normalizar = (s) => (s || "").toString().toLowerCase();
+
+  const filasFiltradas = useMemo(() => {
+    let list = filas;
+    if (estado !== "Todos") {
+      list = list.filter(r => {
+        const pg = r?.m?.pg;
+        let aprobado;
+        if (typeof pg === "number") aprobado = pg >= 6;
+        else {
+          const est = normalizar(r?.m?.estado);
+          aprobado = est ? est.includes("apro") : false;
+        }
+        return estado === "Aprobado" ? aprobado : !aprobado;
+      });
+    }
+    const q = normalizar(busqueda).trim();
+    if (q) {
+      list = list.filter(r => {
+        const nom = normalizar(r.alumnoNombre);
+        const dni = (r.alumnoDni || "").toString();
+        return nom.includes(q) || dni.includes(q);
+      });
+    }
+    return list;
+  }, [filas, estado, busqueda]);
+
+  // Estadísticas rápidas del curso (sobre filas filtradas)
+  const pgList = filasFiltradas.map(f => f.m.pg).filter(v => typeof v === 'number');
+  const totalFilas = filasFiltradas.length; // alumno-materia visibles
+  const aprobadas = filasFiltradas.filter(f => (f.m.pg ?? 0) >= 6).length;
   const desaprobadas = totalFilas - aprobadas;
   const promedioGeneralCurso = pgList.length ? Math.round((pgList.reduce((a,b)=>a+b,0)/pgList.length)*10)/10 : null;
 
@@ -147,26 +184,23 @@ export default function ReporteNotasCursoMateria() {
   };
 
   const exportCSV = () => {
-    if (!alumnos || alumnos.length === 0) return;
-  const header = ["Nro Doc","Apellido","Nombre","Materia","E1 N1","E1 N2","E1 N3","E1 N4","E1","E2 N1","E2 N2","E2 N3","E2 N4","E2","PG","Estado"]; 
+    if (!filasFiltradas || filasFiltradas.length === 0) return;
+    const header = ["Nro Doc","Apellido","Nombre","Materia","E1 N1","E1 N2","E1 N3","E1 N4","E1","E2 N1","E2 N2","E2 N3","E2 N4","E2","PG","Estado"]; 
     const rows = [];
-    for (const a of alumnos) {
-      const mats = a.materias || [];
-      if (mats.length === 0) rows.push([a.dni||"", a.apellido||"", a.nombre||"", "", "","","","","","","","","","","",""]);
-      for (const m of mats) {
-  const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : [];
-  const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
-        rows.push([
-          a.dni||"", a.apellido||"", a.nombre||"",
-          m.materiaNombre||"",
-          e1[0]??"", e1[1]??"", e1[2]??"", e1[3]??"",
-          m.e1??"",
-          e2[0]??"", e2[1]??"", e2[2]??"", e2[3]??"",
-          m.e2??"",
-          m.pg??"",
-          m.estado??""
-        ]);
-      }
+    for (const r of filasFiltradas) {
+      const a = r.alumno; const m = r.m;
+      const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : [];
+      const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
+      rows.push([
+        a.dni||"", a.apellido||"", a.nombre||"",
+        m.materiaNombre||"",
+        e1[0]??"", e1[1]??"", e1[2]??"", e1[3]??"",
+        m.e1??"",
+        e2[0]??"", e2[1]??"", e2[2]??"", e2[3]??"",
+        m.e2??"",
+        m.pg??"",
+        m.estado??""
+      ]);
     }
     const csv = [header, ...rows].map(r => r.map(v => '"' + String(v ?? "").replace(/"/g,'""') + '"').join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -234,16 +268,31 @@ export default function ReporteNotasCursoMateria() {
       {!loading && data && !error && (
         <Card>
           <Card.Body>
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
+            <div className="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-3 gap-2">
               <div>
                 <h5 className="mb-1">{data?.curso?.nombre || "Curso"} · Año {data?.anio}</h5>
                 <div className="text-muted small">Total de alumnos: {data?.total}</div>
               </div>
-              <div className="mt-2 mt-md-0">
-                <Button className="me-2" size="sm" variant="outline-secondary" onClick={exportCSV}>Exportar CSV</Button>
-                <Button size="sm" variant="outline-secondary" onClick={printOnlyTable}>Imprimir / PDF (solo tabla)</Button>
+              <div className="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2">
+                <Form.Control
+                  placeholder="Buscar alumno (nombre, apellido, DNI)"
+                  value={busqueda}
+                  onChange={(e)=>setBusqueda(e.target.value)}
+                  style={{ minWidth: 260 }}
+                />
+                <Form.Select value={vista} onChange={(e)=>setVista(e.target.value)} style={{ minWidth: 180 }}>
+                  <option value="materia">Vista: Por materia</option>
+                  <option value="alumno">Vista: Por alumno</option>
+                  <option value="plana">Vista: Plana</option>
+                </Form.Select>
+                <Form.Select value={estado} onChange={(e)=>setEstado(e.target.value)} style={{ minWidth: 180 }}>
+                  <option value="Todos">Estado: Todos</option>
+                  <option value="Aprobado">Aprobado</option>
+                  <option value="Desaprobado">Desaprobado</option>
+                </Form.Select>
               </div>
             </div>
+
             {/* Estadísticas rápidas */}
             <div className="mb-3">
               <Estadisticas
@@ -256,81 +305,213 @@ export default function ReporteNotasCursoMateria() {
               />
             </div>
 
-            {/* Tabla principal estilo R3 */}
+            {/* Acciones de exportación fuera del header y del área imprimible */}
+            <div className="d-flex justify-content-end gap-2 mb-3">
+              <Button variant="outline-secondary" onClick={exportCSV}>Exportar CSV</Button>
+              <Button variant="outline-secondary" onClick={printOnlyTable}>Imprimir / PDF</Button>
+            </div>
+
+            {/* Contenido imprimible por vista */}
             <div ref={printRef}>
-            <Table striped bordered hover responsive size="sm">
-              <thead>
-                <tr>
-                  <th>Nro Doc</th>
-                  <th>Apellido</th>
-                  <th>Nombre</th>
-                  <th>Materia</th>
-                  {periodo !== 'E2' && <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>}
-                  {periodo !== 'E1' && <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>}
-                  <th>PG</th>
-                  <th>CO</th>
-                  <th>EX</th>
-                  <th>PFA</th>
-                  <th>Estado</th>
-                </tr>
-                <tr>
-                  <th colSpan={4}></th>
-                  {periodo !== 'E2' && (<>
-                    <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E1</th>
-                  </>)}
-                  {periodo !== 'E1' && (<>
-                    <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
-                  </>)}
-                  <th></th>
-                  <th></th>
-                  <th></th>
-                  <th></th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {alumnos.length === 0 && (
-                  <tr><td colSpan={totalCols} className="text-center text-muted">Sin datos</td></tr>
-                )}
-                {alumnos.map((a, idxA) => {
-                  const mats = a.materias || [];
-                  if (mats.length === 0) {
-                    return (
-                      <tr key={`a-${idxA}`}>
-                        <td>{a.dni||""}</td>
-                        <td>{a.apellido||""}</td>
-                        <td>{a.nombre||""}</td>
-                        <td colSpan={e1Cols + e2Cols} className="text-muted">Sin materias para filtros seleccionados</td>
-                        <td></td><td></td><td></td><td></td><td></td>
-                      </tr>
-                    );
-                  }
-                  return mats.map((m, idxM) => {
-                    const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : [];
-                    const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
-                    return (
-                      <tr key={`a-${idxA}-m-${idxM}`}>
-                        <td>{a.dni||""}</td>
-                        <td>{a.apellido||""}</td>
-                        <td>{a.nombre||""}</td>
-                        <td>{m.materiaNombre||""}</td>
-                        {periodo !== 'E2' && (<>
-                          <td>{e1[0]??"-"}</td><td>{e1[1]??"-"}</td><td>{e1[2]??"-"}</td><td>{e1[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e1??"-"}</Badge></td>
-                        </>)}
-                        {periodo !== 'E1' && (<>
-                          <td>{e2[0]??"-"}</td><td>{e2[1]??"-"}</td><td>{e2[2]??"-"}</td><td>{e2[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e2??"-"}</Badge></td>
-                        </>)}
-                        <td><Badge bg={m.pg>=6?"success":"danger"}>{m.pg??"-"}</Badge></td>
-                        <td></td>
-                        <td></td>
-                        <td>{m.pg ?? "-"}</td>
-                        <td>{m.estado??"-"}</td>
-                      </tr>
-                    );
-                  });
-                })}
-              </tbody>
-            </Table>
+              {vista === 'plana' && (
+                <Table striped bordered hover responsive size="sm">
+                  <thead>
+                    <tr>
+                      <th>Nro Doc</th>
+                      <th>Apellido</th>
+                      <th>Nombre</th>
+                      <th>Materia</th>
+                      {periodo !== 'E2' && <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>}
+                      {periodo !== 'E1' && <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>}
+                      <th>PG</th>
+                      <th>CO</th>
+                      <th>EX</th>
+                      <th>PFA</th>
+                      <th>Estado</th>
+                    </tr>
+                    <tr>
+                      <th colSpan={4}></th>
+                      {periodo !== 'E2' && (<>
+                        <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E1</th>
+                      </>)}
+                      {periodo !== 'E1' && (<>
+                        <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
+                      </>)}
+                      <th></th>
+                      <th></th>
+                      <th></th>
+                      <th></th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filasFiltradas.length === 0 && (
+                      <tr><td colSpan={totalCols} className="text-center text-muted">Sin datos</td></tr>
+                    )}
+                    {filasFiltradas.map((r, idx) => {
+                      const a = r.alumno; const m = r.m;
+                      const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : [];
+                      const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
+                      return (
+                        <tr key={`pl-${idx}`}>
+                          <td>{a.dni||""}</td>
+                          <td>{a.apellido||""}</td>
+                          <td>{a.nombre||""}</td>
+                          <td>{m.materiaNombre||""}</td>
+                          {periodo !== 'E2' && (<>
+                            <td>{e1[0]??"-"}</td><td>{e1[1]??"-"}</td><td>{e1[2]??"-"}</td><td>{e1[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e1??"-"}</Badge></td>
+                          </>)}
+                          {periodo !== 'E1' && (<>
+                            <td>{e2[0]??"-"}</td><td>{e2[1]??"-"}</td><td>{e2[2]??"-"}</td><td>{e2[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e2??"-"}</Badge></td>
+                          </>)}
+                          <td><Badge bg={m.pg>=6?"success":"danger"}>{m.pg??"-"}</Badge></td>
+                          <td></td>
+                          <td></td>
+                          <td>{m.pg ?? "-"}</td>
+                          <td>{m.estado??"-"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              )}
+
+              {vista === 'alumno' && (
+                <div className="d-flex flex-column gap-3">
+                  {(() => {
+                    // group by alumno
+                    const map = new Map();
+                    for (const r of filasFiltradas) {
+                      const key = (r.alumno?.dni || r.alumno?.id || r.alumnoNombre);
+                      if (!map.has(key)) map.set(key, { alumno: r.alumno, filas: [] });
+                      map.get(key).filas.push(r);
+                    }
+                    const grupos = Array.from(map.values()).sort((x,y)=>{
+                      const ap = collator.compare(x.alumno?.apellido||"", y.alumno?.apellido||"");
+                      if (ap!==0) return ap; return collator.compare(x.alumno?.nombre||"", y.alumno?.nombre||"");
+                    });
+                    if (grupos.length===0) return <div className="text-center text-muted">Sin datos</div>;
+                    return grupos.map((g, gi) => (
+                      <div key={`ga-${gi}`}>
+                        <div className="fw-bold mb-2">{g.alumno?.apellido || ''} {g.alumno?.nombre || ''} · DNI {g.alumno?.dni || '-'}</div>
+                        <Table striped bordered hover responsive size="sm">
+                          <thead>
+                            <tr>
+                              <th>Materia</th>
+                              {periodo !== 'E2' && <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>}
+                              {periodo !== 'E1' && <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>}
+                              <th>PG</th>
+                              <th>CO</th>
+                              <th>EX</th>
+                              <th>PFA</th>
+                              <th>Estado</th>
+                            </tr>
+                            <tr>
+                              <th></th>
+                              {periodo !== 'E2' && (<>
+                                <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E1</th>
+                              </>)}
+                              {periodo !== 'E1' && (<>
+                                <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
+                              </>)}
+                              <th></th><th></th><th></th><th></th><th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {g.filas.map((r, rIdx) => {
+                              const m = r.m; const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : []; const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
+                              return (
+                                <tr key={`ga-${gi}-r-${rIdx}`}>
+                                  <td>{m.materiaNombre||""}</td>
+                                  {periodo !== 'E2' && (<>
+                                    <td>{e1[0]??"-"}</td><td>{e1[1]??"-"}</td><td>{e1[2]??"-"}</td><td>{e1[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e1??"-"}</Badge></td>
+                                  </>)}
+                                  {periodo !== 'E1' && (<>
+                                    <td>{e2[0]??"-"}</td><td>{e2[1]??"-"}</td><td>{e2[2]??"-"}</td><td>{e2[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e2??"-"}</Badge></td>
+                                  </>)}
+                                  <td><Badge bg={m.pg>=6?"success":"danger"}>{m.pg??"-"}</Badge></td>
+                                  <td></td><td></td><td>{m.pg ?? "-"}</td><td>{m.estado ?? "-"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </Table>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+
+              {vista === 'materia' && (
+                <div className="d-flex flex-column gap-3">
+                  {(() => {
+                    // group by materia
+                    const map = new Map();
+                    for (const r of filasFiltradas) {
+                      const key = r.m?.materiaId || r.m?.materiaNombre || r.materiaNombre;
+                      if (!map.has(key)) map.set(key, { nombre: r.m?.materiaNombre || r.materiaNombre || '-', filas: [] });
+                      map.get(key).filas.push(r);
+                    }
+                    const grupos = Array.from(map.values()).sort((x,y)=> collator.compare(x.nombre||"", y.nombre||""));
+                    if (grupos.length===0) return <div className="text-center text-muted">Sin datos</div>;
+                    return grupos.map((g, gi) => (
+                      <div key={`gm-${gi}`}>
+                        <div className="fw-bold mb-2">Materia: {g.nombre}</div>
+                        <Table striped bordered hover responsive size="sm">
+                          <thead>
+                            <tr>
+                              <th>Nro Doc</th>
+                              <th>Apellido</th>
+                              <th>Nombre</th>
+                              {periodo !== 'E2' && <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>}
+                              {periodo !== 'E1' && <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>}
+                              <th>PG</th>
+                              <th>CO</th>
+                              <th>EX</th>
+                              <th>PFA</th>
+                              <th>Estado</th>
+                            </tr>
+                            <tr>
+                              <th colSpan={3}></th>
+                              {periodo !== 'E2' && (<>
+                                <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E1</th>
+                              </>)}
+                              {periodo !== 'E1' && (<>
+                                <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
+                              </>)}
+                              <th></th><th></th><th></th><th></th><th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {g.filas.sort((r1,r2)=>{
+                              const a1 = r1.alumno; const a2 = r2.alumno;
+                              const ap = collator.compare(a1?.apellido||"", a2?.apellido||"");
+                              if (ap!==0) return ap; return collator.compare(a1?.nombre||"", a2?.nombre||"");
+                            }).map((r, rIdx) => {
+                              const a = r.alumno; const m = r.m; const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : []; const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
+                              return (
+                                <tr key={`gm-${gi}-r-${rIdx}`}>
+                                  <td>{a.dni||""}</td>
+                                  <td>{a.apellido||""}</td>
+                                  <td>{a.nombre||""}</td>
+                                  {periodo !== 'E2' && (<>
+                                    <td>{e1[0]??"-"}</td><td>{e1[1]??"-"}</td><td>{e1[2]??"-"}</td><td>{e1[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e1??"-"}</Badge></td>
+                                  </>)}
+                                  {periodo !== 'E1' && (<>
+                                    <td>{e2[0]??"-"}</td><td>{e2[1]??"-"}</td><td>{e2[2]??"-"}</td><td>{e2[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e2??"-"}</Badge></td>
+                                  </>)}
+                                  <td><Badge bg={m.pg>=6?"success":"danger"}>{m.pg??"-"}</Badge></td>
+                                  <td></td><td></td><td>{m.pg ?? "-"}</td><td>{m.estado ?? "-"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </Table>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
             </div>
           </Card.Body>
         </Card>
