@@ -107,6 +107,19 @@ export default function ReporteNotasCursoMateria() {
 
   const materiasCurso = materias.map(m => ({ id: m.materiaId ?? m.id, nombre: m.nombreMateria ?? m.nombre }));
 
+  // Labels auxiliares
+  const cursoLabel = useMemo(() => {
+    if (data?.curso?.nombre) return data.curso.nombre;
+    const c = cursos.find(c => String(c.id) === String(cursoId));
+    return c ? (c.nombre || `${c.anio ?? ''} ${c.division ?? ''} ${c.nivel ?? ''}`.trim()) : String(cursoId || '');
+  }, [data, cursos, cursoId]);
+
+  const materiaLabel = useMemo(() => {
+    if (!materiaId) return 'Todas';
+    const m = materiasCurso.find(x => String(x.id) === String(materiaId));
+    return m?.nombre || String(materiaId);
+  }, [materiasCurso, materiaId]);
+
   // Filas planas alumno-materia y filtros
   const filas = useMemo(() => {
     const list = [];
@@ -169,13 +182,16 @@ export default function ReporteNotasCursoMateria() {
     const css = `
       body { font-family: Arial, sans-serif; padding: 16px; }
       h3 { margin: 0 0 12px 0; }
+      .sub { margin: 0 0 12px 0; color: #555; font-size: 12px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
       thead tr:first-child th { background: #f0f0f0; }
     `;
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Notas</title><style>${css}</style></head><body>`);
-    const titulo = `${data?.curso?.nombre || 'Curso'} · Año ${data?.anio || anio}${materiaId ? ' · Materia: ' + (materiasCurso.find(x=>String(x.id)===String(materiaId))?.nombre||'') : ''}`;
+    const titulo = `${cursoLabel || 'Curso'} · Año ${data?.anio || anio}`;
+    const sub = `Materia: ${materiaLabel}  |  Período: ${periodo}  |  Estado: ${estado}`;
     win.document.write(`<h3>${titulo}</h3>`);
+    win.document.write(`<div class="sub">${sub}</div>`);
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
     win.document.close();
@@ -207,7 +223,9 @@ export default function ReporteNotasCursoMateria() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `reporte_notas_curso_${data?.curso?.nombre || cursoId}_${anio}.csv`;
+  const slug = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
+    const nombre = `reporte_notas_${slug(cursoLabel)}_${anio}_${slug(materiaLabel)}_${slug(periodo)}_${slug(estado)}.csv`;
+    a.download = nombre;
     a.click();
     URL.revokeObjectURL(url);
   };

@@ -161,7 +161,17 @@ export default function ReporteRinde() {
         vista,
         filas: filasFiltradas,
         gruposAlumno: agrupadosPorAlumnoFiltrados,
-        filename: `reporte_rinden_${vista}.csv`,
+        filename: (() => {
+          const slug = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
+          const meta = [
+            slug(cursoLabel || ''),
+            anio,
+            materiaId ? slug(materiaLabel) : 'todas',
+            condicion && condicion !== 'TODAS' ? slug(condicion) : 'todas',
+            slug(vista),
+          ].filter(Boolean).join('_');
+          return `reporte_rinden_${meta}.csv`;
+        })(),
       });
     } catch {
       toast.error('No se pudo exportar CSV');
