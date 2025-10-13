@@ -5,6 +5,7 @@ import RenderCampos from "../Components/RenderCampos";
 import RenderCamposEditable from "../Components/RenderCamposEditables";
 import { camposTutor } from "../Entidades/camposTutor";
 import { listarTutores, editarTutor } from "../Services/TutorService";
+import { listarAlumnosACargo } from "../Services/TutorAlumnoService";
 import { useAuth } from "../Context/AuthContext";
 import { toast } from "react-toastify";
 import { inputLocalToBackendISO } from "../utils/fechas";
@@ -18,7 +19,9 @@ export default function TutorDetalle() {
   const [tutor, setTutor] = useState(tutorState || null);
   const [formData, setFormData] = useState(tutorState || {});
   const [loadingTutor, setLoadingTutor] = useState(true);
-  // Alumnos a cargo: pendiente de endpoint. Dejamos la pestaña vacía por ahora.
+  const [alumnosCargo, setAlumnosCargo] = useState([]);
+  const [alumnosCargoLoading, setAlumnosCargoLoading] = useState(false);
+  const [alumnosCargoError, setAlumnosCargoError] = useState("");
 
   // Cargar tutor (siempre intentamos enriquecer con datos completos)
   useEffect(() => {
@@ -51,7 +54,24 @@ export default function TutorDetalle() {
     fetchTutor();
   }, [user?.token, id, tutorState]);
 
-  // Nota: la carga de alumnos a cargo se implementará cuando haya endpoint específico.
+  // Cargar alumnos a cargo del tutor
+  useEffect(() => {
+    const fetchAlumnos = async () => {
+      if (!user?.token || !id) return;
+      setAlumnosCargoLoading(true);
+      setAlumnosCargoError("");
+      try {
+        const lista = await listarAlumnosACargo(user.token, id);
+        setAlumnosCargo(Array.isArray(lista) ? lista : []);
+      } catch (e) {
+        console.error(e);
+        setAlumnosCargoError(e.message || "Error cargando alumnos a cargo");
+      } finally {
+        setAlumnosCargoLoading(false);
+      }
+    };
+    fetchAlumnos();
+  }, [user?.token, id]);
 
   if (!tutor && !tutorState) return <p>Cargando...</p>;
   const tShow = tutor || tutorState;
@@ -117,7 +137,31 @@ export default function TutorDetalle() {
         {
           id: "alumnos",
           label: "Alumnos a cargo",
-          content: () => (<div />), // Dejado vacío hasta tener endpoint
+          content: () => (
+            <div>
+              {alumnosCargoLoading && <p>Cargando alumnos a cargo...</p>}
+              {alumnosCargoError && <p className="text-danger">{alumnosCargoError}</p>}
+              {!alumnosCargoLoading && !alumnosCargoError && (
+                alumnosCargo.length ? (
+                  <ul className="list-group">
+                    {alumnosCargo.map((a) => (
+                      <li key={a.id} className="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong>{a.nombre} {a.apellido}</strong>
+                          {a.dni ? <span className="text-muted"> • DNI: {a.dni}</span> : null}
+                        </div>
+                        <div className="text-end">
+                          {a.email ? <div className="small text-muted">{a.email}</div> : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Este tutor no tiene alumnos a cargo.</p>
+                )
+              )}
+            </div>
+          ),
         },
       ]}
     />

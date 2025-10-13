@@ -1,6 +1,6 @@
 const API_URL = 'http://localhost:8080';
 
-// 📌 Asignar tutor a alumno
+// Asignar tutor a alumno
 export const asignarTutorAAlumno = async (token, tutorId, alumnoId) => {
   try {
     const response = await fetch(`${API_URL}/tutorAlumno/asignarTutor/${tutorId}/${alumnoId}`, {
@@ -11,15 +11,20 @@ export const asignarTutorAAlumno = async (token, tutorId, alumnoId) => {
       },
     });
 
-    if (!response.ok) throw new Error("Error al asignar tutor al alumno");
-    return await response.json();
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      const msg = data?.mensaje || `Error ${response.status}`;
+      throw new Error(`Error al asignar tutor: ${msg}`);
+    }
+    return data;
   } catch (error) {
     console.error("Error al asignar tutor:", error);
     throw error;
   }
 };
 
-// 📌 Desasignar tutor de alumno
+// Desasignar tutor de alumno
 export const desasignarTutorDeAlumno = async (token, tutorId, alumnoId) => {
   try {
     const response = await fetch(`${API_URL}/tutorAlumno/desasignarTutor/${tutorId}/${alumnoId}`, {
@@ -30,10 +35,35 @@ export const desasignarTutorDeAlumno = async (token, tutorId, alumnoId) => {
       },
     });
 
-    if (!response.ok) throw new Error("Error al desasignar tutor del alumno");
-    return await response.json();
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      const msg = data?.mensaje || `Error ${response.status}`;
+      throw new Error(`Error al desasignar tutor: ${msg}`);
+    }
+    return data;
   } catch (error) {
     console.error("Error al desasignar tutor:", error);
+    throw error;
+  }
+};
+
+// Listar alumnos a cargo de un tutor
+export const listarAlumnosACargo = async (token, tutorId) => {
+  try {
+    const resp = await fetch(`${API_URL}/tutorAlumno/${tutorId}/alumnos`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    const text = await resp.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!resp.ok) throw new Error(data?.mensaje || `Error ${resp.status}`);
+    // Backend devuelve AlumnoResponseList con alumnoDtos
+    return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : [];
+  } catch (error) {
+    console.error('Error al listar alumnos a cargo:', error);
     throw error;
   }
 };
