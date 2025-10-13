@@ -10,87 +10,10 @@ import {
 	actualizarAsistenciaAlumno,
 } from '../Services/AsistenciaAlumnoService';
 import { toast } from 'react-toastify';
+import FiltrosAsistencia from '../Components/Asistencia/FiltrosAsistencia';
+import TablaAsistencia from '../Components/Asistencia/TablaAsistencia';
+import ModalEditarAsistencia from '../Components/Asistencia/ModalEditarAsistencia';
 
-// Campo de formulario Bootstrap
-function FormGroupSelect({ label, value, onChange, options, placeholder = 'Seleccione...' }) {
-	const id = `select-${label?.toLowerCase()?.replace(/\s+/g, '-') || 'field'}`;
-	return (
-		<div className="mb-3">
-			{label && <label className="form-label" htmlFor={id}>{label}</label>}
-			<select id={id} className="form-select" value={value || ''} onChange={(e) => onChange(e.target.value)}>
-				<option value="">{placeholder}</option>
-				{options.map((opt) => (
-					<option key={opt.value} value={opt.value}>
-						{opt.label}
-					</option>
-				))}
-			</select>
-		</div>
-	);
-}
-
-// Fila de alumno con selector de estado y observación
-function FilaAlumno({
-	alumno,
-	presenteMarcado,
-	estadoActual,
-	observacionActual,
-	onTogglePresente,
-	onEditar,
-	disabled,
-}) {
-	const nombre = `${alumno.apellido ?? ''} ${alumno.nombre ?? ''}`.trim();
-
-	const badgeClass = (estado) => {
-		switch (estado) {
-			case 'PRESENTE':
-				return 'badge text-bg-success';
-			case 'AUSENTE':
-				return 'badge text-bg-secondary';
-			case 'TARDE':
-				return 'badge text-bg-warning text-dark';
-			case 'JUSTIFICADO':
-				return 'badge text-bg-info text-dark';
-			default:
-				return 'badge text-bg-light text-dark';
-		}
-	};
-
-	return (
-		<tr>
-			<td className="py-2">{alumno.dni || '-'}</td>
-			<td className="py-2">{nombre}</td>
-			<td className="py-2 text-center">
-				<input
-					className="form-check-input"
-					type="checkbox"
-					checked={!!presenteMarcado}
-					onChange={onTogglePresente}
-				/>
-			</td>
-			<td className="py-2">
-				<span className={badgeClass(estadoActual)}>{estadoActual || '—'}</span>
-			</td>
-			<td className="py-2" style={{ minWidth: 240 }}>
-				{observacionActual ? (
-					<span
-						title={observacionActual}
-						style={{ maxWidth: 320, display: 'inline-block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-					>
-						{observacionActual}
-					</span>
-				) : (
-					<span className="text-muted">—</span>
-				)}
-			</td>
-			<td className="py-2">
-				<button className="btn btn-sm btn-outline-secondary" onClick={onEditar} disabled={disabled}>
-					Editar
-				</button>
-			</td>
-		</tr>
-	);
-}
 
 export default function AsistenciaAlumnos() {
 	const { user } = useAuth();
@@ -156,7 +79,12 @@ export default function AsistenciaAlumnos() {
 				}
 				setAsistencia(map);
 				// pre-chequear presentes actuales
-				const presentesSet = new Set(items.filter((x) => x.estado === 'PRESENTE').map((x) => x.alumnoId));
+				// TARDE también se considera presente
+				const presentesSet = new Set(
+					items
+						.filter((x) => x.estado === 'PRESENTE' || x.estado === 'TARDE')
+						.map((x) => x.alumnoId)
+				);
 				setPresentes(presentesSet);
 			} catch (e) {
 				toast.error(e.message || 'Error al cargar asistencia');
@@ -180,7 +108,7 @@ export default function AsistenciaAlumnos() {
 		const actual = asistencia[alumno.id] || { estado: '', observacion: '' };
 		setModalEdit({
 			open: true,
-			alumno,
+			alumno: { ...alumno, tipo: 'Alumno' },
 			estado: actual.estado === 'TARDE' || actual.estado === 'JUSTIFICADO' ? actual.estado : 'TARDE',
 			observacion: actual.observacion || '',
 		});
@@ -203,6 +131,13 @@ export default function AsistenciaAlumnos() {
 				...prev,
 				[modalEdit.alumno.id]: { estado: modalEdit.estado, observacion: modalEdit.observacion || '' },
 			}));
+			// Sincronizar checkbox: TARDE => presente, JUSTIFICADO => no presente
+			setPresentes((prev) => {
+				const nuevo = new Set(prev);
+				if (modalEdit.estado === 'TARDE') nuevo.add(modalEdit.alumno.id);
+				if (modalEdit.estado === 'JUSTIFICADO') nuevo.delete(modalEdit.alumno.id);
+				return nuevo;
+			});
 			toast.success('Edición guardada');
 			cerrarModalEditar();
 		} catch (e) {
@@ -220,7 +155,14 @@ export default function AsistenciaAlumnos() {
 
 			// Política: solo se marcan PRESENTES; el resto queda AUSENTE automáticamente
 			const presentesIds = Array.from(presentes);
-			const overrides = {}; // sin overrides en toma rápida
+			// Preservar estados puntuales TARDE y JUSTIFICADO como overrides
+			const overrides = {};
+			for (const al of alumnos) {
+				const est = asistencia[al.id]?.estado;
+				if (est === 'TARDE' || est === 'JUSTIFICADO') {
+					overrides[al.id] = est;
+				}
+			}
 
 				// Confirmación: si no hay ningún estado seleccionado, se marcarán todos AUSENTES
 				const totalSeleccionados = presentesIds.length + Object.keys(overrides).length;
@@ -278,11 +220,13 @@ export default function AsistenciaAlumnos() {
 				JUSTIFICADO: 0,
 				SIN_SELECCION: 0,
 				TOTAL: alumnos.length,
+				PRESENTE_INCLUYE_TARDE: 0,
 			};
 			for (const al of alumnos) {
 				const est = asistencia[al.id]?.estado || '';
 				if (!est) counts.SIN_SELECCION += 1;
 				else if (counts[est] !== undefined) counts[est] += 1;
+				if (est === 'PRESENTE' || est === 'TARDE') counts.PRESENTE_INCLUYE_TARDE += 1;
 			}
 			return counts;
 		}, [alumnos, asistencia]);
@@ -298,42 +242,22 @@ export default function AsistenciaAlumnos() {
 				</div>
 
 				{/* Filtros */}
-				<div className="card mb-3">
-					<div className="card-body">
-						<div className="row g-3 align-items-end">
-							<div className="col-sm-4">
-								<FormGroupSelect
-									label="Curso"
-									value={cursoId}
-									onChange={setCursoId}
-									options={cursoOptions}
-									placeholder="Seleccione un curso"
-								/>
-							</div>
-							<div className="col-sm-3">
-								<div className="mb-3">
-									<label className="form-label">Fecha</label>
-									<input type="date" className="form-control" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-								</div>
-							</div>
-							<div className="col-sm-5">
-								<div className="d-flex gap-2 justify-content-sm-end align-items-end flex-wrap">
-									<button className="btn btn-outline-success" onClick={marcarTodosPresentes} disabled={!alumnos.length}>
-										Marcar todos PRESENTES
-									</button>
-									<button className="btn btn-outline-secondary" onClick={limpiarSeleccion} disabled={!alumnos.length}>
-										Limpiar selección
-									</button>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
+				<FiltrosAsistencia
+					cursos={cursoOptions}
+					cursoId={cursoId}
+					setCursoId={setCursoId}
+					fecha={fecha}
+					setFecha={setFecha}
+					onMarcarTodosPresentes={() => marcarTodosPresentes()}
+					onLimpiarSeleccion={() => limpiarSeleccion()}
+					disableAcciones={!alumnos.length}
+				/>
 
 				{/* Contadores */}
 				<div className="row g-2 mb-3">
 					<div className="col-auto"><span className="badge text-bg-secondary">Total: {contadores.TOTAL}</span></div>
 					<div className="col-auto"><span className="badge text-bg-success">Presentes: {contadores.PRESENTE}</span></div>
+					<div className="col-auto"><span className="badge text-bg-success">Presentes (incluye TARDE): {contadores.PRESENTE_INCLUYE_TARDE}</span></div>
 					<div className="col-auto"><span className="badge text-bg-danger">Ausentes: {contadores.AUSENTE}</span></div>
 					<div className="col-auto"><span className="badge text-bg-warning text-dark">Tarde: {contadores.TARDE}</span></div>
 					<div className="col-auto"><span className="badge text-bg-primary">Justificados: {contadores.JUSTIFICADO}</span></div>
@@ -356,78 +280,28 @@ export default function AsistenciaAlumnos() {
 						</button>
 					</div>
 					<div className="card-body p-0">
-						<div className="table-responsive">
-							<table className="table table-hover align-middle mb-0">
-								<thead className="table-light">
-									<tr>
-															<th>DNI</th>
-															<th>Alumno</th>
-															<th className="text-center" style={{ width: 110 }}>Presente</th>
-															<th>Estado actual</th>
-															<th>Observación</th>
-															<th>Acciones</th>
-									</tr>
-								</thead>
-								<tbody>
-									{alumnos.length === 0 && (
-										<tr>
-											<td colSpan={6} className="text-center text-muted py-3">
-												{cursoId ? 'No hay alumnos en el curso' : 'Seleccione un curso y una fecha'}
-											</td>
-										</tr>
-									)}
-													{alumnos.map((al) => (
-														<FilaAlumno
-															key={al.id}
-															alumno={al}
-															presenteMarcado={presentes.has(al.id)}
-															estadoActual={asistencia[al.id]?.estado || ''}
-															observacionActual={asistencia[al.id]?.observacion || ''}
-															onTogglePresente={() => handleTogglePresente(al.id)}
-															onEditar={() => abrirModalEditar(al)}
-															disabled={cargando}
-														/>
-													))}
-								</tbody>
-							</table>
-						</div>
+						<TablaAsistencia
+							personas={alumnos.map((a) => ({ id: a.id, dni: a.dni, nombre: `${a.apellido ?? ''} ${a.nombre ?? ''}`.trim(), apellido: a.apellido, tipo: 'Alumno' }))}
+							asistenciaPorId={asistencia}
+							presentes={presentes}
+							onTogglePresente={(id) => handleTogglePresente(id)}
+							onClickEditar={(p) => abrirModalEditar(p)}
+							disabled={cargando}
+						/>
 					</div>
 				</div>
 
-				{/* Modal edición puntual */}
-				{modalEdit.open && (
-					<div className="modal d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-						<div className="modal-dialog" role="document">
-							<div className="modal-content">
-								<div className="modal-header">
-									<h5 className="modal-title">Editar asistencia</h5>
-									<button type="button" className="btn-close" aria-label="Close" onClick={cerrarModalEditar}></button>
-								</div>
-								<div className="modal-body">
-									<p className="mb-2"><strong>Alumno:</strong> {modalEdit.alumno?.apellido} {modalEdit.alumno?.nombre}</p>
-									<div className="mb-3">
-										<label className="form-label">Estado</label>
-										<select className="form-select" value={modalEdit.estado} onChange={(e) => setModalEdit((m) => ({ ...m, estado: e.target.value }))}>
-											<option value="TARDE">Tarde</option>
-											<option value="JUSTIFICADO">Justificado</option>
-										</select>
-									</div>
-									<div className="mb-3">
-										<label className="form-label">Observación</label>
-										<textarea className="form-control" rows={3} value={modalEdit.observacion} onChange={(e) => setModalEdit((m) => ({ ...m, observacion: e.target.value }))} />
-									</div>
-								</div>
-								<div className="modal-footer">
-									<button type="button" className="btn btn-secondary" onClick={cerrarModalEditar}>Cancelar</button>
-									<button type="button" className="btn btn-primary" onClick={guardarEdicionModal} disabled={cargando}>
-										{cargando ? <span className="spinner-border spinner-border-sm me-2" /> : null}
-										Guardar
-									</button>
-								</div>
-							</div>
-						</div>
-					</div>
-				)}
+				<ModalEditarAsistencia
+					open={modalEdit.open}
+					persona={modalEdit.alumno}
+					estado={modalEdit.estado}
+					observacion={modalEdit.observacion}
+					setEstado={(v) => setModalEdit((m) => ({ ...m, estado: v }))}
+					setObservacion={(v) => setModalEdit((m) => ({ ...m, observacion: v }))}
+					onClose={cerrarModalEditar}
+					onSave={guardarEdicionModal}
+					cargando={cargando}
+				/>
 
 						{/* Aclaración */}
 						<div className="mt-2 text-muted">
