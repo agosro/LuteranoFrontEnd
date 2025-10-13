@@ -1,7 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge } from "react-bootstrap";
+import AsyncSelect from "react-select/async";
 import { useAuth } from "../Context/AuthContext";
 import { listarAlumnosConFiltros } from "../Services/AlumnoService";
+import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
+import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { listarCalifPorAnio } from "../Services/CalificacionesService";
 import { resumenNotasAlumnoPorAnio } from "../Services/ReporteNotasService";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
@@ -20,8 +23,11 @@ export default function ReporteNotasAlumnos() {
 
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [alumnoId, setAlumnoId] = useState("");
-  const [alumnos, setAlumnos] = useState([]);
-  const [loadingAlumnos, setLoadingAlumnos] = useState(false);
+  const [alumnoOption, setAlumnoOption] = useState(null);
+  const [cursos, setCursos] = useState([]);
+  const [cursoAnioSel, setCursoAnioSel] = useState("");
+  const [divisionSel, setDivisionSel] = useState("");
+  const [cursoId, setCursoId] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -30,25 +36,106 @@ export default function ReporteNotasAlumnos() {
   // const [rawForYear, setRawForYear] = useState(null); // calificaciones crudas del año
   const printRef = React.useRef(null);
 
-  // Cargar alumnos básicos para selector (podemos permitir filtro por apellido más adelante)
+  // Cargar cursos (según rol)
   useEffect(() => {
     let active = true;
-    async function load() {
+    async function loadCursos() {
       try {
-        setLoadingAlumnos(true);
-        const lista = await listarAlumnosConFiltros(token, {});
-        if (active) setAlumnos(lista);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (active) setLoadingAlumnos(false);
+        let lista = [];
+        if (user?.rol === "ROLE_DOCENTE" && user?.docenteId) {
+          lista = await listarCursosPorDocente(token, user.docenteId);
+        } else if (user?.rol === "ROLE_PRECEPTOR" && user?.preceptorId) {
+          lista = await listarCursosPorPreceptor(token, user.preceptorId);
+        } else {
+          lista = await listarCursos(token);
+        }
+        if (active) setCursos(lista || []);
+      } catch {
+        // noop
       }
     }
-    if (token) load();
-    return () => {
-      active = false;
-    };
-  }, [token]);
+    if (token) loadCursos();
+    return () => { active = false; };
+  }, [token, user]);
+
+  // Derivar opciones de año y división a partir de cursos
+  const aniosCursoOptions = useMemo(() => {
+    const set = new Set();
+    (cursos || []).forEach(c => { if (c.anio != null) set.add(String(c.anio)); });
+    return Array.from(set).sort((a,b)=> Number(a)-Number(b));
+  }, [cursos]);
+
+  const divisionesOptions = useMemo(() => {
+    if (!cursoAnioSel) return [];
+    const set = new Set();
+    (cursos || []).filter(c => String(c.anio) === String(cursoAnioSel)).forEach(c => {
+      if (c.division != null && c.division !== '') set.add(String(c.division));
+    });
+    return Array.from(set).sort();
+  }, [cursos, cursoAnioSel]);
+
+  // Cuando cambian año y división, calcular cursoId
+  useEffect(() => {
+    const match = (cursos || []).find(c => String(c.anio) === String(cursoAnioSel) && String(c.division) === String(divisionSel));
+    setCursoId(match?.id ? String(match.id) : "");
+  }, [cursos, cursoAnioSel, divisionSel]);
+
+  // Al cambiar curso, limpiar alumno seleccionado
+  useEffect(() => {
+    setAlumnoOption(null);
+    setAlumnoId("");
+  }, [cursoId]);
+
+  // Helpers para búsqueda
+  const buildFiltrosAlumno = useCallback((q) => {
+    const s = (q || "").trim();
+    if (!s) return {};
+    if (/^\d{3,}$/.test(s)) return { dni: s };
+    // backend acepta nombre/apellido; usamos ambos con el mismo término
+    return { nombre: s, apellido: s };
+  }, []);
+
+  const alumnosCursoCache = useRef({}); // cursoId -> lista alumnos
+  const alumnosDefaultCache = useRef(null); // lista default sin curso
+  const buscarEnLista = (lista, q) => {
+    const s = (q || "").toLowerCase();
+    if (!s) return lista;
+    return (lista || []).filter(a => {
+      const nom = `${a.apellido || ''} ${a.nombre || ''}`.toLowerCase();
+      const dni = (a.dni || '').toString();
+      return nom.includes(s) || dni.includes(s);
+    });
+  };
+
+  const loadAlumnoOptions = useCallback(async (inputValue) => {
+    const q = (inputValue || "").trim();
+    try {
+      // Si hay curso seleccionado, buscar dentro de ese curso
+      if (cursoId) {
+        let lista = alumnosCursoCache.current[cursoId];
+        if (!lista) {
+          lista = await listarAlumnosPorCurso(token, Number(cursoId));
+          alumnosCursoCache.current[cursoId] = Array.isArray(lista) ? lista : [];
+        }
+        const filtrada = buscarEnLista(lista, q).slice(0, 200);
+        return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
+      }
+      // Sin curso: búsqueda remota por nombre/apellido o DNI
+      if (q.length < 1) {
+        // Lista default sin filtro (cacheada)
+        if (!alumnosDefaultCache.current) {
+          const lista = await listarAlumnosConFiltros(token, {});
+          alumnosDefaultCache.current = Array.isArray(lista) ? lista : [];
+        }
+        return alumnosDefaultCache.current.slice(0, 200).map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
+      }
+      const filtros = buildFiltrosAlumno(q);
+      const lista = await listarAlumnosConFiltros(token, filtros);
+      return (lista || []).slice(0, 200).map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
+    } catch {
+      return [];
+    }
+  }, [token, cursoId, buildFiltrosAlumno]);
 
   const aniosPosibles = useMemo(() => {
     const y = new Date().getFullYear();
@@ -172,22 +259,38 @@ export default function ReporteNotasAlumnos() {
         <Card.Body>
           <Form onSubmit={onSubmit}>
             <Row className="g-3">
-              <Col md={6}>
-                <Form.Label>Alumno</Form.Label>
-                <Form.Select
-                  value={alumnoId}
-                  onChange={(e) => setAlumnoId(e.target.value)}
-                  disabled={loadingAlumnos}
-                >
-                  <option value="">Seleccioná un alumno</option>
-                  {alumnos.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.apellido}, {a.nombre} {a.dni ? `- ${a.dni}` : ""}
-                    </option>
+              <Col md={3}>
+                <Form.Label>Curso (Año, opcional)</Form.Label>
+                <Form.Select value={cursoAnioSel} onChange={(e)=>setCursoAnioSel(e.target.value)}>
+                  <option value="">Todos</option>
+                  {aniosCursoOptions.map(an => (
+                    <option key={an} value={an}>{an}</option>
                   ))}
                 </Form.Select>
               </Col>
               <Col md={3}>
+                <Form.Label>División (opcional)</Form.Label>
+                <Form.Select value={divisionSel} onChange={(e)=>setDivisionSel(e.target.value)} disabled={!cursoAnioSel}>
+                  <option value="">Todas</option>
+                  {divisionesOptions.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </Form.Select>
+              </Col>
+              <Col md={4}>
+                <Form.Label>Alumno</Form.Label>
+                <AsyncSelect
+                  cacheOptions
+                  defaultOptions={true}
+                  loadOptions={loadAlumnoOptions}
+                  value={alumnoOption}
+                  onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
+                  placeholder={cursoId ? "Seleccioná o escribí para filtrar dentro del curso..." : "Seleccioná un alumno o escribí para filtrar"}
+                  isClearable
+                  classNamePrefix="select"
+                />
+              </Col>
+              <Col md={2}>
                 <Form.Label>Año</Form.Label>
                 <Form.Select value={anio} onChange={(e) => setAnio(e.target.value)}>
                   {aniosPosibles.map((y) => (
@@ -197,8 +300,8 @@ export default function ReporteNotasAlumnos() {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={3} className="d-flex align-items-end">
-                <Button type="submit" variant="primary" disabled={loading}>
+              <Col md={2} className="d-flex align-items-end">
+                <Button type="submit" variant="primary" disabled={loading || !alumnoId}>
                   {loading ? (
                     <>
                       <Spinner size="sm" animation="border" className="me-2" /> Generando...
