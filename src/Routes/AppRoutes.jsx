@@ -37,6 +37,7 @@ import ReporteNotasAlumnos from '../Pages/ReporteNotasAlumnos.jsx';
 import ReporteNotasCursoMateria from '../Pages/ReporteNotasCursoMateria.jsx';
 import ReporteLegajoAlumno from '../Pages/ReporteLegajoAlumno.jsx';
 import AsistenciaAlumnos from '../Pages/AsistenciaAlumnos.jsx';
+import AsistenciaDocentes from '../Pages/AsistenciaDocentes.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -119,9 +120,12 @@ function AppRoutes() {
           <Route path="reportes/notas-por-curso" element={<ReporteNotasCursoMateria />} />
         </Route>
 
-        {/* Asistencia -> ADMIN, PRECEPTOR (alumnos). Docentes se reserva para futuro */}
+        {/* Asistencia -> ADMIN, PRECEPTOR (alumnos). Docentes -> ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_PRECEPTOR']} />}>
           <Route path="asistencia/alumnos" element={<AsistenciaAlumnos />} />
+        </Route>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+          <Route path="asistencia/docentes" element={<AsistenciaDocentes />} />
         </Route>
 
         {/* Calificaciones -> ADMIN, DOCENTE, */}
