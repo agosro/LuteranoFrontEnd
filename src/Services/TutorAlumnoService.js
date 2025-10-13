@@ -48,22 +48,27 @@ export const desasignarTutorDeAlumno = async (token, tutorId, alumnoId) => {
   }
 };
 
-// Listar alumnos a cargo de un tutor
+// 📌 Listar alumnos a cargo de un tutor
 export const listarAlumnosACargo = async (token, tutorId) => {
   try {
-    const resp = await fetch(`${API_URL}/tutorAlumno/${tutorId}/alumnos`, {
+    const response = await fetch(`${API_URL}/tutorAlumno/${tutorId}/alumnos`, {
+      method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
-    const text = await resp.text();
-    const data = text ? JSON.parse(text) : null;
-    if (!resp.ok) throw new Error(data?.mensaje || `Error ${resp.status}`);
-    // Backend devuelve AlumnoResponseList con alumnoDtos
-    return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : [];
+
+    const data = await response.json();
+    if (!response.ok) {
+      const mensaje = data?.mensaje || "Error al listar alumnos a cargo";
+      throw new Error(mensaje);
+    }
+
+    // El backend devuelve AlumnoResponseList con el campo alumnoDtos
+    return data?.alumnoDtos ?? [];
   } catch (error) {
-    console.error('Error al listar alumnos a cargo:', error);
+    console.error("Error al listar alumnos a cargo:", error);
     throw error;
   }
 };

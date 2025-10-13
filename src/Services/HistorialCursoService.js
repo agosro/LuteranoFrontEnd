@@ -25,6 +25,10 @@ export const listarHistorialAlumnoFiltrado = async (token, alumnoId, { cicloLect
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
     if (!response.ok) {
+      // Si no tiene curso aún, el backend puede responder 404/422: tratamos como historial vacío
+      if (response.status === 404 || response.status === 422) {
+        return { historialCursos: [] };
+      }
       const base = data?.mensaje || `Error ${response.status}`;
       if (response.status === 403) throw new Error(`${base}: no autorizado (403)`);
       throw new Error(base || "Error al obtener historial completo");
@@ -51,8 +55,9 @@ export const obtenerHistorialActualAlumno  = async (token, alumnoId) => {
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
     if (!response.ok) {
+      // Sin curso vigente también es un caso normal: devolvemos null en la propiedad esperada por el front
       if (response.status === 404 || response.status === 422) {
-        return { historialCursoDto: null };
+        return { historialCurso: null };
       }
       const base = data?.mensaje || `Error ${response.status}`;
       if (response.status === 403) throw new Error(`${base}: no autorizado (403)`);
