@@ -105,6 +105,7 @@ export default function AsistenciaDocentes() {
         const nuevo = new Set(prev);
         if (modalEdit.estado === 'TARDE') nuevo.add(modalEdit.docente.id);
         if (modalEdit.estado === 'JUSTIFICADO') nuevo.delete(modalEdit.docente.id);
+        if (modalEdit.estado === 'CON_LICENCIA') nuevo.delete(modalEdit.docente.id);
         return nuevo;
       });
       toast.success('Edición guardada');
