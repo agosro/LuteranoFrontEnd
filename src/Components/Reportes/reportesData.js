@@ -37,7 +37,8 @@ const reportes = [
     id: 5,
     titulo: "Alumnos que llegan tarde regularmente",
     descripcion: "Detectá a los alumnos con reincidencias de llegadas tarde.",
-    categoria: "Alumnos"
+    categoria: "Alumnos",
+    ruta: "/reportes/tardanzas"
   },
   {
     id: 6,

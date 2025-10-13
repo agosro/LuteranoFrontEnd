@@ -38,6 +38,7 @@ import ReporteNotasCursoMateria from '../Pages/ReporteNotasCursoMateria.jsx';
 import ReporteLegajoAlumno from '../Pages/ReporteLegajoAlumno.jsx';
 import AsistenciaAlumnos from '../Pages/AsistenciaAlumnos.jsx';
 import AsistenciaDocentes from '../Pages/AsistenciaDocentes.jsx';
+import ReporteTardanzas from '../Pages/ReporteTardanzas.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -118,6 +119,7 @@ function AppRoutes() {
           <Route path="reportes/legajo-alumno" element={<ReporteLegajoAlumno />} />
           <Route path="reportes/notas-alumnos" element={<ReporteNotasAlumnos />} />
           <Route path="reportes/notas-por-curso" element={<ReporteNotasCursoMateria />} />
+          <Route path="reportes/tardanzas" element={<ReporteTardanzas />} />
         </Route>
 
         {/* Asistencia -> ADMIN, PRECEPTOR (alumnos). Docentes -> ADMIN */}
