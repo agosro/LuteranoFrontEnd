@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useParams, Link } from "react-router-dom";
 import TablaDetalle from "../Components/TablaDetalles";
 import RenderCampos from "../Components/RenderCampos";
 import RenderCamposEditable from "../Components/RenderCamposEditables";
 import { camposTutor } from "../Entidades/camposTutor";
 import { listarTutores, editarTutor } from "../Services/TutorService";
+import { listarAlumnosACargo } from "../Services/TutorAlumnoService";
 import { useAuth } from "../Context/AuthContext";
 import { toast } from "react-toastify";
 import { inputLocalToBackendISO } from "../utils/fechas";
@@ -18,7 +19,9 @@ export default function TutorDetalle() {
   const [tutor, setTutor] = useState(tutorState || null);
   const [formData, setFormData] = useState(tutorState || {});
   const [loadingTutor, setLoadingTutor] = useState(true);
-  // Alumnos a cargo: pendiente de endpoint. Dejamos la pestaña vacía por ahora.
+  const [alumnosCargo, setAlumnosCargo] = useState([]);
+  const [alumnosCargoLoading, setAlumnosCargoLoading] = useState(false);
+  const [alumnosCargoError, setAlumnosCargoError] = useState("");
 
   // Cargar tutor (siempre intentamos enriquecer con datos completos)
   useEffect(() => {
@@ -51,7 +54,29 @@ export default function TutorDetalle() {
     fetchTutor();
   }, [user?.token, id, tutorState]);
 
-  // Nota: la carga de alumnos a cargo se implementará cuando haya endpoint específico.
+  // Cargar alumnos a cargo del tutor
+  const tutorIdEffective = useMemo(
+    () => id || tutor?.id || tutorState?.id || null,
+    [id, tutor?.id, tutorState?.id]
+  );
+
+  useEffect(() => {
+    const fetchAlumnos = async () => {
+      if (!user?.token || !tutorIdEffective) return;
+      setAlumnosCargoLoading(true);
+      setAlumnosCargoError("");
+      try {
+        const lista = await listarAlumnosACargo(user.token, tutorIdEffective);
+        setAlumnosCargo(Array.isArray(lista) ? lista : []);
+      } catch (e) {
+        console.error(e);
+        setAlumnosCargoError(e.message || "Error cargando alumnos a cargo");
+      } finally {
+        setAlumnosCargoLoading(false);
+      }
+    };
+    fetchAlumnos();
+  }, [user?.token, tutorIdEffective]);
 
   if (!tutor && !tutorState) return <p>Cargando...</p>;
   const tShow = tutor || tutorState;
@@ -117,7 +142,39 @@ export default function TutorDetalle() {
         {
           id: "alumnos",
           label: "Alumnos a cargo",
-          content: () => (<div />), // Dejado vacío hasta tener endpoint
+          content: () => (
+            <div>
+              {alumnosCargoLoading && <p>Cargando alumnos a cargo...</p>}
+              {alumnosCargoError && <p className="text-danger">{alumnosCargoError}</p>}
+              {!alumnosCargoLoading && !alumnosCargoError && (
+                alumnosCargo.length ? (
+                  <ul className="list-group">
+                    {alumnosCargo.map((a) => (
+                      <li key={a.id} className="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong>{a.nombre} {a.apellido}</strong>
+                          {a.dni ? <span className="text-muted"> • DNI: {a.dni}</span> : null}
+                        </div>
+                        <div className="text-end">
+                          {a.email ? <div className="small text-muted">{a.email}</div> : null}
+                          <Link
+                            to={`/alumnos/${a.id}`}
+                            state={a}
+                            className="btn btn-sm btn-outline-primary mt-1"
+                            title="Ver alumno"
+                          >
+                            Ver alumno
+                          </Link>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Este tutor no tiene alumnos a cargo.</p>
+                )
+              )}
+            </div>
+          ),
         },
       ]}
     />
