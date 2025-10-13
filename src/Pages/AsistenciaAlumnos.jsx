@@ -10,6 +10,7 @@ import {
 	actualizarAsistenciaAlumno,
 } from '../Services/AsistenciaAlumnoService';
 import { toast } from 'react-toastify';
+import ConfirmarAccion from '../Components/Modals/ConfirmarAccion';
 
 // Campo de formulario Bootstrap
 function FormGroupSelect({ label, value, onChange, options, placeholder = 'Seleccione...' }) {
@@ -108,6 +109,19 @@ export default function AsistenciaAlumnos() {
 	const [presentes, setPresentes] = useState(new Set()); // ids marcados como presente para el guardado masivo
 	const [modalEdit, setModalEdit] = useState({ open: false, alumno: null, estado: 'TARDE', observacion: '' });
 	const [cargando, setCargando] = useState(false);
+	const [confirm, setConfirm] = useState({ open: false, title: '', message: '', payload: null, btnClass: 'btn-primary', loading: false });
+
+	const cerrarConfirm = () => setConfirm((c) => ({ ...c, open: false, loading: false }));
+	const confirmarGuardar = async () => {
+		setConfirm((c) => ({ ...c, loading: true }));
+		try {
+			await ejecutarGuardarMasivo(confirm.payload);
+			cerrarConfirm();
+		} catch (e) {
+			toast.error(e.message || 'No se pudo guardar asistencia');
+			setConfirm((c) => ({ ...c, loading: false }));
+		}
+	};
 
 	// Cargar cursos
 	useEffect(() => {
@@ -203,6 +217,17 @@ export default function AsistenciaAlumnos() {
 				...prev,
 				[modalEdit.alumno.id]: { estado: modalEdit.estado, observacion: modalEdit.observacion || '' },
 			}));
+			// Sincronizar checkbox de Presente según el estado elegido
+			setPresentes((prev) => {
+				const nuevo = new Set(prev);
+				const id = modalEdit.alumno.id;
+				if (modalEdit.estado === 'TARDE') {
+					nuevo.add(id); // Tarde cuenta como presente
+				} else if (modalEdit.estado === 'JUSTIFICADO') {
+					nuevo.delete(id); // Justificado no debe quedar como presente
+				}
+				return nuevo;
+			});
 			toast.success('Edición guardada');
 			cerrarModalEditar();
 		} catch (e) {
@@ -212,47 +237,68 @@ export default function AsistenciaAlumnos() {
 		}
 	};
 
-	// Guardado masivo usando el endpoint /asistencia/alumnos/curso
-	const handleGuardarMasivo = async () => {
-		if (!token || !cursoId || !fecha) return;
-			try {
+	// Ejecuta el guardado masivo con el payload indicado
+	const ejecutarGuardarMasivo = async (payload) => {
+		try {
 			setCargando(true);
-
-			// Política: solo se marcan PRESENTES; el resto queda AUSENTE automáticamente
-			const presentesIds = Array.from(presentes);
-			const overrides = {}; // sin overrides en toma rápida
-
-				// Confirmación: si no hay ningún estado seleccionado, se marcarán todos AUSENTES
-				const totalSeleccionados = presentesIds.length + Object.keys(overrides).length;
-				if (totalSeleccionados === 0) {
-					const confirmar = window.confirm('No seleccionaste ningún estado. Se marcarán todos como AUSENTE. ¿Deseás continuar?');
-					if (!confirmar) {
-						setCargando(false);
-						return;
-					}
-				}
-
-			const payload = {
-				cursoId: Number(cursoId),
-				fecha,
-				presentesIds,
-				overridesPorAlumnoId: overrides,
-			};
-
 			const resp = await registrarAsistenciaCurso(token, payload);
 			if (resp?.code && resp.code < 0) throw new Error(resp.mensaje || 'Error al registrar asistencia');
 			toast.success('Asistencia guardada');
-			// refrescar estados actuales
 			const items = await listarAsistenciaCursoPorFecha(token, Number(cursoId), fecha);
 			const map = {};
 			for (const it of items) {
 				if (it.alumnoId) map[it.alumnoId] = { estado: it.estado || '', observacion: it.observacion || '' };
 			}
 			setAsistencia(map);
-		} catch (e) {
-			toast.error(e.message || 'No se pudo guardar asistencia');
 		} finally {
 			setCargando(false);
+		}
+	};
+
+	// Guardado masivo usando el endpoint /asistencia/alumnos/curso (con confirmación por modal)
+	const handleGuardarMasivo = async () => {
+		if (!token || !cursoId || !fecha) return;
+		// Política: solo se marcan PRESENTES; el resto queda AUSENTE automáticamente
+		const presentesIds = Array.from(presentes);
+		const overrides = {};
+		const payload = {
+			cursoId: Number(cursoId),
+			fecha,
+			presentesIds,
+			overridesPorAlumnoId: overrides,
+		};
+
+		const totalSeleccionados = presentesIds.length + Object.keys(overrides).length;
+		// Caso 1: nadie seleccionado => todos AUSENTES (confirmar)
+		if (totalSeleccionados === 0) {
+			setConfirm({
+				open: true,
+				title: 'Confirmar guardado',
+				message: 'No seleccionaste a nadie. Se marcarán todos como AUSENTE. ¿Deseás continuar?',
+				payload,
+				btnClass: 'btn-primary',
+				loading: false,
+			});
+			return;
+		}
+		// Caso 2: todos seleccionados => todos PRESENTES (confirmar)
+		if (alumnos.length > 0 && presentesIds.length === alumnos.length) {
+			setConfirm({
+				open: true,
+				title: 'Confirmar guardado',
+				message: 'Vas a marcar a TODOS los alumnos como PRESENTES. ¿Deseás continuar?',
+				payload,
+				btnClass: 'btn-success',
+				loading: false,
+			});
+			return;
+		}
+
+		// Caso normal: guardar directo
+		try {
+			await ejecutarGuardarMasivo(payload);
+		} catch (e) {
+			toast.error(e.message || 'No se pudo guardar asistencia');
 		}
 	};
 
@@ -327,6 +373,19 @@ export default function AsistenciaAlumnos() {
 								</div>
 							</div>
 						</div>
+
+						{/* Modal de confirmación para guardado masivo */}
+						<ConfirmarAccion
+							show={confirm.open}
+							title={confirm.title}
+							message={confirm.message}
+							confirmText="Confirmar"
+							cancelText="Cancelar"
+							confirmBtnClass={confirm.btnClass}
+							onConfirm={confirmarGuardar}
+							onClose={cerrarConfirm}
+							loading={confirm.loading}
+						/>
 					</div>
 				</div>
 
