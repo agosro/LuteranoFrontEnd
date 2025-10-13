@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
@@ -18,6 +18,7 @@ export default function ReporteTardanzas() {
   const [limit, setLimit] = useState(20);
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(false);
+  const printRef = useRef(null);
 
   useEffect(() => {
     if (!token) return;
@@ -68,6 +69,65 @@ export default function ReporteTardanzas() {
 
   const totalTardanzas = useMemo(() => items.reduce((acc, it) => acc + (it?.cantidadTardanzas ?? 0), 0), [items]);
 
+  // Export CSV (respeta filtros actuales y los items mostrados)
+  const exportCSV = () => {
+    if (!items || items.length === 0) return;
+    const header = ["Alumno", "Curso", "Tardanzas"];
+    const rows = items.map(it => [
+      getNombreAlumno(it),
+      getNombreCurso(it),
+      getCantidadTardanzas(it)
+    ]);
+    const csv = [header, ...rows]
+      .map(cols => cols.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(','))
+      .join('\n');
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cursoLbl = modo === 'curso' ? (cursos.find(c=>String(c.value)===String(cursoId))?.label || String(cursoId||'')) : 'todos';
+    const cursoSlug = cursoLbl.replace(/\s+/g, '_');
+    const rangoSlug = (desde || hasta) ? `${(desde||'x')}_a_${(hasta||'x')}` : 'todos';
+    const topSlug = (limit != null) ? `_top_${limit}` : '';
+    a.download = `reporte_tardanzas_${cursoSlug}_${rangoSlug}${topSlug}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Imprimir/PDF solo tabla
+  const printOnlyTable = () => {
+    if (!printRef.current) return;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    const css = `
+      body { font-family: Arial, sans-serif; padding: 16px; }
+      h3 { margin: 0 0 12px 0; }
+      .sub { margin: 0 0 12px 0; color: #555; font-size: 12px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
+      thead tr:first-child th { background: #f0f0f0; }
+    `;
+    const titulo = modo === 'curso' ? `Tardanzas · Curso ${cursos.find(c=>String(c.value)===String(cursoId))?.label || ''}` : 'Tardanzas · Todos los cursos';
+    const fmt = (d) => {
+      if (!d) return '';
+      const parts = String(d).split('-');
+      if (parts.length === 3) {
+        const [y,m,day] = parts; return `${day}/${m}/${y}`;
+      }
+      return d;
+    };
+    const rango = (desde || hasta) ? `${fmt(desde)} – ${fmt(hasta)}` : 'Todos';
+    const sub = `Rango: ${rango} · Top N: ${limit ?? ''}`;
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Tardanzas</title><style>${css}</style></head><body>`);
+    win.document.write(`<h3>${titulo}</h3>`);
+    win.document.write(`<div class="sub">${sub}</div>`);
+    win.document.write(printRef.current.innerHTML);
+    win.document.write('</body></html>');
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 300);
+  };
+
   return (
     <div className="container py-3">
       <Breadcrumbs />
@@ -116,14 +176,19 @@ export default function ReporteTardanzas() {
         </div>
       </div>
 
-      <div className="row g-2 mb-3">
+      <div className="row g-2 mb-2">
         <div className="col-auto"><span className="badge text-bg-secondary">Total filas: {items.length}</span></div>
         <div className="col-auto"><span className="badge text-bg-warning text-dark">Total tardanzas: {totalTardanzas}</span></div>
+      </div>
+      {/* Acciones de exportación fuera del área imprimible */}
+      <div className="d-flex justify-content-end gap-2 mb-3">
+        <button className="btn btn-outline-secondary btn-sm" onClick={exportCSV} disabled={!items || items.length===0}>Exportar CSV</button>
+        <button className="btn btn-outline-secondary btn-sm" onClick={printOnlyTable} disabled={!items || items.length===0}>Imprimir / PDF</button>
       </div>
 
       <div className="card">
         <div className="card-header"><strong>Resultados</strong></div>
-        <div className="card-body p-0">
+        <div className="card-body p-0" ref={printRef}>
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
