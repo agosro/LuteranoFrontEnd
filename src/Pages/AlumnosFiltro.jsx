@@ -7,14 +7,28 @@ import { crearAlumno } from "../Services/AlumnoService";
 import { camposAlumno } from "../Entidades/camposAlumno";
 import { toast } from "react-toastify";
 import { inputLocalToBackendISO } from "../utils/fechas";
+import { listarCursos } from "../Services/CursoService";
+import { getTituloCurso } from "../utils/cursos";
 
 export default function FiltroAlumnosPage() {
   const { user } = useAuth();
 
   const [modalCrearShow, setModalCrearShow] = useState(false);
   const [formDataCrear, setFormDataCrear] = useState({});
+  const [cursosOptions, setCursosOptions] = useState([]);
 
-  const abrirModalCrear = () => { setFormDataCrear({}); setModalCrearShow(true); };
+  const abrirModalCrear = async () => {
+    setFormDataCrear({});
+    try {
+      const lista = await listarCursos(user.token);
+      const opts = (lista || []).map(c => ({ value: c.id, label: getTituloCurso(c) }));
+      setCursosOptions(opts);
+    } catch (e) {
+      console.error("Error cargando cursos para creación de alumno:", e);
+      setCursosOptions([]);
+    }
+    setModalCrearShow(true);
+  };
   const cerrarModalCrear = () => { setFormDataCrear({}); setModalCrearShow(false); };
 
   const handleInputChangeCrear = (name, value) =>
@@ -22,6 +36,7 @@ export default function FiltroAlumnosPage() {
 
   const handleCreate = async (datos) => {
     try {
+      const cursoIdSel = typeof datos.cursoActual === 'object' ? datos.cursoActual?.id : datos.cursoActual;
       const nuevoAlumno = {
         nombre: datos.nombre,
         apellido: datos.apellido,
@@ -34,7 +49,7 @@ export default function FiltroAlumnosPage() {
   fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento) || undefined,
   fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso) || undefined,
         ...(datos.tutor?.id && { tutor: { id: datos.tutor.id } }),
-        ...(datos.cursoActual?.id && { cursoActual: { id: datos.cursoActual.id } }),
+        ...(cursoIdSel && { cursoActual: { id: cursoIdSel } }),
       };
 
       await crearAlumno(user.token, nuevoAlumno);
@@ -79,7 +94,10 @@ export default function FiltroAlumnosPage() {
       <ModalCrearEntidad
         show={modalCrearShow}
         onClose={cerrarModalCrear}
-        campos={camposAlumno(false, true)}
+        campos={[
+          ...camposAlumno(false, true),
+          { name: "cursoActual", label: "Curso (opcional)", type: "select", opciones: cursosOptions, required: false },
+        ]}
         formData={formDataCrear}
         onInputChange={handleInputChangeCrear}
         onSubmit={handleCreate}
