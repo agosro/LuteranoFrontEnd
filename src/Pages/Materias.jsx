@@ -56,6 +56,10 @@ export default function ListaMaterias() {
   const [materiaParaAsignar, setMateriaParaAsignar] = useState(null);
 
   const abrirModalAsignarDocente = (materia) => {
+    if (!materia?.cursoId) {
+      toast.warn("Para asignar un docente, primero asigná la materia a un curso.");
+      return;
+    }
     setMateriaParaAsignar(materia);
     setModalAsignarDocenteShow(true);
   };
@@ -221,13 +225,17 @@ export default function ListaMaterias() {
         camposFiltrado={['nombreMateria', 'descripcion', 'cursoNombre', 'docenteNombre']}
         botonCrear={<BotonCrear texto="Crear materia" onClick={() => setModalCrearShow(true)} />}
         placeholderBuscador="Buscar por nombre, descripción o curso"
-        extraButtons={(materia) => [
-          {
+        extraButtons={(materia) => {
+          const puedeAsignar = !!materia.cursoId;
+          const btn = {
             icon: <FaUserTie />,
             onClick: () => abrirModalAsignarDocente(materia),
-            title: "Asignar Docente",
-          }
-        ]}
+            title: puedeAsignar ? "Asignar Docente" : "Asignar a un curso para habilitar",
+            disabled: !puedeAsignar,
+            className: !puedeAsignar ? "btn-outline-secondary" : undefined,
+          };
+          return [btn];
+        }}
       />
 
       <ModalVerEntidad
