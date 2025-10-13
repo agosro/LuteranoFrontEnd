@@ -9,7 +9,7 @@ import BotonCrear from "../Components/Botones/BotonCrear";
 import { toast } from "react-toastify";
 import { camposCurso } from "../Entidades/camposCurso";
 import { listarCursos, crearCurso, editarCurso, eliminarCurso } from "../Services/CursoService";
-import { listarAulas } from "../Services/AulaService";
+import { listarAulas, listarAulasLibres } from "../Services/AulaService";
 import { listarMaterias } from "../Services/MateriaService";
 
 // 🆕 imports para asignar materias
@@ -115,22 +115,37 @@ export default function ListaCursos() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const abrirModalCrear = () => { setFormData({}); setCursoSeleccionado(null); setModalCrearShow(true); };
-  const abrirModalEditar = (curso) => {
+  const abrirModalCrear = async () => {
+    setFormData({});
+    setCursoSeleccionado(null);
+    try {
+      const libres = await listarAulasLibres(token);
+      const opciones = (libres || []).map(a => ({ value: a.id, label: a.nombre }));
+      setAulasOptions(opciones);
+    } catch (e) {
+      toast.error(e.message || "No se pudieron cargar las aulas libres");
+      // fallback: mantiene las opciones que ya había
+    } finally {
+      setModalCrearShow(true);
+    }
+  };
+  const abrirModalEditar = async (curso) => {
     setCursoSeleccionado(curso);
-    // Calcular aulas disponibles incluyendo el aula actual aunque esté ocupada
-    setAulasOptions(prev => {
-      // aulasOptions original viene de la carga general pero regeneramos a partir de aulas + cursos
-      // Necesitamos listarAulas y filtrar contra 'cursos' en memoria.
-      // Para simplicidad asumimos que 'cursos' ya está actualizado.
-      const aulasUsadasPorOtros = new Set(
-        cursos
-          .filter(c => c.id !== curso.id && c.aula?.value)
-          .map(c => c.aula.value)
-      );
-      const actuales = prev.filter(a => !aulasUsadasPorOtros.has(a.value) || a.value === curso.aula?.value);
-      return actuales;
-    });
+    // Cargar aulas libres e incluir el aula actual aunque no esté libre
+    try {
+      const libres = await listarAulasLibres(token);
+      let opciones = (libres || []).map(a => ({ value: a.id, label: a.nombre }));
+
+      const aulaActualId = curso.aula?.value || curso.aula?.id || null;
+      const aulaActualLabel = curso.aulaNombre || curso.aula?.label || null;
+      if (aulaActualId && !opciones.some(o => o.value === aulaActualId)) {
+        opciones = [...opciones, { value: aulaActualId, label: aulaActualLabel || `Aula ${aulaActualId}` }];
+      }
+      setAulasOptions(opciones);
+    } catch (e) {
+      toast.error(e.message || "No se pudieron cargar las aulas libres");
+      // fallback: mantiene opciones actuales
+    }
     setFormData({
       id: curso.id,
       anio: curso.anio,

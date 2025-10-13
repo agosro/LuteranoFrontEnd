@@ -6,7 +6,7 @@ import RenderCampos from "../Components/RenderCampos";
 import RenderCamposEditable from "../Components/RenderCamposEditables";
 import { camposCurso } from "../Entidades/camposCurso";
 import { obtenerCursoPorId, editarCurso } from "../Services/CursoService";
-import { listarAulas } from "../Services/AulaService";
+import { listarAulas, listarAulasLibres } from "../Services/AulaService";
 import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { listarMateriasDeCurso } from "../Services/MateriaCursoService";
 import { getModulosConEstadoPorDia } from "../Services/ModuloService";
@@ -27,6 +27,7 @@ export default function CursoDetalle() {
   const [curso, setCurso] = useState(cursoState || null);
   const [formData, setFormData] = useState(cursoState || {});
   const [aulasOptions, setAulasOptions] = useState([]);
+  const [aulasLibresOptions, setAulasLibresOptions] = useState([]);
   const [preceptor, setPreceptor] = useState(cursoState?.preceptor || null);
   const [preceptorLoading, setPreceptorLoading] = useState(false);
 
@@ -49,9 +50,18 @@ export default function CursoDetalle() {
 
     const cargarDatos = async () => {
       try {
-        // Aulas para selects
+        // Aulas para selects (todas y libres)
         const aulas = await listarAulas(token);
-        setAulasOptions((aulas || []).map(a => ({ value: a.id, label: a.nombre })));
+        const opcionesTodas = (aulas || []).map(a => ({ value: a.id, label: a.nombre }));
+        setAulasOptions(opcionesTodas);
+        try {
+          const aulasLibres = await listarAulasLibres(token);
+          setAulasLibresOptions((aulasLibres || []).map(a => ({ value: a.id, label: a.nombre })));
+        } catch (e) {
+          // Fallback: si falla, usamos todas para no bloquear edición
+          setAulasLibresOptions(opcionesTodas);
+          toast.error(e.message || "No se pudieron cargar las aulas libres");
+        }
 
         // Si no vino por state, obtener por id
         if (!cursoState && id) {
@@ -299,7 +309,22 @@ export default function CursoDetalle() {
               </>
             ) : (
               <RenderCamposEditable
-                campos={camposCurso(false, aulasOptions, [], false)}
+                campos={(() => {
+                  // En modo edición usamos aulas libres + aula actual si no estuviera libre
+                  const aulaActualId = (() => {
+                    const raw = formData?.aulaId ?? curso?.aula?.id ?? curso?.aula?.value ?? curso?.aulaId;
+                    const num = Number(raw);
+                    return Number.isFinite(num) ? num : null;
+                  })();
+                  let opcionesEdit = [...aulasLibresOptions];
+                  if (aulaActualId != null && !opcionesEdit.some(o => o.value === aulaActualId)) {
+                    const labelActual =
+                      aulasOptions.find(o => o.value === aulaActualId)?.label ||
+                      curso?.aulaNombre || `Aula ${aulaActualId}`;
+                    opcionesEdit = [...opcionesEdit, { value: aulaActualId, label: labelActual }];
+                  }
+                  return camposCurso(false, opcionesEdit, [], false);
+                })()}
                 formData={formData}
                 setFormData={setFormData}
               />
@@ -366,6 +391,15 @@ export default function CursoDetalle() {
                           ) : (
                             <span className="text-muted">Sin docente</span>
                           )}
+                          <div>
+                            <Link
+                              to={`/materias/${m.materiaId}`}
+                              state={m}
+                              className="btn btn-sm btn-outline-primary mt-1"
+                            >
+                              Ver materia
+                            </Link>
+                          </div>
                         </div>
                       </li>
                     ))}
@@ -385,7 +419,17 @@ export default function CursoDetalle() {
               {horariosLoading && <p>Cargando horarios...</p>}
               {horariosError && <p className="text-danger">{horariosError}</p>}
               {!horariosLoading && !horariosError && (
-                <div className="table-responsive">
+                <>
+                  <div className="d-flex justify-content-end mb-2">
+                    <Link
+                      to={`/cursos/${id}/horarios`}
+                      state={curso}
+                      className="btn btn-outline-primary btn-sm"
+                    >
+                      Gestionar horarios
+                    </Link>
+                  </div>
+                  <div className="table-responsive">
                   <table className="table table-bordered table-hover">
                     <thead className="table-success text-center">
                       <tr>
@@ -437,7 +481,8 @@ export default function CursoDetalle() {
                       })()}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </>
               )}
             </div>
           ),
