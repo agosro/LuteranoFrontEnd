@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useParams, Link } from "react-router-dom";
 import TablaDetalle from "../Components/TablaDetalles";
 import RenderCampos from "../Components/RenderCampos";
 import RenderCamposEditable from "../Components/RenderCamposEditables";
@@ -55,13 +55,18 @@ export default function TutorDetalle() {
   }, [user?.token, id, tutorState]);
 
   // Cargar alumnos a cargo del tutor
+  const tutorIdEffective = useMemo(
+    () => id || tutor?.id || tutorState?.id || null,
+    [id, tutor?.id, tutorState?.id]
+  );
+
   useEffect(() => {
     const fetchAlumnos = async () => {
-      if (!user?.token || !id) return;
+      if (!user?.token || !tutorIdEffective) return;
       setAlumnosCargoLoading(true);
       setAlumnosCargoError("");
       try {
-        const lista = await listarAlumnosACargo(user.token, id);
+        const lista = await listarAlumnosACargo(user.token, tutorIdEffective);
         setAlumnosCargo(Array.isArray(lista) ? lista : []);
       } catch (e) {
         console.error(e);
@@ -71,7 +76,7 @@ export default function TutorDetalle() {
       }
     };
     fetchAlumnos();
-  }, [user?.token, id]);
+  }, [user?.token, tutorIdEffective]);
 
   if (!tutor && !tutorState) return <p>Cargando...</p>;
   const tShow = tutor || tutorState;
@@ -152,6 +157,14 @@ export default function TutorDetalle() {
                         </div>
                         <div className="text-end">
                           {a.email ? <div className="small text-muted">{a.email}</div> : null}
+                          <Link
+                            to={`/alumnos/${a.id}`}
+                            state={a}
+                            className="btn btn-sm btn-outline-primary mt-1"
+                            title="Ver alumno"
+                          >
+                            Ver alumno
+                          </Link>
                         </div>
                       </li>
                     ))}
