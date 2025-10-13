@@ -14,6 +14,16 @@ export default function TablaDetalle({
   const [modoEditar, setModoEditar] = useState(false);
   const navigate = useNavigate();
 
+  const tabEsEditable = (tab) => {
+    if (!tab) return false;
+    if (tab.editable === true) return true;
+    const label = tab.label || "";
+    return tab.id === "datos" || /datos/i.test(label);
+  };
+
+  const activeTab = tabs.find((t) => t.id === activeKey);
+  const mostrarControlesEdicion = tabEsEditable(activeTab);
+
   const handleSave = () => {
     if (onSave) onSave();
     setModoEditar(false);
@@ -43,30 +53,40 @@ export default function TablaDetalle({
           <Button variant="outline-secondary" className="me-2" onClick={() => navigate(-1)}>
             ← Volver
           </Button>
-
-          {!modoEditar ? (
-            <Button variant="primary" onClick={() => setModoEditar(true)}>
-              Editar
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="success"
-                className="me-2"
-                onClick={handleSave}
-              >
-                Guardar
+          {mostrarControlesEdicion && (
+            !modoEditar ? (
+              <Button variant="primary" onClick={() => setModoEditar(true)}>
+                Editar
               </Button>
-              <Button variant="secondary" onClick={handleCancel}>
-                Cancelar
-              </Button>
-            </>
+            ) : (
+              <>
+                <Button
+                  variant="success"
+                  className="me-2"
+                  onClick={handleSave}
+                >
+                  Guardar
+                </Button>
+                <Button variant="secondary" onClick={handleCancel}>
+                  Cancelar
+                </Button>
+              </>
+            )
           )}
         </div>
       </div>
 
       {/* Tabs de Bootstrap */}
-      <Tab.Container activeKey={activeKey} onSelect={(k) => setActiveKey(k)}>
+      <Tab.Container
+        activeKey={activeKey}
+        onSelect={(k) => {
+          setActiveKey(k);
+          const nextTab = tabs.find((t) => t.id === k);
+          if (!tabEsEditable(nextTab)) {
+            setModoEditar(false);
+          }
+        }}
+      >
         <Nav variant="tabs">
           {tabs.map((tab) => (
             <Nav.Item key={tab.id}>

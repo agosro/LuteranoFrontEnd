@@ -33,16 +33,37 @@ export default function ActionButtons({ onView, onEdit, onDelete, extraButtons =
         </button>
       )}
 
-      {extraButtons.map((btn, index) => (
-        <button
-          key={index}
-          className={`btn btn-sm ${btn.className || "btn-outline-info"}`}
-          onClick={btn.onClick}
-          title={btn.title}
-        >
-          {btn.icon}
-        </button>
-      ))}
+      {extraButtons.map((btn, index) => {
+        const className = `btn btn-sm ${btn.className || "btn-outline-info"}`;
+        if (btn.disabled) {
+          // Mostrar tooltip en el contenedor, no en el botón disabled
+          return (
+            <span key={index} className="d-inline-block" title={btn.title}>
+              <button
+                type="button"
+                className={className}
+                disabled
+                tabIndex={-1}
+                aria-disabled="true"
+                onClick={(e) => e.preventDefault()}
+              >
+                {btn.icon}
+              </button>
+            </span>
+          );
+        }
+        return (
+          <button
+            key={index}
+            type="button"
+            className={className}
+            onClick={btn.onClick}
+            title={btn.title}
+          >
+            {btn.icon}
+          </button>
+        );
+      })}
     </div>
   );
 }

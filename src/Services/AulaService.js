@@ -20,6 +20,26 @@ export const listarAulas = async (token) => {
   }
 };
 
+// Obtener lista de aulas libres (no asignadas a cursos)
+export const listarAulasLibres = async (token) => {
+  try {
+    const response = await fetch(`${API_URL}/aula/list/libres`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.mensaje || 'Error al obtener aulas libres');
+
+    return Array.isArray(data.aulaDtos) ? data.aulaDtos : [];
+  } catch (error) {
+    console.error('Error al listar aulas libres:', error);
+    throw error;
+  }
+};
+
 // Crear un aula
 export const crearAula = async (token, aula) => {
   try {
