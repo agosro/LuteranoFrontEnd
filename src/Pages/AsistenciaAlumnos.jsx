@@ -103,13 +103,17 @@ export default function AsistenciaAlumnos() {
 		});
 	};
 
-	// Abrir modal de edición puntual (Tarde/Justificado + observación)
+	// Abrir modal de edición puntual (Presente/Tarde/Justificado + observación)
 	const abrirModalEditar = (alumno) => {
 		const actual = asistencia[alumno.id] || { estado: '', observacion: '' };
+		// Si tiene estado válido, usarlo; si no, por defecto PRESENTE
+		const estadoInicial = actual.estado && ['PRESENTE', 'TARDE', 'JUSTIFICADO'].includes(actual.estado) 
+			? actual.estado 
+			: 'PRESENTE';
 		setModalEdit({
 			open: true,
 			alumno: { ...alumno, tipo: 'Alumno' },
-			estado: actual.estado === 'TARDE' || actual.estado === 'JUSTIFICADO' ? actual.estado : 'TARDE',
+			estado: estadoInicial,
 			observacion: actual.observacion || '',
 		});
 	};
@@ -131,11 +135,14 @@ export default function AsistenciaAlumnos() {
 				...prev,
 				[modalEdit.alumno.id]: { estado: modalEdit.estado, observacion: modalEdit.observacion || '' },
 			}));
-			// Sincronizar checkbox: TARDE => presente, JUSTIFICADO => no presente
+			// Sincronizar checkbox: PRESENTE o TARDE => marcar presente, JUSTIFICADO => no presente
 			setPresentes((prev) => {
 				const nuevo = new Set(prev);
-				if (modalEdit.estado === 'TARDE') nuevo.add(modalEdit.alumno.id);
-				if (modalEdit.estado === 'JUSTIFICADO') nuevo.delete(modalEdit.alumno.id);
+				if (modalEdit.estado === 'PRESENTE' || modalEdit.estado === 'TARDE') {
+					nuevo.add(modalEdit.alumno.id);
+				} else if (modalEdit.estado === 'JUSTIFICADO') {
+					nuevo.delete(modalEdit.alumno.id);
+				}
 				return nuevo;
 			});
 			toast.success('Edición guardada');

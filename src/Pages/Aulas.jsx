@@ -79,7 +79,15 @@ export default function ListaAulas() {
     });
     setModalEditarShow(true);
   };
-  const abrirModalVer = (aula) => { setAulaSeleccionada(aula); setModalVerShow(true); };
+  const abrirModalVer = (aula) => { 
+    // Asegurar que tenga cursoNombre para mostrar en el modal
+    const aulaConNombre = {
+      ...aula,
+      cursoNombre: aula.curso?.label || "Sin curso asignado"
+    };
+    setAulaSeleccionada(aulaConNombre); 
+    setModalVerShow(true); 
+  };
   const abrirModalEliminar = (aula) => { setAulaSeleccionada(aula); setModalEliminarShow(true); };
 
   // Cerrar modales
@@ -99,8 +107,11 @@ export default function ListaAulas() {
     };
 
 
-    // Crear aula y obtener el objeto creado directamente
-    const nuevaAula = await crearAula(token, payload);
+    // Crear aula y obtener el objeto creado
+    const response = await crearAula(token, payload);
+    
+    // El backend devuelve { aula: {...}, code: 0, mensaje: "..." }
+    const nuevaAula = response.aula;
 
     // Asociamos curso si hay cursosOptions
     const aulaConCurso = {
@@ -130,7 +141,11 @@ export default function ListaAulas() {
       cursoId: datos.cursoId || null
     };
 
-    const aulaActualizada = await editarAula(token, payload);
+    const response = await editarAula(token, payload);
+    
+    // El backend devuelve { aula: {...}, code: 0, mensaje: "..." }
+    const aulaActualizada = response.aula;
+    
     toast.success("Aula actualizada con éxito");
     cerrarModalEditar();
 
@@ -212,6 +227,7 @@ export default function ListaAulas() {
         datos={aulaSeleccionada}
         campos={camposAula(true, cursosOptions)}
         titulo={`Datos del aula: ${aulaSeleccionada?.nombre}`}
+        detallePathBase="aulas"
       />
 
       <ConfirmarEliminar

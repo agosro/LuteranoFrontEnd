@@ -76,10 +76,14 @@ export default function AsistenciaDocentes() {
 
   const abrirModalEditar = (docente) => {
     const actual = asistencia[docente.id] || { estado: '', observacion: '' };
+    // Si tiene estado válido, usarlo; si no, por defecto PRESENTE
+    const estadoInicial = actual.estado && ['PRESENTE', 'TARDE', 'JUSTIFICADO', 'CON_LICENCIA'].includes(actual.estado)
+      ? actual.estado
+      : 'PRESENTE';
     setModalEdit({
       open: true,
       docente: { ...docente, tipo: 'Docente' },
-      estado: actual.estado === 'TARDE' || actual.estado === 'JUSTIFICADO' ? actual.estado : 'TARDE',
+      estado: estadoInicial,
       observacion: actual.observacion || '',
     });
   };
@@ -96,16 +100,19 @@ export default function AsistenciaDocentes() {
         observacion: modalEdit.observacion || '',
       });
       if (resp?.code && resp.code < 0) throw new Error(resp.mensaje || 'Error al actualizar');
-      // Actualizar en memoria y sincronizar checkbox: TARDE => presente, JUSTIFICADO => no presente
+      // Actualizar en memoria y sincronizar checkbox: PRESENTE o TARDE => presente, otros => no presente
       setAsistencia((prev) => ({
         ...prev,
         [modalEdit.docente.id]: { estado: modalEdit.estado, observacion: modalEdit.observacion || '' },
       }));
       setPresentes((prev) => {
         const nuevo = new Set(prev);
-        if (modalEdit.estado === 'TARDE') nuevo.add(modalEdit.docente.id);
-        if (modalEdit.estado === 'JUSTIFICADO') nuevo.delete(modalEdit.docente.id);
-        if (modalEdit.estado === 'CON_LICENCIA') nuevo.delete(modalEdit.docente.id);
+        if (modalEdit.estado === 'PRESENTE' || modalEdit.estado === 'TARDE') {
+          nuevo.add(modalEdit.docente.id);
+        } else {
+          // JUSTIFICADO, CON_LICENCIA, etc. => desmarcar
+          nuevo.delete(modalEdit.docente.id);
+        }
         return nuevo;
       });
       toast.success('Edición guardada');

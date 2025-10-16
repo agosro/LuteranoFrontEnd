@@ -27,6 +27,7 @@ export default function ModalEditarAsistencia({
             <div className="mb-3">
               <label className="form-label">Estado</label>
               <select className="form-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+                <option value="PRESENTE">Presente</option>
                 <option value="TARDE">Tarde</option>
                 <option value="JUSTIFICADO">Justificado</option>
                 {incluirLicencia && <option value="CON_LICENCIA">Con licencia</option>}
