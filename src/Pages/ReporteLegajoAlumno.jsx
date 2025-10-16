@@ -3,6 +3,7 @@ import { Card, Row, Col, Form, Button, Spinner, Alert } from "react-bootstrap";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
+import { useLocation } from "react-router-dom";
 import { listarAlumnosConFiltros } from "../Services/AlumnoService";
 import { obtenerHistorialActualAlumno } from "../Services/HistorialCursoService";
 import { isoToDisplay } from "../utils/fechas";
@@ -13,8 +14,10 @@ import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 export default function ReporteLegajoAlumno() {
   const { user } = useAuth();
   const token = user?.token;
+  const location = useLocation();
+  const preselectedAlumnoId = location.state?.preselectedAlumnoId;
 
-  const [alumnoId, setAlumnoId] = useState("");
+  const [alumnoId, setAlumnoId] = useState(preselectedAlumnoId || "");
   const [alumnos, setAlumnos] = useState([]);
   const [loadingAlumnos, setLoadingAlumnos] = useState(false);
 

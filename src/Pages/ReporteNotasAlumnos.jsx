@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge } from "react-bootstrap";
 import AsyncSelect from "react-select/async";
 import { useAuth } from "../Context/AuthContext";
+import { useLocation } from "react-router-dom";
 import { listarAlumnosConFiltros } from "../Services/AlumnoService";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
 import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
@@ -20,9 +21,11 @@ import Estadisticas from "../Components/Reportes/Estadisticas";
 export default function ReporteNotasAlumnos() {
   const { user } = useAuth();
   const token = user?.token;
+  const location = useLocation();
+  const preselectedAlumnoId = location.state?.preselectedAlumnoId;
 
   const [anio, setAnio] = useState(new Date().getFullYear());
-  const [alumnoId, setAlumnoId] = useState("");
+  const [alumnoId, setAlumnoId] = useState(preselectedAlumnoId || "");
   const [alumnoOption, setAlumnoOption] = useState(null);
   const [cursos, setCursos] = useState([]);
   const [cursoAnioSel, setCursoAnioSel] = useState("");
@@ -80,11 +83,37 @@ export default function ReporteNotasAlumnos() {
     setCursoId(match?.id ? String(match.id) : "");
   }, [cursos, cursoAnioSel, divisionSel]);
 
-  // Al cambiar curso, limpiar alumno seleccionado
+  // Al cambiar curso, limpiar alumno seleccionado (salvo que venga preseleccionado)
   useEffect(() => {
-    setAlumnoOption(null);
-    setAlumnoId("");
-  }, [cursoId]);
+    if (!preselectedAlumnoId) {
+      setAlumnoOption(null);
+      setAlumnoId("");
+    }
+  }, [cursoId, preselectedAlumnoId]);
+
+  // Cargar alumno preseleccionado si viene del state
+  useEffect(() => {
+    if (!preselectedAlumnoId || !token) return;
+    let active = true;
+    async function loadPreselected() {
+      try {
+        const lista = await listarAlumnosConFiltros(token, {});
+        const alumno = (lista || []).find(a => String(a.id) === String(preselectedAlumnoId));
+        if (active && alumno) {
+          const opt = {
+            value: alumno.id,
+            label: `${alumno.apellido || ''}, ${alumno.nombre || ''}${alumno.dni ? ' - ' + alumno.dni : ''}`.trim()
+          };
+          setAlumnoOption(opt);
+          setAlumnoId(String(alumno.id));
+        }
+      } catch (e) {
+        console.error("Error cargando alumno preseleccionado:", e);
+      }
+    }
+    loadPreselected();
+    return () => { active = false; };
+  }, [preselectedAlumnoId, token]);
 
   // Helpers para búsqueda
   const buildFiltrosAlumno = useCallback((q) => {
