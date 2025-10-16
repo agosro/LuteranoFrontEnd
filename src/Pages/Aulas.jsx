@@ -79,7 +79,15 @@ export default function ListaAulas() {
     });
     setModalEditarShow(true);
   };
-  const abrirModalVer = (aula) => { setAulaSeleccionada(aula); setModalVerShow(true); };
+  const abrirModalVer = (aula) => { 
+    // Asegurar que tenga cursoNombre para mostrar en el modal
+    const aulaConNombre = {
+      ...aula,
+      cursoNombre: aula.curso?.label || "Sin curso asignado"
+    };
+    setAulaSeleccionada(aulaConNombre); 
+    setModalVerShow(true); 
+  };
   const abrirModalEliminar = (aula) => { setAulaSeleccionada(aula); setModalEliminarShow(true); };
 
   // Cerrar modales
@@ -219,6 +227,7 @@ export default function ListaAulas() {
         datos={aulaSeleccionada}
         campos={camposAula(true, cursosOptions)}
         titulo={`Datos del aula: ${aulaSeleccionada?.nombre}`}
+        detallePathBase="aulas"
       />
 
       <ConfirmarEliminar
