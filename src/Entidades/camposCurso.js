@@ -58,7 +58,7 @@ export const camposCurso = (
         label: "Aula asignada",
         type: "select",
         opciones: aulasOptions,
-        required: false,
+        required: true,
         readOnly: false,
       }]
   ),

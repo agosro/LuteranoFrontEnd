@@ -200,7 +200,7 @@ export default function ListaCursos() {
         anio: datos.anio, // ✅ ya viene como número
         division: datos.division,
         nivel: datos.nivel,
-        aulaId: datos.aulaId || null
+        aulaId: datos.aulaId && datos.aulaId !== "" ? datos.aulaId : null
       };
 
       await crearCurso(token, payload);
@@ -219,7 +219,7 @@ export default function ListaCursos() {
         anio: datos.anio, // ✅ ya viene como número
         division: datos.division,
         nivel: datos.nivel,
-        aulaId: datos.aulaId || null,
+        aulaId: datos.aulaId && datos.aulaId !== "" ? datos.aulaId : null,
         dictados: datos.materias?.map(id => ({ materia: { id } })) || []
       };
 
