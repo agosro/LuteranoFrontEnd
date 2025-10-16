@@ -99,8 +99,11 @@ export default function ListaAulas() {
     };
 
 
-    // Crear aula y obtener el objeto creado directamente
-    const nuevaAula = await crearAula(token, payload);
+    // Crear aula y obtener el objeto creado
+    const response = await crearAula(token, payload);
+    
+    // El backend devuelve { aula: {...}, code: 0, mensaje: "..." }
+    const nuevaAula = response.aula;
 
     // Asociamos curso si hay cursosOptions
     const aulaConCurso = {
@@ -130,7 +133,11 @@ export default function ListaAulas() {
       cursoId: datos.cursoId || null
     };
 
-    const aulaActualizada = await editarAula(token, payload);
+    const response = await editarAula(token, payload);
+    
+    // El backend devuelve { aula: {...}, code: 0, mensaje: "..." }
+    const aulaActualizada = response.aula;
+    
     toast.success("Aula actualizada con éxito");
     cerrarModalEditar();
 
