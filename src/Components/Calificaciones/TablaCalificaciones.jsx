@@ -9,6 +9,10 @@ export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, 
   const [objetivoEliminar, setObjetivoEliminar] = useState(null); // { alumnoId, numeroNota, califId, alumnoLabel }
 
   const handleNotaChange = (alumnoId, numeroNota, valor) => {
+    // Validar que el valor esté entre 1 y 10, o vacío
+    if (valor !== "" && (isNaN(Number(valor)) || Number(valor) < 1 || Number(valor) > 10)) {
+      return; // No actualizar si está fuera del rango
+    }
     setNotasEditadas((prev) => ({
       ...prev,
       [alumnoId]: {
