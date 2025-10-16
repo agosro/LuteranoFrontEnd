@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import TablaDetalle from "../Components/TablaDetalles";
 import RenderCampos from "../Components/RenderCampos";
 import { camposAlumno } from "../Entidades/camposAlumno";
@@ -18,6 +18,7 @@ import { getTituloCurso } from "../utils/cursos";
 
 function AlumnoDetalle() {
   const location = useLocation();
+  const navigate = useNavigate();
   const alumno = location.state;
   const { user } = useAuth();
 
@@ -311,6 +312,46 @@ function AlumnoDetalle() {
                     <p>No tiene historial</p>
                   )
                 )}
+              </div>
+            ),
+          },
+          {
+            id: "reportes",
+            label: "Reportes",
+            content: () => (
+              <div>
+                <div className="mb-3">
+                  <h6 className="mb-3">📊 Generar reportes del alumno</h6>
+                  <p className="text-muted small mb-3">
+                    Hacé clic en cualquiera de los botones para ir directamente al reporte con los datos de este alumno ya pre-cargados.
+                  </p>
+                  <div className="d-flex gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      onClick={() => navigate('/reportes/legajo-alumno', { 
+                        state: { preselectedAlumnoId: alumno.id } 
+                      })}
+                    >
+                      📄 Generar Legajo del Alumno
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-success"
+                      onClick={() => navigate('/reportes/notas-alumnos', { 
+                        state: { preselectedAlumnoId: alumno.id } 
+                      })}
+                    >
+                      📝 Ver Reporte de Notas
+                    </button>
+                  </div>
+                </div>
+                
+                <hr className="my-4" />
+                
+                <div className="alert alert-info">
+                  <strong>💡 Tip:</strong> Estos reportes se abrirán en una nueva vista con la información de <strong>{alumno.nombre} {alumno.apellido}</strong> ya seleccionada. Solo tendrás que hacer clic en "Generar" para obtener el reporte.
+                </div>
               </div>
             ),
           },
