@@ -38,6 +38,11 @@ export default function ReporteNotasAlumnos() {
   const [diag, setDiag] = useState(null); // info de diagnóstico
   // const [rawForYear, setRawForYear] = useState(null); // calificaciones crudas del año
   const printRef = React.useRef(null);
+  // Remontar selector cuando cambian filtros (año/división) para forzar recarga
+  const alumnoSelectKey = React.useMemo(
+    () => `alumno-${cursoAnioSel || 'any'}-${divisionSel || 'any'}-${cursoId || 'none'}`,
+    [cursoAnioSel, divisionSel, cursoId]
+  );
 
   // Cargar cursos (según rol)
   useEffect(() => {
@@ -125,6 +130,7 @@ export default function ReporteNotasAlumnos() {
   }, []);
 
   const alumnosCursoCache = useRef({}); // cursoId -> lista alumnos
+  const alumnosYearCache = useRef({}); // anio -> lista alumnos combinada de ese año
   const alumnosDefaultCache = useRef(null); // lista default sin curso
   const buscarEnLista = (lista, q) => {
     const s = (q || "").toLowerCase();
@@ -139,7 +145,7 @@ export default function ReporteNotasAlumnos() {
   const loadAlumnoOptions = useCallback(async (inputValue) => {
     const q = (inputValue || "").trim();
     try {
-      // Si hay curso seleccionado, buscar dentro de ese curso
+      // Si hay curso seleccionado (año+división), buscar dentro de ese curso
       if (cursoId) {
         let lista = alumnosCursoCache.current[cursoId];
         if (!lista) {
@@ -147,6 +153,26 @@ export default function ReporteNotasAlumnos() {
           alumnosCursoCache.current[cursoId] = Array.isArray(lista) ? lista : [];
         }
         const filtrada = buscarEnLista(lista, q).slice(0, 200);
+        return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
+      }
+      // Si hay AÑO seleccionado pero división = Todas, combinar alumnos de todos los cursos de ese año
+      if (cursoAnioSel) {
+        let yearList = alumnosYearCache.current[cursoAnioSel];
+        if (!yearList) {
+          const cursosDelAnio = (cursos || []).filter(c => String(c.anio) === String(cursoAnioSel));
+          const ids = cursosDelAnio.map(c => c.id).filter(Boolean);
+          const results = await Promise.all(ids.map(id => listarAlumnosPorCurso(token, Number(id)).catch(() => [])));
+          // Combinar y desduplicar por id
+          const map = new Map();
+          for (const arr of results) {
+            for (const a of (arr || [])) {
+              if (!map.has(a.id)) map.set(a.id, a);
+            }
+          }
+          yearList = Array.from(map.values());
+          alumnosYearCache.current[cursoAnioSel] = yearList;
+        }
+        const filtrada = buscarEnLista(yearList, q).slice(0, 200);
         return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
       }
       // Sin curso: búsqueda remota por nombre/apellido o DNI
@@ -164,7 +190,7 @@ export default function ReporteNotasAlumnos() {
     } catch {
       return [];
     }
-  }, [token, cursoId, buildFiltrosAlumno]);
+  }, [token, cursoId, cursoAnioSel, cursos, buildFiltrosAlumno]);
 
   const aniosPosibles = useMemo(() => {
     const y = new Date().getFullYear();
@@ -309,7 +335,8 @@ export default function ReporteNotasAlumnos() {
               <Col md={4}>
                 <Form.Label>Alumno</Form.Label>
                 <AsyncSelect
-                  cacheOptions
+                  key={alumnoSelectKey}
+                  cacheOptions={false}
                   defaultOptions={true}
                   loadOptions={loadAlumnoOptions}
                   value={alumnoOption}
