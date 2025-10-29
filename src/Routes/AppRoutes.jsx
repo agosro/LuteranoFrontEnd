@@ -21,6 +21,7 @@ import Reportes from '../Pages/Reportes.jsx';
 import ReservarEspacio from '../Pages/Reservar.jsx';
 import MisReservas from '../Pages/MisReservas.jsx';
 import GestionarReservas from '../Pages/GestionarReservas.jsx';
+import EspaciosAulicosGestion from '../Pages/EspaciosAulicosGestion.jsx';
 import DashboardLayout from '../Layout/DashboardLayout.jsx';
 import PrivateRoute from './PrivateRoute';
 import MiPerfil from '../Pages/MiPerfil.jsx';
@@ -37,10 +38,14 @@ import ImportarCalificaciones from '../Pages/ImportarCalificaciones.jsx';
 import ReporteNotasAlumnos from '../Pages/ReporteNotasAlumnos.jsx';
 import ReporteNotasCursoMateria from '../Pages/ReporteNotasCursoMateria.jsx';
 import ReporteLegajoAlumno from '../Pages/ReporteLegajoAlumno.jsx';
+import ReporteAnualAlumno from '../Pages/ReporteAnualAlumno.jsx';
+import ReporteAlumnosLibres from '../Pages/ReporteAlumnosLibres.jsx';
 import AsistenciaAlumnos from '../Pages/AsistenciaAlumnos.jsx';
 import AsistenciaDocentes from '../Pages/AsistenciaDocentes.jsx';
 import ReporteTardanzas from '../Pages/ReporteTardanzas.jsx';
 import ReporteRinde from '../Pages/ReporteRinde.jsx';
+import ReporteAsistenciaPerfecta from '../Pages/ReporteAsistenciaPerfecta.jsx';
+import ReporteDisponibilidadDocente from '../Pages/ReporteDisponibilidadDocente.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -122,8 +127,12 @@ function AppRoutes() {
           <Route path="reportes/legajo-alumno" element={<ReporteLegajoAlumno />} />
           <Route path="reportes/notas-alumnos" element={<ReporteNotasAlumnos />} />
           <Route path="reportes/notas-por-curso" element={<ReporteNotasCursoMateria />} />
+          <Route path="reportes/reporte-anual-alumno" element={<ReporteAnualAlumno />} />
           <Route path="reportes/tardanzas" element={<ReporteTardanzas />} />
           <Route path="reportes/rinden" element={<ReporteRinde />} />
+          <Route path="reportes/alumnos-libres" element={<ReporteAlumnosLibres />} />
+          <Route path="reportes/asistencia-perfecta" element={<ReporteAsistenciaPerfecta />} />
+          <Route path="reportes/disponibilidad-docente" element={<ReporteDisponibilidadDocente />} />
         </Route>
 
         {/* Asistencia -> ADMIN, PRECEPTOR (alumnos). Docentes -> ADMIN */}
@@ -143,6 +152,7 @@ function AppRoutes() {
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="configuracion/importar-alumnos" element={<ImportarAlumnos />} />
           <Route path="configuracion/importar-calificaciones" element={<ImportarCalificaciones />} />
+          <Route path="configuracion/espacios-aulicos" element={<EspaciosAulicosGestion />} />
         </Route>
 
         {/* Espacios Áulicos */}

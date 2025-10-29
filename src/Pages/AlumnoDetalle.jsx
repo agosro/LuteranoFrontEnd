@@ -344,6 +344,15 @@ function AlumnoDetalle() {
                     >
                       📝 Ver Reporte de Notas
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={() => navigate('/reportes/reporte-anual-alumno', {
+                        state: { preselectedAlumnoId: alumno.id }
+                      })}
+                    >
+                      📘 Informe Anual del Alumno
+                    </button>
                   </div>
                 </div>
                 

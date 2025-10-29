@@ -75,6 +75,7 @@ export const menuConfig = [
       { label: "Parámetros", path: "/configuracion", roles: ["ROLE_ADMIN"] },
       { label: "Importar Alumnos", path: "/configuracion/importar-alumnos", roles: ["ROLE_ADMIN"] },
       { label: "Importar Calificaciones", path: "/configuracion/importar-calificaciones", roles: ["ROLE_ADMIN"] },
+      { label: "Gestionar Espacios", path: "/configuracion/espacios-aulicos", roles: ["ROLE_ADMIN"] },
 
     ],
   },

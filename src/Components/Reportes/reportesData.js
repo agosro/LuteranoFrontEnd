@@ -11,7 +11,8 @@ const reportes = [
     id: 2,
     titulo: "Alumnos Libres",
     descripcion: "Identificá rápidamente qué estudiantes perdieron la regularidad y el motivo.",
-    categoria: "Alumnos"
+    categoria: "Alumnos",
+    ruta: "/reportes/alumnos-libres"
   },
   {
     id: 3,
@@ -51,7 +52,8 @@ const reportes = [
     id: 7,
     titulo: "Informe Anual de Alumno",
     descripcion: "Generá un informe completo con notas, inasistencias y conducta de todo el año.",
-    categoria: "Alumnos"
+    categoria: "Alumnos",
+    ruta: "/reportes/reporte-anual-alumno"
   },
   {
     id: 8,
@@ -69,7 +71,8 @@ const reportes = [
     id: 10,
     titulo: "Alumnos con Asistencia Perfecta",
     descripcion: "Identificá a los estudiantes que no faltaron nunca en el período.",
-    categoria: "Alumnos"
+    categoria: "Alumnos",
+    ruta: "/reportes/asistencia-perfecta"
   },
   {
     id: 11,
@@ -89,7 +92,8 @@ const reportes = [
     id: 13,
     titulo: "Disponibilidad Docente",
     descripcion: "Revisá los horarios libres de los docentes para organizar clases o mesas.",
-    categoria: "Docentes"
+    categoria: "Docentes",
+    ruta: "/reportes/disponibilidad-docente"
   },
   {
     id: 14,
