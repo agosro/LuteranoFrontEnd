@@ -17,6 +17,7 @@ import AulaDetalle from '../Pages/AulaDetalle.jsx';
 import Tutores from '../Pages/Tutores.jsx';
 import TutorDetalle from '../Pages/TutorDetalle.jsx';
 import Mesas from '../Pages/Mesas.jsx';
+import Turnos from '../Pages/Turnos.jsx';
 import Reportes from '../Pages/Reportes.jsx';
 import ReservarEspacio from '../Pages/Reservar.jsx';
 import MisReservas from '../Pages/MisReservas.jsx';
@@ -88,7 +89,7 @@ function AppRoutes() {
           <Route path="usuarios/:id" element={<UsuarioDetalle />} />
         </Route>
 
-        {/* Materias y Cursos -> SOLO ADMIN */}
+        {/* Materias, Cursos y Turnos -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="materias" element={<Materias />} />
           <Route path="materias/:id" element={<MateriaDetalle />} />
@@ -96,6 +97,7 @@ function AppRoutes() {
           <Route path="cursos/:id" element={<CursoDetalle />} />
           <Route path="/cursos/:id/horarios" element={<CursoHorarios />} />
           <Route path="/horarios" element={<Horarios />} />
+          <Route path="turnos" element={<Turnos />} />
         </Route>
 
         {/* Aulas -> SOLO ADMIN */}

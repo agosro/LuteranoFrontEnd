@@ -29,7 +29,8 @@ export const menuConfig = [
     subItems: [
       { label: "Materias", path: "/materias", roles: ["ROLE_ADMIN"] },
       { label: "Cursos", path: "/cursos", roles: ["ROLE_ADMIN", "ROLE_DOCENTE"] },
-      { label: "Mesas de examen", path: "/mesa-de-examen", roles: ["ROLE_DOCENTE","ROLE_ADMIN"] },
+      { label: "Turnos de examen", path: "/turnos", roles: ["ROLE_ADMIN"] },
+  { label: "Mesas de examen", path: "/mesa-de-examen", roles: ["ROLE_ADMIN"] },
       { label: "Calificaciones", path: "/calificaciones", roles: ["ROLE_DOCENTE","ROLE_ADMIN"] }, // 🆕
     ],
   },

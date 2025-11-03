@@ -133,6 +133,16 @@ export default function Calificaciones() {
     }
   };
 
+  // 3.1️⃣ Al cambiar de etapa, actualizar automáticamente la planilla si ya hay selección válida
+  useEffect(() => {
+    if (!materiaSeleccionada || !cursoSeleccionado) return;
+    // Reutiliza la misma lógica de búsqueda para la nueva etapa seleccionada
+    handleBuscar();
+    // Dependemos solo de 'etapa' para refrescar cuando cambie; las demás
+    // variables se leen de su estado actual dentro de handleBuscar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa]);
+
   // 4️⃣ Guardar cambios desde la tabla
   const handleGuardar = async (alumnoId, notas) => {
     try {
