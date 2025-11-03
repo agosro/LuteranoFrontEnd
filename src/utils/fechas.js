@@ -21,10 +21,13 @@ export function inputLocalToBackendISO(yyyyMmDd) {
 // Para mostrar en formato Argentino DD/MM/YYYY
 export function isoToDisplay(iso, locale = 'es-AR') {
   if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleDateString(locale, {
-    timeZone: 'America/Argentina/Buenos_Aires',
-  });
+  // Si viene como YYYY-MM-DD, evitar crear Date (que interpreta como UTC y puede restar un día).
+  if (RE_YMD.test(iso)) {
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  const dObj = new Date(iso);
+  return dObj.toLocaleDateString(locale, { timeZone: 'America/Argentina/Buenos_Aires' });
 }
 
 // Helper para mapear objetos con campos de fecha
