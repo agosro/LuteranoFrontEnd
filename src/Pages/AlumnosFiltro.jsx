@@ -36,7 +36,13 @@ export default function FiltroAlumnosPage() {
 
   const handleCreate = async (datos) => {
     try {
-      const cursoIdSel = typeof datos.cursoActual === 'object' ? datos.cursoActual?.id : datos.cursoActual;
+  const cursoIdSelRaw = typeof datos.cursoActual === 'object' ? datos.cursoActual?.id : datos.cursoActual;
+  const cursoIdSel = cursoIdSelRaw ? Number(cursoIdSelRaw) : null;
+      // Validación: curso obligatorio
+      if (!cursoIdSel) {
+        toast.error("El curso es obligatorio");
+        return;
+      }
       const nuevoAlumno = {
         nombre: datos.nombre,
         apellido: datos.apellido,
@@ -49,7 +55,7 @@ export default function FiltroAlumnosPage() {
   fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento) || undefined,
   fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso) || undefined,
         ...(datos.tutor?.id && { tutor: { id: datos.tutor.id } }),
-        ...(cursoIdSel && { cursoActual: { id: cursoIdSel } }),
+        cursoActual: { id: Number(cursoIdSel) },
       };
 
       await crearAlumno(user.token, nuevoAlumno);
@@ -96,7 +102,7 @@ export default function FiltroAlumnosPage() {
         onClose={cerrarModalCrear}
         campos={[
           ...camposAlumno(false, true),
-          { name: "cursoActual", label: "Curso (opcional)", type: "select", opciones: cursosOptions, required: false },
+          { name: "cursoActual", label: "Curso", type: "select", opciones: cursosOptions, required: true },
         ]}
         formData={formDataCrear}
         onInputChange={handleInputChangeCrear}
