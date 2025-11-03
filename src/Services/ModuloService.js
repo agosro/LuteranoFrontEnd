@@ -83,3 +83,25 @@ export const getModulosLibresSemana = async (token, cursoId) => {
     throw error;
   }
 };
+
+// 🔹 Módulos con estado de reserva para un espacio áulico y fecha específica
+export const getModulosReservaEstado = async (token, espacioAulicoId, fecha) => {
+  try {
+    const params = new URLSearchParams({ espacioAulicoId, fecha });
+    const response = await fetch(`${API_URL}/modulos/reservas/estado?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.mensaje || "Error al obtener estados de reserva de módulos");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error en getModulosReservaEstado:", error);
+    throw error;
+  }
+};
