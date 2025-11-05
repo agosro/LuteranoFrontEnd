@@ -49,6 +49,7 @@ import ReporteAsistenciaPerfecta from '../Pages/ReporteAsistenciaPerfecta.jsx';
 import ReporteDisponibilidadDocente from '../Pages/ReporteDisponibilidadDocente.jsx';
 import Actas from '../Pages/Actas.jsx';
 import PromocionMasiva from '../Pages/PromocionMasiva.jsx';
+import ReporteDesempenoDocente from '../Pages/ReporteDesempenoDocente.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -137,6 +138,11 @@ function AppRoutes() {
           <Route path="reportes/alumnos-libres" element={<ReporteAlumnosLibres />} />
           <Route path="reportes/asistencia-perfecta" element={<ReporteAsistenciaPerfecta />} />
           <Route path="reportes/disponibilidad-docente" element={<ReporteDisponibilidadDocente />} />
+        </Route>
+
+        {/* Desempeño docente -> ADMIN, DIRECTOR, PRECEPTOR (según backend) */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
+          <Route path="reportes/desempeno-docente" element={<ReporteDesempenoDocente />} />
         </Route>
 
         {/* Actas -> ADMIN, DIRECTOR, PRECEPTOR */}
