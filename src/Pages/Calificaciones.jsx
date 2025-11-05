@@ -34,6 +34,7 @@ export default function Calificaciones() {
   const [mensajeExito, setMensajeExito] = useState("");
   const [mostrarError, setMostrarError] = useState(false);
   const [mensajeError, setMensajeError] = useState("");
+  // Nota Final se muestra solo en reportes; en esta pantalla de carga no se utiliza
 
   // 1️⃣ Traer cursos disponibles
   useEffect(() => {
@@ -99,6 +100,8 @@ export default function Calificaciones() {
 
     fetchMateriasYAlumnos();
   }, [cursoSeleccionado, token, cicloLectivo?.id]);
+
+  // (NF removida de esta pantalla)
 
   // Encabezado con ciclo visible
   const CicloHeader = () => (

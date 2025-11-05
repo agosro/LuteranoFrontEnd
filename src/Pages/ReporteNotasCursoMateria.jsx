@@ -8,6 +8,7 @@ import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import Estadisticas from "../Components/Reportes/Estadisticas";
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
+import { obtenerNotaFinalSimple } from "../Services/NotaFinalService";
 
 // Esta página implementa el reporte estilo R3 del documento: muestra por curso y materia,
 // calificaciones por etapa (4 columnas por etapa), E1/E2 promedios, PG, PFA (uso PG), Estado.
@@ -30,6 +31,7 @@ export default function ReporteNotasCursoMateria() {
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
   const printRef = useRef(null);
+  const [nfMap, setNfMap] = useState({}); // { [alumnoId]: number|null }
 
   // Cargar cursos según rol
   useEffect(() => {
@@ -139,6 +141,40 @@ export default function ReporteNotasCursoMateria() {
     return list;
   }, [alumnos]);
 
+  // Cargar Nota Final por alumno solo cuando hay una materia seleccionada
+  useEffect(() => {
+    if (!token) return;
+    // Solo hacemos NF cuando hay una única materia seleccionada
+    if (!materiaId) { setNfMap({}); return; }
+    // Construimos la lista de alumnoIds visibles en este momento
+    const alumnoIds = alumnos.map(a => a.id).filter(Boolean);
+    if (alumnoIds.length === 0) { setNfMap({}); return; }
+    let cancelled = false;
+    const run = async () => {
+      const results = {};
+      const pool = 6;
+      let idx = 0;
+      async function worker() {
+        while (idx < alumnoIds.length) {
+          const i = idx++;
+          const aid = alumnoIds[i];
+          try {
+            const resp = await obtenerNotaFinalSimple(token, aid, Number(materiaId), Number(anio));
+            results[aid] = typeof resp?.notaFinal === 'number' ? resp.notaFinal : (resp?.notaFinal ?? null);
+          } catch {
+            results[aid] = null;
+          }
+          if (cancelled) return;
+        }
+      }
+      const workers = Array.from({ length: Math.min(pool, alumnoIds.length) }, () => worker());
+      await Promise.all(workers);
+      if (!cancelled) setNfMap(results);
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [token, alumnos, materiaId, anio]);
+
   const normalizar = (s) => (s || "").toString().toLowerCase();
 
   const filasFiltradas = useMemo(() => {
@@ -175,7 +211,8 @@ export default function ReporteNotasCursoMateria() {
 
   const e1Cols = periodo !== 'E2' ? 5 : 0;
   const e2Cols = periodo !== 'E1' ? 5 : 0;
-  const totalCols = 4 + e1Cols + e2Cols + 5; // 4 fijos izq + grupos + 5 (PG,CO,EX,PFA,Estado)
+  const showNF = Boolean(materiaId); // mostramos NF solo cuando hay materia específica
+  const totalCols = 4 + e1Cols + e2Cols + 5 + (showNF ? 1 : 0); // +NF opcional
 
   const printOnlyTable = () => {
     if (!printRef.current) return;
@@ -203,13 +240,20 @@ export default function ReporteNotasCursoMateria() {
 
   const exportCSV = () => {
     if (!filasFiltradas || filasFiltradas.length === 0) return;
-    const header = ["Nro Doc","Apellido","Nombre","Materia","E1 N1","E1 N2","E1 N3","E1 N4","E1","E2 N1","E2 N2","E2 N3","E2 N4","E2","PG","Estado"]; 
+    const header = [
+      "Nro Doc","Apellido","Nombre","Materia",
+      "E1 N1","E1 N2","E1 N3","E1 N4","E1",
+      "E2 N1","E2 N2","E2 N3","E2 N4","E2",
+      "PG",
+      ...(materiaId ? ["NF"] : []),
+      "Estado"
+    ]; 
     const rows = [];
     for (const r of filasFiltradas) {
       const a = r.alumno; const m = r.m;
       const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : [];
       const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
-      rows.push([
+      const base = [
         a.dni||"", a.apellido||"", a.nombre||"",
         m.materiaNombre||"",
         e1[0]??"", e1[1]??"", e1[2]??"", e1[3]??"",
@@ -217,8 +261,10 @@ export default function ReporteNotasCursoMateria() {
         e2[0]??"", e2[1]??"", e2[2]??"", e2[3]??"",
         m.e2??"",
         m.pg??"",
-        m.estado??""
-      ]);
+      ];
+      if (materiaId) base.push(nfMap[a.id] ?? "");
+      base.push(m.estado??"");
+      rows.push(base);
     }
     const csv = [header, ...rows].map(r => r.map(v => '"' + String(v ?? "").replace(/"/g,'""') + '"').join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -351,6 +397,7 @@ export default function ReporteNotasCursoMateria() {
                       {periodo !== 'E2' && <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>}
                       {periodo !== 'E1' && <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>}
                       <th>PG</th>
+                      {showNF && <th>NF</th>}
                       <th>CO</th>
                       <th>EX</th>
                       <th>PFA</th>
@@ -365,6 +412,7 @@ export default function ReporteNotasCursoMateria() {
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
                       </>)}
                       <th></th>
+                      {showNF && <th></th>}
                       <th></th>
                       <th></th>
                       <th></th>
@@ -392,6 +440,7 @@ export default function ReporteNotasCursoMateria() {
                             <td>{e2[0]??"-"}</td><td>{e2[1]??"-"}</td><td>{e2[2]??"-"}</td><td>{e2[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e2??"-"}</Badge></td>
                           </>)}
                           <td><Badge bg={m.pg>=6?"success":"danger"}>{m.pg??"-"}</Badge></td>
+                          {showNF && <td><Badge bg="secondary">{nfMap[a.id] ?? '-'}</Badge></td>}
                           <td></td>
                           <td></td>
                           <td>{m.pg ?? "-"}</td>
@@ -428,6 +477,7 @@ export default function ReporteNotasCursoMateria() {
                               {periodo !== 'E2' && <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>}
                               {periodo !== 'E1' && <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>}
                               <th>PG</th>
+                              {showNF && <th>NF</th>}
                               <th>CO</th>
                               <th>EX</th>
                               <th>PFA</th>
@@ -441,7 +491,9 @@ export default function ReporteNotasCursoMateria() {
                               {periodo !== 'E1' && (<>
                                 <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
                               </>)}
-                              <th></th><th></th><th></th><th></th><th></th>
+                              <th></th>
+                              {showNF && <th></th>}
+                              <th></th><th></th><th></th><th></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -457,6 +509,7 @@ export default function ReporteNotasCursoMateria() {
                                     <td>{e2[0]??"-"}</td><td>{e2[1]??"-"}</td><td>{e2[2]??"-"}</td><td>{e2[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e2??"-"}</Badge></td>
                                   </>)}
                                   <td><Badge bg={m.pg>=6?"success":"danger"}>{m.pg??"-"}</Badge></td>
+                                  {showNF && <td><Badge bg="secondary">{nfMap[g.alumno?.id] ?? '-'}</Badge></td>}
                                   <td></td><td></td><td>{m.pg ?? "-"}</td><td>{m.estado ?? "-"}</td>
                                 </tr>
                               );
@@ -493,6 +546,7 @@ export default function ReporteNotasCursoMateria() {
                               {periodo !== 'E2' && <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>}
                               {periodo !== 'E1' && <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>}
                               <th>PG</th>
+                              {showNF && <th>NF</th>}
                               <th>CO</th>
                               <th>EX</th>
                               <th>PFA</th>
@@ -506,7 +560,9 @@ export default function ReporteNotasCursoMateria() {
                               {periodo !== 'E1' && (<>
                                 <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
                               </>)}
-                              <th></th><th></th><th></th><th></th><th></th>
+                              <th></th>
+                              {showNF && <th></th>}
+                              <th></th><th></th><th></th><th></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -528,6 +584,7 @@ export default function ReporteNotasCursoMateria() {
                                     <td>{e2[0]??"-"}</td><td>{e2[1]??"-"}</td><td>{e2[2]??"-"}</td><td>{e2[3]??"-"}</td><td><Badge bg="light" text="dark">{m.e2??"-"}</Badge></td>
                                   </>)}
                                   <td><Badge bg={m.pg>=6?"success":"danger"}>{m.pg??"-"}</Badge></td>
+                                  {showNF && <td><Badge bg="secondary">{nfMap[a.id] ?? '-'}</Badge></td>}
                                   <td></td><td></td><td>{m.pg ?? "-"}</td><td>{m.estado ?? "-"}</td>
                                 </tr>
                               );

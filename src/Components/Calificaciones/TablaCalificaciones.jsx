@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Table, Button, Form, Stack, Spinner } from "react-bootstrap";
 import ModalConfirmarEliminacion from "./ModalConfirmarEliminacion";
 
-export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, etapa, onGuardar, onEliminar, onGuardarTodos }) {
+export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, etapa, onGuardar, onEliminar, onGuardarTodos, notasFinales }) {
   const [notasEditadas, setNotasEditadas] = useState({});
   const [guardandoTodo, setGuardandoTodo] = useState(false);
   const [mostrarEliminar, setMostrarEliminar] = useState(false);
@@ -121,6 +121,7 @@ export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, 
             <th>Nota 3</th>
             <th>Nota 4</th>
             <th>Promedio</th>
+            {notasFinales && <th>NF</th>}
             <th>Acciones</th>
           </tr>
         </thead>
@@ -180,6 +181,9 @@ export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, 
                   );
                 })}
                 <td className="text-center fw-bold">{promedio}</td>
+                {notasFinales && (
+                  <td className="text-center">{(notasFinales[alumno.id] ?? notasFinales?.[String(alumno.id)]) ?? '-'}</td>
+                )}
                 <td className="text-center">
                   <Button
                     variant="success"
