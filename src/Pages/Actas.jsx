@@ -144,6 +144,63 @@ export default function Actas() {
     });
   }, [actas]);
 
+  const imprimirActa = () => {
+    if (!actaSel) { toast.info('Abrí primero un acta'); return; }
+    const win = window.open('', '_blank');
+    if (!win) return;
+    const css = `
+      @page { margin: 14mm; }
+      body { font-family: Arial, sans-serif; }
+      h3 { margin: 0 0 8px 0; }
+      .sub { color: #555; font-size: 12px; margin-bottom: 10px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
+      thead tr:first-child th { background: #f0f0f0; }
+    `;
+    const alumnos = actaSel.alumnos || actaSel.items || actaSel.detalle || [];
+    const encabezado = {
+      numero: actaSel.numeroActa || '-',
+      curso: actaSel.cursoAnio ? `${actaSel.cursoAnio}°${actaSel.cursoDivision || ''}` : (actaSel.cursoNombre || '-'),
+      materia: actaSel.materiaNombre || '-',
+      turno: actaSel.turnoNombre || actaSel.turnoId || '-',
+      fecha: actaSel.fechaCierre || actaSel.fecha || '-',
+      docentes: Array.isArray(actaSel.docentes)
+        ? actaSel.docentes.map(d => d.nombre || d.nombreCompleto || d.apellidoNombre || '').filter(Boolean).join(', ')
+        : (actaSel.docente || actaSel.docenteNombre || '')
+    };
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Acta de Examen</title><style>${css}</style></head><body>`);
+    win.document.write(`<h3>Acta de Examen</h3>`);
+    win.document.write(`<div class="sub">
+      Número: <strong>${encabezado.numero}</strong> · Curso: <strong>${encabezado.curso}</strong> · Materia: <strong>${encabezado.materia}</strong><br/>
+      Turno: <strong>${encabezado.turno}</strong> · Fecha: <strong>${encabezado.fecha}</strong><br/>
+      Docente/s a cargo: <strong>${encabezado.docentes || '-'}</strong>
+    </div>`);
+    if (Array.isArray(alumnos) && alumnos.length) {
+      win.document.write(`<table><thead><tr>
+        <th>#</th><th>Alumno</th><th>DNI</th><th>Condición</th><th>Nota</th><th>Observación</th>
+      </tr></thead><tbody>`);
+      alumnos.forEach((r, i) => {
+        const nombre = r.apellidoNombre || `${r.apellido || ''} ${r.nombre || ''}`.trim();
+        const obs = r.observacion || r.estado || r.estadoFinal || '';
+        win.document.write(`<tr>
+          <td>${i + 1}</td>
+          <td>${nombre || '-'}</td>
+          <td>${r.dni ?? '-'}</td>
+          <td>${r.condicion ?? '-'}</td>
+          <td>${r.nota ?? r.notaFinal ?? r.pf ?? '-'}</td>
+          <td>${obs || '-'}</td>
+        </tr>`);
+      });
+      win.document.write(`</tbody></table>`);
+    } else {
+      win.document.write(`<div class="sub">Sin detalle de alumnos en el acta.</div>`);
+    }
+    win.document.write(`</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { try { win.print(); } finally { win.close(); } }, 300);
+  };
+
   return (
     <Container className="py-4">
       <div className="mb-3">
@@ -269,6 +326,35 @@ export default function Actas() {
               <div className="mt-3 text-muted" style={{fontSize:'.9rem'}}>
                 Turno: {actaSel?.turnoNombre || actaSel?.turnoId || '-'} — Curso: {actaSel?.cursoAnio ? `${actaSel.cursoAnio}°${actaSel.cursoDivision || ''}` : (actaSel?.cursoId || '-')}
               </div>
+              {/* Si el backend trae detalle de alumnos, lo mostramos también aquí */}
+              {Array.isArray((actaSel?.alumnos || actaSel?.items || actaSel?.detalle)) && (actaSel?.alumnos || actaSel?.items || actaSel?.detalle)?.length > 0 && (
+                <div className="table-responsive mt-3">
+                  <Table bordered size="sm">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Alumno</th>
+                        <th>DNI</th>
+                        <th>Condición</th>
+                        <th>Nota</th>
+                        <th>Observación</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(actaSel.alumnos || actaSel.items || actaSel.detalle).map((r,i) => (
+                        <tr key={i}>
+                          <td>{i+1}</td>
+                          <td>{r.apellidoNombre || `${r.apellido || ''} ${r.nombre || ''}`.trim()}</td>
+                          <td>{r.dni ?? '-'}</td>
+                          <td>{r.condicion ?? '-'}</td>
+                          <td>{r.nota ?? r.notaFinal ?? r.pf ?? '-'}</td>
+                          <td>{r.observacion || r.estado || r.estadoFinal || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </div>
+              )}
             </Form>
           )}
         </Modal.Body>
@@ -278,6 +364,7 @@ export default function Actas() {
             <>
               <Button variant="primary" onClick={guardarActa} disabled={saving}>{saving ? <Spinner size="sm"/> : 'Guardar'}</Button>
               <Button variant="outline-danger" onClick={borrarActa} disabled={saving}>Eliminar</Button>
+              <Button variant="outline-secondary" onClick={imprimirActa} disabled={saving}>Imprimir / PDF</Button>
             </>
           )}
         </Modal.Footer>
