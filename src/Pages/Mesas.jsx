@@ -760,7 +760,6 @@ export default function Mesas() {
           )}
         </Modal.Body>
   <Modal.Footer>
-          <Button variant="secondary" onClick={()=>setShowActa(false)}>Cerrar</Button>
           {acta && (
             <>
               <Button variant="primary" onClick={async ()=>{
@@ -770,6 +769,7 @@ export default function Mesas() {
                   const a = await obtenerActaPorMesa(token, mesaSel.id);
                   setActa(a);
                   toast.success('Acta actualizada');
+                  setShowActa(false);
                 } catch (e) {
                   toast.error(e.message);
                 }
