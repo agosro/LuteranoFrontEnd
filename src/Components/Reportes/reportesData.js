@@ -8,6 +8,13 @@ const reportes = [
     ruta: "/reportes/legajo-alumno"
   },
   {
+    id: 17,
+    titulo: "Exámenes Consecutivos",
+    descripcion: "Detectá alumnos que desaprobaron dos exámenes consecutivos y accedé a estadísticas y recomendaciones.",
+    categoria: "Alumnos",
+    ruta: "/reportes/examenes-consecutivos"
+  },
+  {
     id: 2,
     titulo: "Alumnos Libres",
     descripcion: "Identificá rápidamente qué estudiantes perdieron la regularidad y el motivo.",
@@ -42,12 +49,12 @@ const reportes = [
     categoria: "Alumnos",
     ruta: "/reportes/tardanzas"
   },
-  {
-    id: 6,
-    titulo: "Alumnos con Bajo Rendimiento",
-    descripcion: "Visualizá a los estudiantes con promedios bajos que necesitan apoyo escolar.",
-    categoria: "Alumnos"
-  },
+  // {
+  //   id: 6,
+  //   titulo: "Alumnos con Bajo Rendimiento",
+  //   descripcion: "Visualizá a los estudiantes con promedios bajos que necesitan apoyo escolar.",
+  //   categoria: "Alumnos"
+  // },
   {
     id: 7,
     titulo: "Informe Anual de Alumno",
@@ -55,17 +62,18 @@ const reportes = [
     categoria: "Alumnos",
     ruta: "/reportes/reporte-anual-alumno"
   },
-  {
-    id: 8,
-    titulo: "Desempeño de Alumno",
-    descripcion: "Hacé un seguimiento de la evolución académica de un alumno a lo largo de su trayectoria.",
-    categoria: "Alumnos"
-  },
+  // {
+  //   id: 8,
+  //   titulo: "Desempeño de Alumno",
+  //   descripcion: "Hacé un seguimiento de la evolución académica de un alumno a lo largo de su trayectoria.",
+  //   categoria: "Alumnos"
+  // },
   {
     id: 9,
     titulo: "Ranking de Alumnos",
     descripcion: "Conocé quiénes son los alumnos con mejores promedios y posiciones destacadas.",
-    categoria: "Alumnos"
+    categoria: "Alumnos",
+    ruta: "/reportes/ranking-alumnos"
   },
   {
     id: 10,
@@ -80,12 +88,12 @@ const reportes = [
     descripcion: "Registrá qué alumnos aprobaron después de instancias de recuperación.",
     categoria: "Alumnos"
   },
-  {
-    id: 12,
-    titulo: "Inasistencia de Alumnos",
-    descripcion: "Consultá las faltas de cada alumno y detectá casos con riesgo de abandono.",
-    categoria: "Alumnos"
-  },
+  // {
+  //   id: 12,
+  //   titulo: "Inasistencia de Alumnos",
+  //   descripcion: "Consultá las faltas de cada alumno y detectá casos con riesgo de abandono.",
+  //   categoria: "Alumnos"
+  // },
 
   // 👩‍🏫 Reportes de Docentes
   {
@@ -95,12 +103,12 @@ const reportes = [
     categoria: "Docentes",
     ruta: "/reportes/disponibilidad-docente"
   },
-  {
-    id: 14,
-    titulo: "Carga Horaria Docente",
-    descripcion: "Visualizá la cantidad de horas asignadas a cada docente.",
-    categoria: "Docentes"
-  },
+  // {
+  //   id: 14,
+  //   titulo: "Carga Horaria Docente",
+  //   descripcion: "Visualizá la cantidad de horas asignadas a cada docente.",
+  //   categoria: "Docentes"
+  // },
   {
     id: 15,
     titulo: "Desempeño Docente",

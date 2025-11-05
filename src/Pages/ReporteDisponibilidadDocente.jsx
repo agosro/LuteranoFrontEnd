@@ -1,10 +1,9 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useRef, useState, useCallback, useMemo } from "react";
 import { Card, Button, Form, Row, Col, Spinner, Alert, Table } from "react-bootstrap";
-import AsyncSelect from "react-select/async";
+import AsyncDocenteSelect from "../Components/Controls/AsyncDocenteSelect";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
-import { listarDocentes } from "../Services/DocenteService";
 import { obtenerDisponibilidadDocente } from "../Services/ReporteDisponibilidadService";
 
 export default function ReporteDisponibilidadDocente() {
@@ -25,20 +24,7 @@ export default function ReporteDisponibilidadDocente() {
     return m ? `${m[1]}:${m[2]}` : s;
   }, []);
 
-  const loadDocenteOptions = useCallback(async (inputValue) => {
-    try {
-      const lista = await listarDocentes(token);
-      const q = (inputValue || "").toLowerCase();
-      const filtered = (lista || []).filter(d => {
-        const n = `${d.apellido || ''} ${d.nombre || ''}`.toLowerCase();
-        const dni = String(d.dni || '');
-        return !q || n.includes(q) || dni.includes(q);
-      }).slice(0, 200);
-      return filtered.map(d => ({ value: d.id, label: `${d.apellido || ''}, ${d.nombre || ''}${d.dni ? ' - ' + d.dni : ''}`.trim(), raw: d }));
-    } catch {
-      return [];
-    }
-  }, [token]);
+  // Selector y búsqueda por DNI encapsulados en AsyncDocenteSelect
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -165,17 +151,13 @@ export default function ReporteDisponibilidadDocente() {
         <Card.Body>
           <Form onSubmit={onSubmit}>
             <Row className="g-3">
-              <Col md={6}>
+              <Col md={9}>
                 <Form.Label>Docente</Form.Label>
-                <AsyncSelect
-                  cacheOptions={false}
-                  defaultOptions={true}
-                  loadOptions={loadDocenteOptions}
+                <AsyncDocenteSelect
+                  token={token}
                   value={docenteOpt}
                   onChange={(opt) => { setDocenteOpt(opt); setDocenteId(opt?.value || ""); }}
-                  placeholder="Seleccioná un docente o escribí para filtrar"
-                  isClearable
-                  classNamePrefix="select"
+                  showDniSearch={true}
                 />
               </Col>
               <Col md={2} className="d-flex align-items-end">

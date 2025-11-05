@@ -10,15 +10,17 @@ import {
   eliminarCalificacion,
 } from "../Services/CalificacionesService";
 import TablaCalificaciones from "../Components/Calificaciones/TablaCalificaciones";
-import { Container, Row, Col, Form, Button, Spinner, Modal, Card } from "react-bootstrap";
+import { Container, Row, Col, Form, Button, Spinner, Modal, Card, Alert, Badge } from "react-bootstrap";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
 export default function Calificaciones() {
   const { user } = useAuth();
   const token = user?.token;
   const navigate = useNavigate();
+  const { cicloLectivo } = useCicloLectivo();
 
   const [cursos, setCursos] = useState([]);
   const [materias, setMaterias] = useState([]);
@@ -32,6 +34,7 @@ export default function Calificaciones() {
   const [mensajeExito, setMensajeExito] = useState("");
   const [mostrarError, setMostrarError] = useState(false);
   const [mensajeError, setMensajeError] = useState("");
+  // Nota Final se muestra solo en reportes; en esta pantalla de carga no se utiliza
 
   // 1️⃣ Traer cursos disponibles
   useEffect(() => {
@@ -75,7 +78,7 @@ export default function Calificaciones() {
       }
 
       try {
-        const alums = await listarAlumnosPorCurso(token, cursoSeleccionado);
+        const alums = await listarAlumnosPorCurso(token, cursoSeleccionado, cicloLectivo?.id ?? null);
         setAlumnos(alums);
         setAlumnosError(null);
       } catch (err) {
@@ -85,6 +88,9 @@ export default function Calificaciones() {
           console.warn("Sin permisos para listar alumnos del curso (403)");
           setAlumnos([]);
           setAlumnosError("No tenés permisos para ver los alumnos de este curso. Las materias se cargaron igualmente.");
+        } else if ((err?.message || '').toLowerCase().includes('ciclo lectivo')) {
+          setAlumnos([]);
+          setAlumnosError('Seleccioná un ciclo lectivo en Configuración > Ciclo lectivo');
         } else {
           console.error("Error al cargar alumnos", err);
           setAlumnos([]);
@@ -93,7 +99,20 @@ export default function Calificaciones() {
     };
 
     fetchMateriasYAlumnos();
-  }, [cursoSeleccionado, token]);
+  }, [cursoSeleccionado, token, cicloLectivo?.id]);
+
+  // (NF removida de esta pantalla)
+
+  // Encabezado con ciclo visible
+  const CicloHeader = () => (
+    <div className="mb-2">
+      {cicloLectivo?.id ? (
+        <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
+      ) : (
+        <Alert variant="warning" className="py-1 px-2 mb-0">Seleccioná un ciclo lectivo en Configuración &gt; Ciclo lectivo</Alert>
+      )}
+    </div>
+  );
   // 3️⃣ Cargar calificaciones del curso/materia/etapa
   const handleBuscar = async () => {
     if (!materiaSeleccionada || !cursoSeleccionado) return;
@@ -214,7 +233,8 @@ export default function Calificaciones() {
 
       <Card className="shadow-sm">
         <Card.Body>
-          <h3 className="mb-4">Carga de Calificaciones</h3>
+          <h3 className="mb-2">Carga de Calificaciones</h3>
+          <CicloHeader />
 
           {/* FILTROS */}
           <Row className="mb-3">

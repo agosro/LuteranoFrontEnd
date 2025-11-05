@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Container, Card, Row, Col, Form, Button, Spinner, Table, Badge, Alert } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
@@ -6,19 +6,28 @@ import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
 import { ejecutarPromocionMasiva, simularPromocionMasiva } from '../Services/PromocionMasivaService';
 import ConfirmarAccion from '../Components/Modals/ConfirmarAccion';
+import { useCicloLectivo } from '../Context/CicloLectivoContext.jsx';
 
 export default function PromocionMasiva() {
   const { user } = useAuth();
   const token = user?.token;
   const rol = user?.rol;
+  const { cicloLectivo } = useCicloLectivo();
 
   const [form, setForm] = useState({
     anio: new Date().getFullYear(),
-    cicloLectivoId: 1,
+    cicloLectivoId: 0,
     procesarEgresados: true,
     maxRepeticiones: 2,
     dryRun: false,
   });
+
+  // Sincronizar ciclo desde contexto
+  useEffect(() => {
+    if (cicloLectivo?.id) {
+      setForm((v) => ({ ...v, cicloLectivoId: Number(cicloLectivo.id) }));
+    }
+  }, [cicloLectivo?.id]);
 
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -114,8 +123,8 @@ export default function PromocionMasiva() {
             </Col>
             <Col md={3} sm={6} xs={12}>
               <Form.Group>
-                <Form.Label>Ciclo lectivo ID</Form.Label>
-                <Form.Control type="number" value={form.cicloLectivoId} onChange={handleChange('cicloLectivoId')} />
+                <Form.Label>Ciclo lectivo</Form.Label>
+                <Form.Control type="number" value={form.cicloLectivoId} onChange={handleChange('cicloLectivoId')} disabled />
               </Form.Group>
             </Col>
             <Col md={3} sm={6} xs={12}>
@@ -159,6 +168,12 @@ export default function PromocionMasiva() {
               </Form.Group>
             </Col>
           </Row>
+
+          {!form.cicloLectivoId && (
+            <Alert variant="warning" className="mt-3">
+              Seleccioná un ciclo lectivo en Configuración &gt; Ciclo lectivo para poder ejecutar o simular.
+            </Alert>
+          )}
 
           <Row className="g-2 mt-4">
             <Col md="auto">

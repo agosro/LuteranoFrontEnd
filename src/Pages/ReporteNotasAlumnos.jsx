@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge } from "react-bootstrap";
-import AsyncSelect from "react-select/async";
+import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import { useAuth } from "../Context/AuthContext";
 import { useLocation } from "react-router-dom";
 import { listarAlumnosConFiltros } from "../Services/AlumnoService";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
-import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
+// import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { listarCalifPorAnio } from "../Services/CalificacionesService";
+import { obtenerNotaFinalSimple } from "../Services/NotaFinalService";
 import { resumenNotasAlumnoPorAnio } from "../Services/ReporteNotasService";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
@@ -32,12 +33,16 @@ export default function ReporteNotasAlumnos() {
   const [divisionSel, setDivisionSel] = useState("");
   const [cursoId, setCursoId] = useState("");
 
+  // (Reemplazado por componente AsyncAlumnoSelect)
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
   const [diag, setDiag] = useState(null); // info de diagnóstico
   // const [rawForYear, setRawForYear] = useState(null); // calificaciones crudas del año
   const printRef = React.useRef(null);
+  // Nota Final por materia (clave: materiaId -> NF)
+  const [nfMap, setNfMap] = useState({});
   // Remontar selector cuando cambian filtros (año/división) para forzar recarga
   const alumnoSelectKey = React.useMemo(
     () => `alumno-${cursoAnioSel || 'any'}-${divisionSel || 'any'}-${cursoId || 'none'}`,
@@ -121,76 +126,9 @@ export default function ReporteNotasAlumnos() {
   }, [preselectedAlumnoId, token]);
 
   // Helpers para búsqueda
-  const buildFiltrosAlumno = useCallback((q) => {
-    const s = (q || "").trim();
-    if (!s) return {};
-    if (/^\d{3,}$/.test(s)) return { dni: s };
-    // backend acepta nombre/apellido; usamos ambos con el mismo término
-    return { nombre: s, apellido: s };
-  }, []);
+  // (buscador encapsulado en componente)
 
-  const alumnosCursoCache = useRef({}); // cursoId -> lista alumnos
-  const alumnosYearCache = useRef({}); // anio -> lista alumnos combinada de ese año
-  const alumnosDefaultCache = useRef(null); // lista default sin curso
-  const buscarEnLista = (lista, q) => {
-    const s = (q || "").toLowerCase();
-    if (!s) return lista;
-    return (lista || []).filter(a => {
-      const nom = `${a.apellido || ''} ${a.nombre || ''}`.toLowerCase();
-      const dni = (a.dni || '').toString();
-      return nom.includes(s) || dni.includes(s);
-    });
-  };
-
-  const loadAlumnoOptions = useCallback(async (inputValue) => {
-    const q = (inputValue || "").trim();
-    try {
-      // Si hay curso seleccionado (año+división), buscar dentro de ese curso
-      if (cursoId) {
-        let lista = alumnosCursoCache.current[cursoId];
-        if (!lista) {
-          lista = await listarAlumnosPorCurso(token, Number(cursoId));
-          alumnosCursoCache.current[cursoId] = Array.isArray(lista) ? lista : [];
-        }
-        const filtrada = buscarEnLista(lista, q).slice(0, 200);
-        return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      // Si hay AÑO seleccionado pero división = Todas, combinar alumnos de todos los cursos de ese año
-      if (cursoAnioSel) {
-        let yearList = alumnosYearCache.current[cursoAnioSel];
-        if (!yearList) {
-          const cursosDelAnio = (cursos || []).filter(c => String(c.anio) === String(cursoAnioSel));
-          const ids = cursosDelAnio.map(c => c.id).filter(Boolean);
-          const results = await Promise.all(ids.map(id => listarAlumnosPorCurso(token, Number(id)).catch(() => [])));
-          // Combinar y desduplicar por id
-          const map = new Map();
-          for (const arr of results) {
-            for (const a of (arr || [])) {
-              if (!map.has(a.id)) map.set(a.id, a);
-            }
-          }
-          yearList = Array.from(map.values());
-          alumnosYearCache.current[cursoAnioSel] = yearList;
-        }
-        const filtrada = buscarEnLista(yearList, q).slice(0, 200);
-        return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      // Sin curso: búsqueda remota por nombre/apellido o DNI
-      if (q.length < 1) {
-        // Lista default sin filtro (cacheada)
-        if (!alumnosDefaultCache.current) {
-          const lista = await listarAlumnosConFiltros(token, {});
-          alumnosDefaultCache.current = Array.isArray(lista) ? lista : [];
-        }
-        return alumnosDefaultCache.current.slice(0, 200).map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      const filtros = buildFiltrosAlumno(q);
-      const lista = await listarAlumnosConFiltros(token, filtros);
-      return (lista || []).slice(0, 200).map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-    } catch {
-      return [];
-    }
-  }, [token, cursoId, cursoAnioSel, cursos, buildFiltrosAlumno]);
+  // Alumno options handled by AsyncAlumnoSelect
 
   const aniosPosibles = useMemo(() => {
     const y = new Date().getFullYear();
@@ -201,6 +139,7 @@ export default function ReporteNotasAlumnos() {
     e.preventDefault();
     setError("");
     setData(null);
+    setNfMap({});
     if (!alumnoId) {
       setError("Seleccioná un alumno");
       return;
@@ -215,6 +154,38 @@ export default function ReporteNotasAlumnos() {
       const res = await resumenNotasAlumnoPorAnio(token, alumnoId, anio);
       setData(res);
       if (res?.code && res.code < 0) setError(res.mensaje || "Error en el reporte");
+
+      // Cargar Nota Final por materia en paralelo (si hay materias)
+      try {
+        const materias = res?.calificacionesAlumnoResumenDto?.materias || [];
+        const ids = materias.map(m => m.materiaId).filter(id => id != null);
+        if (ids.length) {
+          const pool = 6;
+          const resultados = {};
+          let i = 0;
+          async function worker() {
+            while (i < ids.length) {
+              const idx = i++;
+              const mid = ids[idx];
+              try {
+                const resp = await obtenerNotaFinalSimple(token, Number(alumnoId), Number(mid), Number(anio));
+                // El endpoint simple puede devolver { notaFinal: number } o un número directo según backend
+                const val = typeof resp === 'number' ? resp : (resp?.notaFinal ?? resp?.valor ?? null);
+                resultados[mid] = val;
+              } catch {
+                resultados[mid] = null;
+              }
+            }
+          }
+          const workers = Array.from({ length: Math.min(pool, ids.length) }, () => worker());
+          await Promise.all(workers);
+          setNfMap(resultados);
+        }
+      } catch {
+        // noop NF
+      } finally {
+        // done
+      }
 
       // Traigo también las calificaciones crudas del año para diagnóstico y posibles tooltips de fechas
       try {
@@ -238,6 +209,9 @@ export default function ReporteNotasAlumnos() {
     }
   };
 
+  // Buscar por DNI: setea un override de lista para el selector y autoselecciona si hay un único resultado
+  // DNI search now handled inside AsyncAlumnoSelect
+
   const resumenDto = data?.calificacionesAlumnoResumenDto;
   const resumen = resumenDto?.materias || [];
 
@@ -247,7 +221,7 @@ export default function ReporteNotasAlumnos() {
       "Materia",
       "E1 N1","E1 N2","E1 N3","E1 N4","E1 Prom",
       "E2 N1","E2 N2","E2 N3","E2 N4","E2 Prom",
-      "PG","Estado"
+      "PG","NF","Estado"
     ];
     const rows = resumen.map(r => {
       const e1arr = Array.isArray(r.e1Notas) ? r.e1Notas : [];
@@ -256,7 +230,7 @@ export default function ReporteNotasAlumnos() {
         r.materiaNombre || "",
         e1arr[0] ?? "", e1arr[1] ?? "", e1arr[2] ?? "", e1arr[3] ?? "", (r.e1 ?? ""),
         e2arr[0] ?? "", e2arr[1] ?? "", e2arr[2] ?? "", e2arr[3] ?? "", (r.e2 ?? ""),
-        (r.pg ?? ""), (r.estado ?? "")
+        (r.pg ?? ""), (nfMap?.[r.materiaId] ?? ""), (r.estado ?? "")
       ];
     });
     const csv = [header, ...rows]
@@ -332,18 +306,17 @@ export default function ReporteNotasAlumnos() {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={4}>
+              <Col md={7}>
                 <Form.Label>Alumno</Form.Label>
-                <AsyncSelect
+                <AsyncAlumnoSelect
                   key={alumnoSelectKey}
-                  cacheOptions={false}
-                  defaultOptions={true}
-                  loadOptions={loadAlumnoOptions}
+                  token={token}
                   value={alumnoOption}
                   onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
-                  placeholder={cursoId ? "Seleccioná o escribí para filtrar dentro del curso..." : "Seleccioná un alumno o escribí para filtrar"}
-                  isClearable
-                  classNamePrefix="select"
+                  cursos={cursos}
+                  cursoId={cursoId}
+                  cursoAnioSel={cursoAnioSel}
+                  showDniSearch={true}
                 />
               </Col>
               <Col md={2}>
@@ -430,12 +403,14 @@ export default function ReporteNotasAlumnos() {
                         <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>
                         <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>
                         <th>PG</th>
+                        <th>NF</th>
                         <th>Estado</th>
                       </tr>
                       <tr>
                         <th></th>
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E1</th>
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
+                        <th></th>
                         <th></th>
                         <th></th>
                       </tr>
@@ -450,6 +425,7 @@ export default function ReporteNotasAlumnos() {
                             <td>{e1[0] ?? '-'}</td><td>{e1[1] ?? '-'}</td><td>{e1[2] ?? '-'}</td><td>{e1[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e1 ?? '-'}</Badge></td>
                             <td>{e2[0] ?? '-'}</td><td>{e2[1] ?? '-'}</td><td>{e2[2] ?? '-'}</td><td>{e2[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e2 ?? '-'}</Badge></td>
                             <td><Badge bg={(r.pg ?? 0) >= 6 ? 'success' : 'danger'}>{r.pg ?? '-'}</Badge></td>
+                            <td>{nfMap?.[r.materiaId] ?? '-'}</td>
                             <td>{r.estado ?? '-'}</td>
                           </tr>
                         );

@@ -15,12 +15,14 @@ import { listarCursos } from "../Services/CursoService";
 import { listarTutores } from "../Services/TutorService";
 import { asignarTutorAAlumno, desasignarTutorDeAlumno } from "../Services/TutorAlumnoService";
 import { getTituloCurso } from "../utils/cursos";
+import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
 function AlumnoDetalle() {
   const location = useLocation();
   const navigate = useNavigate();
   const alumno = location.state;
   const { user } = useAuth();
+  const { cicloLectivo } = useCicloLectivo();
 
   const [formData, setFormData] = useState(alumno || {});
   const [historial, setHistorial] = useState([]);
@@ -30,7 +32,6 @@ function AlumnoDetalle() {
   const [histActualLoading, setHistActualLoading] = useState(true);
   const [histActualError, setHistActualError] = useState("");
 
-  // cicloLectivoId fijo en 1 por ahora; no se usa estado
   const [cursoId] = useState(null);
 
   const [showAsignarCurso, setShowAsignarCurso] = useState(false);
@@ -46,7 +47,7 @@ function AlumnoDetalle() {
       setHistLoading(true);
       setHistError("");
       try {
-        const ciclo = 1; // hardcode temporal
+        const ciclo = cicloLectivo?.id ?? null;
         const data = await listarHistorialAlumnoFiltrado(
           user.token,
           alumno.id,
@@ -400,7 +401,8 @@ function AlumnoDetalle() {
           }));
         }}
         onAsignar={async (token, cursoIdSeleccionado, alumnoId) => {
-          const req = { alumnoId, cursoId: cursoIdSeleccionado, cicloLectivoId: 1 };
+          const cicloId = cicloLectivo?.id ?? null;
+          const req = { alumnoId, cursoId: cursoIdSeleccionado, cicloLectivoId: cicloId };
           await asignarCursoAlumno(token, req);
           try {
             const dataActual = await obtenerHistorialActualAlumno(token, alumnoId);
@@ -412,7 +414,7 @@ function AlumnoDetalle() {
             const dataLista = await listarHistorialAlumnoFiltrado(
               token,
               alumnoId,
-              { cicloLectivoId: 1, cursoId: cursoId || null }
+              { cicloLectivoId: cicloId, cursoId: cursoId || null }
             );
             const listaRef = Array.isArray(dataLista?.historialCursos) ? dataLista.historialCursos : [];
             setHistorial(listaRef);
