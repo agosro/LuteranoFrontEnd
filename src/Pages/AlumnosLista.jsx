@@ -83,6 +83,7 @@ export default function ListaAlumnos() {
   const columnasAlumnos = [
     { key: "nombreApellido", label: "Nombre y Apellido", render: a => `${a.nombre} ${a.apellido}` },
     { key: "dni", label: "DNI" },
+    { key: "curso", label: "Curso", render: a => a?.cursoActual ? `${a.cursoActual.anio ?? ''}°${a.cursoActual.division ?? ''}` : '-' },
     { key: "email", label: "Email" },
     { key: "telefono", label: "Teléfono" },
   ];
