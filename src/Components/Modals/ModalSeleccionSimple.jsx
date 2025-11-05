@@ -15,6 +15,7 @@ export default function ModalSeleccionSimple({
   token,
   onActualizar,
   toastOnSuccess = true,
+  hint,
 }) {
   const [opciones, setOpciones] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
@@ -100,6 +101,11 @@ export default function ModalSeleccionSimple({
         <Modal.Title>{titulo}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {hint ? (
+          <div className="alert alert-info py-2 small" role="alert">
+            {hint}
+          </div>
+        ) : null}
         {loading ? (
           <p>Cargando opciones...</p>
         ) : (

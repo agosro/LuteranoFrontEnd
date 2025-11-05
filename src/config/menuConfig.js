@@ -29,7 +29,6 @@ export const menuConfig = [
     subItems: [
       { label: "Materias", path: "/materias", roles: ["ROLE_ADMIN"] },
       { label: "Cursos", path: "/cursos", roles: ["ROLE_ADMIN", "ROLE_DOCENTE"] },
-      { label: "Mesas de examen", path: "/mesa-de-examen", roles: ["ROLE_DOCENTE","ROLE_ADMIN"] },
       { label: "Calificaciones", path: "/calificaciones", roles: ["ROLE_DOCENTE","ROLE_ADMIN"] }, // 🆕
     ],
   },
@@ -65,6 +64,16 @@ export const menuConfig = [
     subItems: [
       { label: "Alumnos", path: "/asistencia/alumnos", roles: ["ROLE_PRECEPTOR","ROLE_ADMIN"] },
       { label: "Docentes", path: "/asistencia/docentes", roles: ["ROLE_ADMIN"] },
+    ],
+  },
+  {
+    label: "Mesa de examen",
+    icon: FaClipboardList,
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"],
+    subItems: [
+      { label: "Mesas", path: "/mesa-de-examen", roles: ["ROLE_ADMIN"] },
+      { label: "Turnos de examen", path: "/turnos", roles: ["ROLE_ADMIN"] },
+      { label: "Actas", path: "/actas", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] },
     ],
   },
   {

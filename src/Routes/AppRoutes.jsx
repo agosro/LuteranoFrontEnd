@@ -17,6 +17,7 @@ import AulaDetalle from '../Pages/AulaDetalle.jsx';
 import Tutores from '../Pages/Tutores.jsx';
 import TutorDetalle from '../Pages/TutorDetalle.jsx';
 import Mesas from '../Pages/Mesas.jsx';
+import Turnos from '../Pages/Turnos.jsx';
 import Reportes from '../Pages/Reportes.jsx';
 import ReservarEspacio from '../Pages/Reservar.jsx';
 import MisReservas from '../Pages/MisReservas.jsx';
@@ -46,6 +47,7 @@ import ReporteTardanzas from '../Pages/ReporteTardanzas.jsx';
 import ReporteRinde from '../Pages/ReporteRinde.jsx';
 import ReporteAsistenciaPerfecta from '../Pages/ReporteAsistenciaPerfecta.jsx';
 import ReporteDisponibilidadDocente from '../Pages/ReporteDisponibilidadDocente.jsx';
+import Actas from '../Pages/Actas.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -88,7 +90,7 @@ function AppRoutes() {
           <Route path="usuarios/:id" element={<UsuarioDetalle />} />
         </Route>
 
-        {/* Materias y Cursos -> SOLO ADMIN */}
+        {/* Materias, Cursos y Turnos -> SOLO ADMIN */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="materias" element={<Materias />} />
           <Route path="materias/:id" element={<MateriaDetalle />} />
@@ -96,6 +98,7 @@ function AppRoutes() {
           <Route path="cursos/:id" element={<CursoDetalle />} />
           <Route path="/cursos/:id/horarios" element={<CursoHorarios />} />
           <Route path="/horarios" element={<Horarios />} />
+          <Route path="turnos" element={<Turnos />} />
         </Route>
 
         {/* Aulas -> SOLO ADMIN */}
@@ -133,6 +136,11 @@ function AppRoutes() {
           <Route path="reportes/alumnos-libres" element={<ReporteAlumnosLibres />} />
           <Route path="reportes/asistencia-perfecta" element={<ReporteAsistenciaPerfecta />} />
           <Route path="reportes/disponibilidad-docente" element={<ReporteDisponibilidadDocente />} />
+        </Route>
+
+        {/* Actas -> ADMIN, DIRECTOR, PRECEPTOR */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
+          <Route path="actas" element={<Actas />} />
         </Route>
 
         {/* Asistencia -> ADMIN, PRECEPTOR (alumnos). Docentes -> ADMIN */}

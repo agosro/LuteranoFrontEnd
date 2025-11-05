@@ -1,44 +1,52 @@
-import React, { useState } from "react";
-import { Table, Button, Badge } from "react-bootstrap";
+import React, { useEffect, useMemo, useState } from "react";
+import { Table, Button, Badge, Spinner, Form } from "react-bootstrap";
 import { isoToDisplay } from "../utils/fechas";
+import { useAuth } from "../Context/AuthContext";
+import { listarReservas, aprobarReserva, denegarReserva } from "../Services/ReservaService";
+import { listarEspaciosAulicos } from "../Services/EspacioAulicoService";
+import { listarCursos } from "../Services/CursoService";
+import { toast } from "react-toastify";
+import Breadcrumbs from "../Components/Botones/Breadcrumbs";
+import BackButton from "../Components/Botones/BackButton";
 
 export default function GestionarReservas() {
-  // 🔹 Datos de ejemplo (mock)
-  const [reservas, setReservas] = useState([
-    {
-      id: 1,
-      usuario: "Docente Juan Pérez",
-      espacio: { nombre: "Aula 101" },
-      fecha: "2025-09-20",
-      hora: "08:00",
-      estado: "PENDIENTE",
-    },
-    {
-      id: 2,
-      usuario: "Docente María López",
-      espacio: { nombre: "Laboratorio" },
-      fecha: "2025-09-22",
-      hora: "10:00",
-      estado: "APROBADA",
-    },
-    {
-      id: 3,
-      usuario: "Docente Ana Torres",
-      espacio: { nombre: "Gimnasio" },
-      fecha: "2025-09-23",
-      hora: "12:00",
-      estado: "DENEGADA",
-    },
-  ]);
+  const { user } = useAuth();
+  const token = user?.token;
 
-  // 🔹 Cambiar estado de una reserva
-  const cambiarEstado = (id, nuevoEstado) => {
-    setReservas((prev) =>
-      prev.map((reserva) =>
-        reserva.id === id ? { ...reserva, estado: nuevoEstado } : reserva
-      )
-    );
+  const [cargando, setCargando] = useState(true);
+  const [reservas, setReservas] = useState([]);
+  const [espaciosMap, setEspaciosMap] = useState({});
+  const [cursosMap, setCursosMap] = useState({});
+  const [filtroEstado, setFiltroEstado] = useState("TODOS");
+
+  const cargarDatos = async () => {
+    setCargando(true);
+    try {
+      const [resList, espaciosList, cursosList] = await Promise.all([
+        listarReservas(token),
+        listarEspaciosAulicos(token).catch(() => []),
+        listarCursos(token).catch(() => []),
+      ]);
+      setReservas(Array.isArray(resList?.reservaEspacioDtos) ? resList.reservaEspacioDtos : []);
+      const emap = (espaciosList || []).reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+      const cmap = (cursosList || []).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+      setEspaciosMap(emap);
+      setCursosMap(cmap);
+    } catch (e) {
+      toast.error(e?.message || "Error cargando reservas");
+      setReservas([]);
+    } finally {
+      setCargando(false);
+    }
   };
+
+  useEffect(() => { if (token) cargarDatos(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const reservasFiltradas = useMemo(() => {
+    if (filtroEstado === "TODOS") return reservas;
+    return reservas.filter(r => String(r.estado) === String(filtroEstado));
+  }, [reservas, filtroEstado]);
 
   const renderEstado = (estado) => {
     switch (estado) {
@@ -53,60 +61,103 @@ export default function GestionarReservas() {
     }
   };
 
+  const handleAprobar = async (id) => {
+    try {
+      await aprobarReserva(id, token);
+      toast.success("Reserva aprobada");
+      setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: "APROBADA" } : r));
+    } catch (e) {
+      toast.error(e?.message || "No se pudo aprobar");
+    }
+  };
+
+  const handleDenegar = async (id) => {
+    const motivo = window.prompt("Motivo de la denegación:");
+    if (motivo === null) return; // cancelado
+    if (!motivo.trim()) {
+      toast.info("Debés ingresar un motivo");
+      return;
+    }
+    try {
+      await denegarReserva(id, motivo.trim(), token);
+      toast.success("Reserva denegada");
+      setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: "DENEGADA", motivoDenegacion: motivo.trim() } : r));
+    } catch (e) {
+      toast.error(e?.message || "No se pudo denegar");
+    }
+  };
+
   return (
     <div className="container mt-4">
-      <h2>Gestionar Reservas</h2>
-      {reservas.length === 0 ? (
-        <p>No hay reservas registradas.</p>
-      ) : (
-        <Table striped bordered hover className="mt-3">
-          <thead>
-            <tr>
-              <th>Usuario</th>
-              <th>Espacio</th>
-              <th>Fecha</th>
-              <th>Hora</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reservas.map((reserva) => (
-              <tr key={reserva.id}>
-                <td>{reserva.usuario}</td>
-                <td>{reserva.espacio.nombre}</td>
-                <td>{isoToDisplay(reserva.fecha)}</td>
-                <td>{reserva.hora}</td>
-                <td>{renderEstado(reserva.estado)}</td>
-                <td>
-                  {reserva.estado === "PENDIENTE" && (
-                    <>
-                      <Button
-                        variant="success"
-                        size="sm"
-                        className="me-2"
-                        onClick={() => cambiarEstado(reserva.id, "APROBADA")}
-                      >
-                        Aprobar
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => cambiarEstado(reserva.id, "DENEGADA")}
-                      >
-                        Denegar
-                      </Button>
-                    </>
-                  )}
-                  {reserva.estado !== "PENDIENTE" && (
-                    <span className="text-muted">Sin acciones</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+      <Breadcrumbs />
+      <BackButton />
+
+      <div className="card mt-3">
+        <div className="card-body">
+          <div className="d-flex align-items-center justify-content-between">
+            <h3 className="mb-0">Gestionar Reservas</h3>
+            <div className="d-flex align-items-center gap-2">
+              <Form.Select size="sm" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                <option value="TODOS">Todos</option>
+                <option value="PENDIENTE">Pendientes</option>
+                <option value="APROBADA">Aprobadas</option>
+                <option value="DENEGADA">Denegadas</option>
+              </Form.Select>
+              <Button size="sm" variant="outline-secondary" onClick={cargarDatos} disabled={cargando}>
+                {cargando ? <Spinner size="sm" /> : "Refrescar"}
+              </Button>
+            </div>
+          </div>
+
+          {cargando ? (
+            <div className="mt-3 text-muted">Cargando reservas...</div>
+          ) : reservasFiltradas.length === 0 ? (
+            <p className="mt-3">No hay reservas registradas.</p>
+          ) : (
+            <Table striped bordered hover className="mt-3">
+              <thead>
+                <tr>
+                  <th>Reserva</th>
+                  <th>Curso</th>
+                  <th>Espacio</th>
+                  <th>Fecha</th>
+                  <th>Módulo</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservasFiltradas.map((r) => {
+                  const espacio = espaciosMap[r.espacioAulicoId];
+                  const curso = cursosMap[r.cursoId];
+                  const cursoLabel = curso ? `${curso.anio ?? ''}°${curso.division ?? ''}` : r.cursoId;
+                  const moduloLabel = r.modulo ? `${r.modulo.orden} (${r.modulo.desde} - ${r.modulo.hasta})` : r.moduloId || "";
+                  return (
+                    <tr key={r.id}>
+                      <td>#{r.id}</td>
+                      <td>{cursoLabel}</td>
+                      <td>{espacio?.nombre || r.espacioAulicoId}</td>
+                      <td>{isoToDisplay(r.fecha)}</td>
+                      <td>{moduloLabel}</td>
+                      <td>{renderEstado(r.estado)}</td>
+                      <td>
+                        {String(r.estado) === "PENDIENTE" ? (
+                          <div className="d-flex gap-2">
+                            <Button variant="success" size="sm" onClick={() => handleAprobar(r.id)}>Aprobar</Button>
+                            <Button variant="danger" size="sm" onClick={() => handleDenegar(r.id)}>Denegar</Button>
+                          </div>
+                        ) : (
+                          <span className="text-muted">Sin acciones</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

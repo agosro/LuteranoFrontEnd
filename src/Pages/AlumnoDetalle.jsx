@@ -372,11 +372,31 @@ function AlumnoDetalle() {
         titulo={`Asignar curso a ${alumno?.nombre} ${alumno?.apellido}`}
         entidad={{ id: alumno?.id, cursoActual: histActual }}
         campoAsignado="cursoActual"
+        hint={histActual ? "Este alumno ya tiene un curso vigente: solo podés cambiar la división dentro del mismo año y nivel." : undefined}
         obtenerOpciones={async (token) => {
           const lista = await listarCursos(token);
-          return lista.map(c => ({
+          // Si ya tiene curso vigente, limitar opciones al mismo año (y nivel) para permitir solo cambiar división
+          let opciones = Array.isArray(lista) ? lista : [];
+          if (histActual?.curso) {
+            const anioActual = histActual.curso?.anio;
+            const nivelActual = histActual.curso?.nivel;
+            if (anioActual != null) {
+              opciones = opciones.filter((c) =>
+                String(c?.anio) === String(anioActual) &&
+                (nivelActual == null || String(c?.nivel) === String(nivelActual))
+              );
+            }
+          }
+
+          // Ordenar por división para que sea más claro elegir
+          opciones.sort((a, b) => String(a?.division ?? "").localeCompare(String(b?.division ?? ""), 'es', { numeric: true, sensitivity: 'base' }));
+
+          // Si por algún motivo no hay opciones después del filtro, volver a la lista completa para no bloquear
+          const finalList = opciones.length ? opciones : (Array.isArray(lista) ? lista : []);
+
+          return finalList.map((c) => ({
             value: c.id,
-            label: getTituloCurso(c)
+            label: getTituloCurso(c),
           }));
         }}
         onAsignar={async (token, cursoIdSeleccionado, alumnoId) => {

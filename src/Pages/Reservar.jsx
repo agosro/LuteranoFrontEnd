@@ -6,25 +6,10 @@ import { toast } from "react-toastify";
 import { useAuth } from "../Context/AuthContext";
 import { listarCursosPorDocente, listarCursos } from "../Services/CursoService";
 import { listarEspaciosAulicos } from "../Services/EspacioAulicoService";
-import { getModulosConEstadoPorDia } from "../Services/ModuloService";
+import { getModulosReservaEstado } from "../Services/ModuloService";
 import { solicitarReserva } from "../Services/ReservaService";
 
-// Utilidad: mapear Date -> 'DiaSemana' del backend
-const diaSemanaBackend = (yyyyMmDd) => {
-  if (!yyyyMmDd) return null;
-  const d = new Date(`${yyyyMmDd}T00:00:00`);
-  const day = d.getDay(); // 0=Domingo ... 6=Sábado
-  switch (day) {
-    case 0: return "DOMINGO";
-    case 1: return "LUNES";
-    case 2: return "MARTES";
-    case 3: return "MIERCOLES"; // sin tilde, como enum backend
-    case 4: return "JUEVES";
-    case 5: return "VIERNES";
-    case 6: return "SABADO";
-    default: return null;
-  }
-};
+// (Ya no se requiere mapear día de semana; el endpoint de reservas usa fecha directamente)
 
 export default function ReservarEspacio() {
   const { user } = useAuth();
@@ -82,20 +67,28 @@ export default function ReservarEspacio() {
     return () => { mounted = false; };
   }, [token, docenteId]);
 
-  // Cargar módulos por día cuando tengo curso, fecha y espacio áulico
+  // Cargar módulos (estado de reserva) cuando tengo fecha y espacio áulico
   useEffect(() => {
     let active = true;
     async function loadModulos() {
-      if (!cursoId || !fecha || !espacioId) { setModulos([]); return; }
-      const diaParam = diaSemanaBackend(fecha);
-      if (!diaParam) { setModulos([]); return; }
+      if (!fecha || !espacioId) { setModulos([]); return; }
       setCargandoModulos(true);
       setError(null);
       try {
-        const data = await getModulosConEstadoPorDia(token, cursoId, diaParam);
+        const data = await getModulosReservaEstado(token, Number(espacioId), fecha);
         if (!active) return;
-        // backend responde { modulos: [...] }
-        setModulos(Array.isArray(data.modulos) ? data.modulos : []);
+        const lista = Array.isArray(data.modulos) ? data.modulos : [];
+        const mapeado = lista.map((d) => ({
+          modulo: {
+            id: d.id,
+            orden: d.orden,
+            desde: d.horaInicio,
+            hasta: d.horaFin,
+          },
+          ocupado: !!d.ocupado,
+          motivoOcupacion: d.motivoOcupacion || null,
+        }));
+        setModulos(mapeado);
       } catch (e) {
         if (active) setError(e?.message || "Error al cargar módulos");
         if (active) setModulos([]);
@@ -105,7 +98,7 @@ export default function ReservarEspacio() {
     }
     loadModulos();
     return () => { active = false; };
-  }, [cursoId, fecha, espacioId, token]);
+  }, [fecha, espacioId, token]);
 
   const abrirReserva = (mod) => {
     setModuloSeleccionado(mod);
@@ -130,27 +123,31 @@ export default function ReservarEspacio() {
       toast.success(resp?.mensaje || "Reserva solicitada");
       setShow(false);
       setMotivo("");
-      // Actualizar estado localmente para reflejar ocupado
-      setModulos((prev) => prev.map(m => {
-        if (m.modulo.id === moduloSeleccionado.modulo.id) {
-          let nuevasReservas = Array.isArray(m.reservas) ? [...m.reservas] : [];
-          nuevasReservas.push({ espacioAulicoId: Number(espacioId) });
-          return { ...m, reservas: nuevasReservas };
-        }
-        return m;
-      }));
+      // Refrescar ocupación desde backend
+      try {
+        const data = await getModulosReservaEstado(token, Number(espacioId), fecha);
+        const lista = Array.isArray(data.modulos) ? data.modulos : [];
+        const mapeado = lista.map((d) => ({
+          modulo: { id: d.id, orden: d.orden, desde: d.horaInicio, hasta: d.horaFin },
+          ocupado: !!d.ocupado,
+          motivoOcupacion: d.motivoOcupacion || null,
+        }));
+        setModulos(mapeado);
+  } catch { /* ignore */ }
     } catch (e) {
       toast.error(e?.message || "No se pudo crear la reserva");
-      // Si el error es que el espacio ya está reservado, actualizar el estado localmente
-      if ((e?.message || "").includes("El espacio ya está reservado")) {
-        setModulos((prev) => prev.map(m => {
-          if (m.modulo.id === moduloSeleccionado.modulo.id) {
-            let nuevasReservas = Array.isArray(m.reservas) ? [...m.reservas] : [];
-            nuevasReservas.push({ espacioAulicoId: Number(espacioId) });
-            return { ...m, reservas: nuevasReservas };
-          }
-          return m;
-        }));
+      // Si el error es que el espacio ya está reservado, refrescar ocupación y cerrar modal
+      if ((e?.message || "").toLowerCase().includes("ya está reservado")) {
+        try {
+          const data = await getModulosReservaEstado(token, Number(espacioId), fecha);
+          const lista = Array.isArray(data.modulos) ? data.modulos : [];
+          const mapeado = lista.map((d) => ({
+            modulo: { id: d.id, orden: d.orden, desde: d.horaInicio, hasta: d.horaFin },
+            ocupado: !!d.ocupado,
+            motivoOcupacion: d.motivoOcupacion || null,
+          }));
+          setModulos(mapeado);
+  } catch { /* ignore */ }
         setShow(false);
       }
     }
@@ -179,7 +176,7 @@ export default function ReservarEspacio() {
                   <option value="">Seleccioná un curso</option>
                   {cursos.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {`${c.anio ?? ''}° ${formatNivel(c.nivel)} ${c.division ?? ''}`.trim()}
+                      {`${c.anio ?? ''}°${c.division ?? ''}`}
                     </option>
                   ))}
                 </Form.Select>
@@ -230,18 +227,14 @@ export default function ReservarEspacio() {
                   </tr>
                 ) : (
                   modulos.map((m) => {
-                    // Solo marcar como ocupado si el espacio áulico seleccionado está reservado en ese módulo y fecha
-                    let ocupado = false;
-                    if (Array.isArray(m.reservas) && espacioId) {
-                      ocupado = m.reservas.some(r => String(r.espacioAulicoId) === String(espacioId));
-                    }
-                    const libre = !ocupado;
+                    // Usar estado de reserva provisto por el backend
+                    const libre = !m.ocupado;
                     return (
                       <tr key={m.modulo.id} className={libre ? "" : "table-danger"}>
                         <td>{m.modulo.orden}</td>
                         <td>{m.modulo.desde}</td>
                         <td>{m.modulo.hasta}</td>
-                        <td>{libre ? "Libre" : "Ocupado"}</td>
+                        <td>{libre ? "Libre" : (m.motivoOcupacion ? `Ocupado - ${m.motivoOcupacion}` : "Ocupado")}</td>
                         <td>
                           <Button
                             size="sm"
@@ -294,12 +287,4 @@ export default function ReservarEspacio() {
   );
 }
 
-// Helpers
-function formatNivel(nivel) {
-  if (!nivel) return '';
-  const map = {
-    BASICO: 'Básico',
-    ORIENTADO: 'Orientado',
-  };
-  return map[nivel] || String(nivel).charAt(0) + String(nivel).slice(1).toLowerCase();
-}
+// Helpers (ya no mostramos nivel en el selector de curso)

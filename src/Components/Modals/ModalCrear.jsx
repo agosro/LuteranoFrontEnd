@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import Select from "react-select";
 import { isoToInputLocal } from "../../utils/fechas";
 
@@ -12,11 +12,14 @@ export default function ModalCrearEntidad({
   onInputChange,
   onUsuarioChange,
 }) {
-  if (!show) return null;
+  const [errors, setErrors] = useState({});
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     onInputChange(name, type === "checkbox" ? checked : value);
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSelectChange = (selectedOptions, name) => {
@@ -33,7 +36,32 @@ export default function ModalCrearEntidad({
           : ""
       );
     }
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
+
+  const validate = () => {
+    const nuevosErrores = {};
+    (Array.isArray(campos) ? campos : []).forEach(({ name, label, type, required }) => {
+      if (!required) return;
+      const val = formData[name];
+      let invalido = false;
+      if (type === "multiselect") {
+        invalido = !Array.isArray(val) || val.length === 0;
+      } else {
+        invalido = val === undefined || val === null || val === "";
+      }
+      if (invalido) {
+        const baseLabel = label || name;
+        nuevosErrores[name] = `${baseLabel} es requerido`;
+      }
+    });
+    setErrors(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
+
+  if (!show) return null;
 
   return (
     <div
@@ -68,6 +96,7 @@ export default function ModalCrearEntidad({
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (!validate()) return;
             onSubmit(formData);
           }}
         >
@@ -89,6 +118,13 @@ export default function ModalCrearEntidad({
                   classNamePrefix="react-select"
                   placeholder={`Seleccione ${label.toLowerCase()}...`}
                   isDisabled={disabled}
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: errors[name] ? '#dc3545' : base.borderColor,
+                      boxShadow: errors[name] ? '0 0 0 0.25rem rgba(220,53,69,.25)' : base.boxShadow,
+                    }),
+                  }}
                 />
               ) : type === "select" ? (
                 <Select
@@ -98,13 +134,20 @@ export default function ModalCrearEntidad({
                   classNamePrefix="react-select"
                   placeholder={`Seleccione ${label.toLowerCase()}...`}
                   isDisabled={disabled}
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: errors[name] ? '#dc3545' : base.borderColor,
+                      boxShadow: errors[name] ? '0 0 0 0.25rem rgba(220,53,69,.25)' : base.boxShadow,
+                    }),
+                  }}
                 />
               ) : type === "date" ? (
                 <input
                   id={name}
                   name={name}
                   type="date"
-                  className="form-control"
+                  className={`form-control ${errors[name] ? 'is-invalid' : ''}`}
                   value={isoToInputLocal(formData[name])}
                   onChange={handleChange}
                   required={required}
@@ -115,12 +158,15 @@ export default function ModalCrearEntidad({
                   id={name}
                   name={name}
                   type={type || "text"}
-                  className="form-control"
+                  className={`form-control ${errors[name] ? 'is-invalid' : ''}`}
                   value={formData[name] || ""}
                   onChange={handleChange}
                   required={required}
                   disabled={disabled}
                 />
+              )}
+              {errors[name] && (
+                <div className="invalid-feedback d-block">{errors[name]}</div>
               )}
             </div>
           ))}
