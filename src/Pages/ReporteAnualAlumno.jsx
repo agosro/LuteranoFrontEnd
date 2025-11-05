@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge } from "react-bootstrap";
-import AsyncSelect from "react-select/async";
+import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
 import { listarAlumnosConFiltros } from "../Services/AlumnoService";
-import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
+// import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { obtenerInformeAnualAlumno } from "../Services/ReporteAnualAlumnoService";
 
 export default function ReporteAnualAlumno() {
@@ -105,76 +105,11 @@ export default function ReporteAnualAlumno() {
     return () => { active = false; };
   }, [preselectedAlumnoId, token]);
 
-  // Cache y helpers de alumnos (misma lógica que ReporteNotasAlumnos)
-  const alumnosCursoCache = React.useRef({});
-  const alumnosYearCache = React.useRef({});
-  const alumnosDefaultCache = React.useRef(null);
-  // Forzar remontar el AsyncSelect cuando cambian año/división/cursoId para refrescar opciones por defecto
+  // Forzar remontar el selector cuando cambian año/división/cursoId
   const alumnoSelectKey = React.useMemo(
     () => `alumno-${cursoAnioSel || 'any'}-${divisionSel || 'any'}-${cursoId || 'none'}`,
     [cursoAnioSel, divisionSel, cursoId]
   );
-  const buscarEnLista = (lista, q) => {
-    const s = (q || "").toLowerCase();
-    if (!s) return lista;
-    return (lista || []).filter(a => {
-      const nom = `${a.apellido || ''} ${a.nombre || ''}`.toLowerCase();
-      const dni = (a.dni || '').toString();
-      return nom.includes(s) || dni.includes(s);
-    });
-  };
-
-  const buildFiltrosAlumno = useCallback((q) => {
-    const s = (q || "").trim();
-    if (!s) return {};
-    if (/^\d{3,}$/.test(s)) return { dni: s };
-    return { nombre: s, apellido: s };
-  }, []);
-
-  const loadAlumnoOptions = useCallback(async (inputValue) => {
-    const q = (inputValue || "").trim();
-    try {
-      if (cursoId) {
-        let lista = alumnosCursoCache.current[cursoId];
-        if (!lista) {
-          lista = await listarAlumnosPorCurso(token, Number(cursoId));
-          alumnosCursoCache.current[cursoId] = Array.isArray(lista) ? lista : [];
-        }
-        const filtrada = buscarEnLista(lista, q).slice(0, 200);
-        return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      if (cursoAnioSel) {
-        let yearList = alumnosYearCache.current[cursoAnioSel];
-        if (!yearList) {
-          const cursosDelAnio = (cursos || []).filter(c => String(c.anio) === String(cursoAnioSel));
-          const ids = cursosDelAnio.map(c => c.id).filter(Boolean);
-          const results = await Promise.all(ids.map(id => listarAlumnosPorCurso(token, Number(id)).catch(() => [])));
-          const map = new Map();
-          for (const arr of results) {
-            for (const a of (arr || [])) {
-              if (!map.has(a.id)) map.set(a.id, a);
-            }
-          }
-          yearList = Array.from(map.values());
-          alumnosYearCache.current[cursoAnioSel] = yearList;
-        }
-        const filtrada = buscarEnLista(yearList, q).slice(0, 200);
-        return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      if (q.length < 1) {
-        if (!alumnosDefaultCache.current) {
-          const lista = await listarAlumnosConFiltros(token, {});
-          alumnosDefaultCache.current = Array.isArray(lista) ? lista : [];
-        }
-        return alumnosDefaultCache.current.slice(0, 200).map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      const filtros = buildFiltrosAlumno(q);
-      const lista = await listarAlumnosConFiltros(token, filtros);
-      return (lista || []).slice(0, 200).map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-    } catch {
-      return [];
-    }
-  }, [token, cursoId, cursoAnioSel, cursos, buildFiltrosAlumno]);
 
   const aniosPosibles = useMemo(() => {
     const y = new Date().getFullYear();
@@ -221,7 +156,7 @@ export default function ReporteAnualAlumno() {
     // Construir un CSV más completo: metadatos + tabla de materias + resumen de inasistencias y previas
     const lines = [];
     const alumnoNombre = `${dto?.apellido || ''}, ${dto?.nombre || ''}`.trim();
-    const cursoLbl = dto?.curso ? `${dto.curso.anio || ''} ${dto.curso.division || ''}`.trim() : '';
+  const cursoLbl = dto?.curso ? `${dto.curso.anio ?? ''}${dto?.curso?.anio != null ? '°' : ''} ${dto.curso.division || ''}`.trim() : '';
     // Metadatos
     lines.push(["Colegio", "COLEGIO LUTERANO CONCORDIA"]);
     lines.push(["Año", dto?.anio ?? anio]);
@@ -338,18 +273,17 @@ export default function ReporteAnualAlumno() {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={4}>
+              <Col md={7}>
                 <Form.Label>Alumno</Form.Label>
-                <AsyncSelect
+                <AsyncAlumnoSelect
                   key={alumnoSelectKey}
-                  cacheOptions={false}
-                  defaultOptions={true}
-                  loadOptions={loadAlumnoOptions}
+                  token={token}
                   value={alumnoOption}
                   onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
-                  placeholder={cursoId ? "Seleccioná o escribí para filtrar dentro del curso..." : "Seleccioná un alumno o escribí para filtrar"}
-                  isClearable
-                  classNamePrefix="select"
+                  cursos={cursos}
+                  cursoId={cursoId}
+                  cursoAnioSel={cursoAnioSel}
+                  showDniSearch={true}
                 />
               </Col>
               <Col md={2}>
@@ -400,7 +334,7 @@ export default function ReporteAnualAlumno() {
                   </tr>
                   <tr>
                     <td>
-                      Curso: <strong>{dto?.curso ? `${dto.curso.anio || ''} ${dto.curso.division || ''}`.trim() : '-'}</strong>
+                      Curso: <strong>{dto?.curso ? `${dto.curso.anio ?? ''}${dto?.curso?.anio != null ? '°' : ''} ${dto.curso.division || ''}`.trim() : '-'}</strong>
                       &nbsp;&nbsp; Ciclo Lectivo: <strong>{dto?.anio || anio}</strong>
                     </td>
                     <td className="text-end">Nivel: <strong>{dto?.curso?.nivel || '-'}</strong></td>

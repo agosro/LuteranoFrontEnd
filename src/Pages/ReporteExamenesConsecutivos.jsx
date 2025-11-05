@@ -8,11 +8,13 @@ import { listarCursos } from '../Services/CursoService';
 import { listarMaterias } from '../Services/MateriaService';
 import { institucional, porMateria, porCurso, resumen as resumenSvc } from '../Services/ReporteExamenesConsecutivosService';
 import { toast } from 'react-toastify';
+import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
 export default function ReporteExamenesConsecutivos() {
   const { user } = useAuth();
   const token = user?.token;
   const rol = user?.rol;
+  const { cicloLectivo } = useCicloLectivo();
 
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [ambito, setAmbito] = useState('institucional'); // institucional | materia | curso | resumen
@@ -189,7 +191,14 @@ export default function ReporteExamenesConsecutivos() {
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
-      <h2 className="mb-3">Exámenes consecutivos desaprobados</h2>
+      <h2 className="mb-1">Exámenes consecutivos desaprobados</h2>
+      <div className="mb-3">
+        {cicloLectivo?.id ? (
+          <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
+        ) : (
+          <Alert variant="warning" className="py-1 px-2 mb-0">Seleccioná un ciclo lectivo en Configuración &gt; Ciclo lectivo</Alert>
+        )}
+      </div>
 
       <Card className="mb-3">
         <Card.Body>

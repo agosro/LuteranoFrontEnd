@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge } from "react-bootstrap";
-import AsyncSelect from "react-select/async";
+import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import { useAuth } from "../Context/AuthContext";
 import { useLocation } from "react-router-dom";
 import { listarAlumnosConFiltros } from "../Services/AlumnoService";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
-import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
+// import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { listarCalifPorAnio } from "../Services/CalificacionesService";
 import { resumenNotasAlumnoPorAnio } from "../Services/ReporteNotasService";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
@@ -31,6 +31,8 @@ export default function ReporteNotasAlumnos() {
   const [cursoAnioSel, setCursoAnioSel] = useState("");
   const [divisionSel, setDivisionSel] = useState("");
   const [cursoId, setCursoId] = useState("");
+
+  // (Reemplazado por componente AsyncAlumnoSelect)
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -121,76 +123,9 @@ export default function ReporteNotasAlumnos() {
   }, [preselectedAlumnoId, token]);
 
   // Helpers para búsqueda
-  const buildFiltrosAlumno = useCallback((q) => {
-    const s = (q || "").trim();
-    if (!s) return {};
-    if (/^\d{3,}$/.test(s)) return { dni: s };
-    // backend acepta nombre/apellido; usamos ambos con el mismo término
-    return { nombre: s, apellido: s };
-  }, []);
+  // (buscador encapsulado en componente)
 
-  const alumnosCursoCache = useRef({}); // cursoId -> lista alumnos
-  const alumnosYearCache = useRef({}); // anio -> lista alumnos combinada de ese año
-  const alumnosDefaultCache = useRef(null); // lista default sin curso
-  const buscarEnLista = (lista, q) => {
-    const s = (q || "").toLowerCase();
-    if (!s) return lista;
-    return (lista || []).filter(a => {
-      const nom = `${a.apellido || ''} ${a.nombre || ''}`.toLowerCase();
-      const dni = (a.dni || '').toString();
-      return nom.includes(s) || dni.includes(s);
-    });
-  };
-
-  const loadAlumnoOptions = useCallback(async (inputValue) => {
-    const q = (inputValue || "").trim();
-    try {
-      // Si hay curso seleccionado (año+división), buscar dentro de ese curso
-      if (cursoId) {
-        let lista = alumnosCursoCache.current[cursoId];
-        if (!lista) {
-          lista = await listarAlumnosPorCurso(token, Number(cursoId));
-          alumnosCursoCache.current[cursoId] = Array.isArray(lista) ? lista : [];
-        }
-        const filtrada = buscarEnLista(lista, q).slice(0, 200);
-        return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      // Si hay AÑO seleccionado pero división = Todas, combinar alumnos de todos los cursos de ese año
-      if (cursoAnioSel) {
-        let yearList = alumnosYearCache.current[cursoAnioSel];
-        if (!yearList) {
-          const cursosDelAnio = (cursos || []).filter(c => String(c.anio) === String(cursoAnioSel));
-          const ids = cursosDelAnio.map(c => c.id).filter(Boolean);
-          const results = await Promise.all(ids.map(id => listarAlumnosPorCurso(token, Number(id)).catch(() => [])));
-          // Combinar y desduplicar por id
-          const map = new Map();
-          for (const arr of results) {
-            for (const a of (arr || [])) {
-              if (!map.has(a.id)) map.set(a.id, a);
-            }
-          }
-          yearList = Array.from(map.values());
-          alumnosYearCache.current[cursoAnioSel] = yearList;
-        }
-        const filtrada = buscarEnLista(yearList, q).slice(0, 200);
-        return filtrada.map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      // Sin curso: búsqueda remota por nombre/apellido o DNI
-      if (q.length < 1) {
-        // Lista default sin filtro (cacheada)
-        if (!alumnosDefaultCache.current) {
-          const lista = await listarAlumnosConFiltros(token, {});
-          alumnosDefaultCache.current = Array.isArray(lista) ? lista : [];
-        }
-        return alumnosDefaultCache.current.slice(0, 200).map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-      }
-      const filtros = buildFiltrosAlumno(q);
-      const lista = await listarAlumnosConFiltros(token, filtros);
-      return (lista || []).slice(0, 200).map(a => ({ value: a.id, label: `${a.apellido || ''}, ${a.nombre || ''}${a.dni ? ' - ' + a.dni : ''}`.trim() }));
-    } catch {
-      return [];
-    }
-  }, [token, cursoId, cursoAnioSel, cursos, buildFiltrosAlumno]);
+  // Alumno options handled by AsyncAlumnoSelect
 
   const aniosPosibles = useMemo(() => {
     const y = new Date().getFullYear();
@@ -237,6 +172,9 @@ export default function ReporteNotasAlumnos() {
       setLoading(false);
     }
   };
+
+  // Buscar por DNI: setea un override de lista para el selector y autoselecciona si hay un único resultado
+  // DNI search now handled inside AsyncAlumnoSelect
 
   const resumenDto = data?.calificacionesAlumnoResumenDto;
   const resumen = resumenDto?.materias || [];
@@ -332,18 +270,17 @@ export default function ReporteNotasAlumnos() {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={4}>
+              <Col md={7}>
                 <Form.Label>Alumno</Form.Label>
-                <AsyncSelect
+                <AsyncAlumnoSelect
                   key={alumnoSelectKey}
-                  cacheOptions={false}
-                  defaultOptions={true}
-                  loadOptions={loadAlumnoOptions}
+                  token={token}
                   value={alumnoOption}
                   onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
-                  placeholder={cursoId ? "Seleccioná o escribí para filtrar dentro del curso..." : "Seleccioná un alumno o escribí para filtrar"}
-                  isClearable
-                  classNamePrefix="select"
+                  cursos={cursos}
+                  cursoId={cursoId}
+                  cursoAnioSel={cursoAnioSel}
+                  showDniSearch={true}
                 />
               </Col>
               <Col md={2}>

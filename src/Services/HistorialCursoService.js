@@ -1,13 +1,15 @@
 const API_URL = 'http://localhost:8080';
 
-// Lista el historial completo del alumno. Si no se indica cicloLectivoId, se usa 1 temporalmente.
+// Lista el historial completo del alumno. Requiere cicloLectivoId explícito.
 export const listarHistorialAlumnoFiltrado = async (token, alumnoId, { cicloLectivoId = null, cursoId = null } = {}) => {
   try {
+    if (cicloLectivoId == null) {
+      throw new Error('Debe seleccionar un ciclo lectivo');
+    }
     let url = `${API_URL}/historial-curso/alumno/${alumnoId}/historial-completo`;
 
     const params = [];
-    // Hardcode: si no viene cicloLectivoId, enviar 1 por ahora.
-    params.push(`cicloLectivoId=${cicloLectivoId ?? 1}`);
+    params.push(`cicloLectivoId=${cicloLectivoId}`);
     if (cursoId) params.push(`cursoId=${cursoId}`);
 
     if (params.length > 0) {
@@ -71,12 +73,13 @@ export const obtenerHistorialActualAlumno  = async (token, alumnoId) => {
 };
 
 
-// Lista los alumnos del curso (usa ciclo lectivo activo si no se especifica)
+// Lista los alumnos del curso: requiere ciclo lectivo explícito
 export const listarAlumnosPorCurso = async (token, cursoId, cicloLectivoId = null) => {
   try {
-    // Alinear con lo que funciona en Postman: /historial-curso/{cursoId}/alumnos?cicloLectivoId=1
-    const cl = cicloLectivoId ?? 1;
-    const url = `${API_URL}/historial-curso/${cursoId}/alumnos?cicloLectivoId=${cl}`;
+    if (cicloLectivoId == null) {
+      throw new Error('Debe seleccionar un ciclo lectivo');
+    }
+    const url = `${API_URL}/historial-curso/${cursoId}/alumnos?cicloLectivoId=${cicloLectivoId}`;
 
     const response = await fetch(url, {
       method: "GET",

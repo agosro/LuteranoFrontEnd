@@ -52,6 +52,7 @@ import PromocionMasiva from '../Pages/PromocionMasiva.jsx';
 import ReporteDesempenoDocente from '../Pages/ReporteDesempenoDocente.jsx';
 import ReporteRankingAlumnos from '../Pages/ReporteRankingAlumnos.jsx';
 import ReporteExamenesConsecutivos from '../Pages/ReporteExamenesConsecutivos.jsx';
+import ConfiguracionCicloLectivo from '../Pages/ConfiguracionCicloLectivo.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -180,6 +181,11 @@ function AppRoutes() {
           <Route path="configuracion/importar-alumnos" element={<ImportarAlumnos />} />
           <Route path="configuracion/importar-calificaciones" element={<ImportarCalificaciones />} />
           <Route path="configuracion/espacios-aulicos" element={<EspaciosAulicosGestion />} />
+        </Route>
+
+        {/* Ciclo lectivo -> ADMIN, DIRECTOR, PRECEPTOR (listar y seleccionar). Crear solo se habilita en UI para ADMIN/DIRECTOR */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
+          <Route path="configuracion/ciclo-lectivo" element={<ConfiguracionCicloLectivo />} />
         </Route>
 
         {/* Promoción masiva -> ADMIN, DIRECTOR, PRECEPTOR (simulación). La ejecución real se valida en UI */}

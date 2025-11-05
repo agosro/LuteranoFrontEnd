@@ -62,12 +62,12 @@ const reportes = [
     categoria: "Alumnos",
     ruta: "/reportes/reporte-anual-alumno"
   },
-  {
-    id: 8,
-    titulo: "Desempeño de Alumno",
-    descripcion: "Hacé un seguimiento de la evolución académica de un alumno a lo largo de su trayectoria.",
-    categoria: "Alumnos"
-  },
+  // {
+  //   id: 8,
+  //   titulo: "Desempeño de Alumno",
+  //   descripcion: "Hacé un seguimiento de la evolución académica de un alumno a lo largo de su trayectoria.",
+  //   categoria: "Alumnos"
+  // },
   {
     id: 9,
     titulo: "Ranking de Alumnos",

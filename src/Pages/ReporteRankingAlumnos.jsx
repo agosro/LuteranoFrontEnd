@@ -6,10 +6,12 @@ import { useAuth } from '../Context/AuthContext';
 import { listarCursos } from '../Services/CursoService';
 import { rankingCurso, rankingColegio, rankingTodosCursos } from '../Services/ReporteRankingAlumnoService';
 import { toast } from 'react-toastify';
+import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
 export default function ReporteRankingAlumnos() {
   const { user } = useAuth();
   const token = user?.token;
+  const { cicloLectivo } = useCicloLectivo();
 
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [modo, setModo] = useState('colegio'); // 'colegio' | 'curso' | 'todos'
@@ -120,7 +122,14 @@ export default function ReporteRankingAlumnos() {
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
-      <h2 className="mb-3">Ranking de Alumnos</h2>
+      <h2 className="mb-1">Ranking de Alumnos</h2>
+      <div className="mb-3">
+        {cicloLectivo?.id ? (
+          <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
+        ) : (
+          <Alert variant="warning" className="py-1 px-2 mb-0">Seleccioná un ciclo lectivo en Configuración &gt; Ciclo lectivo</Alert>
+        )}
+      </div>
 
       <Card className="mb-3">
         <Card.Body>

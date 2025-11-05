@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Row, Col, Form, Button, Spinner, Alert } from "react-bootstrap";
+import { Card, Row, Col, Form, Button, Spinner, Alert, Badge } from "react-bootstrap";
+import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
@@ -10,16 +11,19 @@ import { isoToDisplay } from "../utils/fechas";
 import { getTituloCurso } from "../utils/cursos";
 import { listarCursos } from "../Services/CursoService";
 import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
+import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
 export default function ReporteLegajoAlumno() {
   const { user } = useAuth();
   const token = user?.token;
   const location = useLocation();
   const preselectedAlumnoId = location.state?.preselectedAlumnoId;
+  const { cicloLectivo } = useCicloLectivo();
 
   const [alumnoId, setAlumnoId] = useState(preselectedAlumnoId || "");
+  const [alumnoOption, setAlumnoOption] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
-  const [loadingAlumnos, setLoadingAlumnos] = useState(false);
+  // DNI search integrado en AsyncAlumnoSelect
 
   // Filtro opcional por curso/división
   const [cursos, setCursos] = useState([]);
@@ -36,14 +40,11 @@ export default function ReporteLegajoAlumno() {
     let active = true;
     async function load() {
       try {
-        setLoadingAlumnos(true);
         const lista = await listarAlumnosConFiltros(token, {});
         if (active) setAlumnos(lista);
       } catch (e) {
         console.error(e);
-      } finally {
-        if (active) setLoadingAlumnos(false);
-      }
+  } finally { /* noop */ }
     }
     if (token) load();
     return () => { active = false; };
@@ -74,29 +75,27 @@ export default function ReporteLegajoAlumno() {
       try {
         if (!cursoId) {
           // Si se limpia el curso, volvemos al listado general
-          setLoadingAlumnos(true);
           const lista = await listarAlumnosConFiltros(token, {});
           if (active) setAlumnos(lista);
           return;
-        }
-        setLoadingAlumnos(true);
-        const lista = await listarAlumnosPorCurso(token, cursoId);
+    }
+    const lista = await listarAlumnosPorCurso(token, cursoId, cicloLectivo?.id ?? null);
         if (active) setAlumnos(lista || []);
         // Si el alumno seleccionado no pertenece, limpiarlo
         if (active && alumnoId) {
           const stillThere = (lista || []).some(a => String(a.id) === String(alumnoId));
-          if (!stillThere) setAlumnoId("");
+          if (!stillThere) { setAlumnoId(""); setAlumnoOption(null); }
         }
       } catch (e) {
         console.error("Error al cargar alumnos por curso", e);
         if (active) setAlumnos([]);
-      } finally {
-        if (active) setLoadingAlumnos(false);
-      }
+  } finally { /* noop */ }
     }
     if (token) loadAlumnosPorCurso();
     return () => { active = false; };
-  }, [token, cursoId, alumnoId]);
+  }, [token, cursoId, alumnoId, cicloLectivo?.id]);
+
+  // Búsqueda y carga de alumnos encapsuladas en AsyncAlumnoSelect
 
   const alumnoSel = useMemo(() => alumnos.find(a => String(a.id) === String(alumnoId)) || null, [alumnos, alumnoId]);
 
@@ -108,7 +107,7 @@ export default function ReporteLegajoAlumno() {
     try {
       setLoading(true);
       // Base de datos personales desde lista (evita otro endpoint detalle)
-      const base = alumnoSel || {};
+      const base = alumnoOption?.raw || alumnoSel || {};
       // Curso vigente y ciclo: usar exactamente el campo del backend
       let vigente = null;
       try {
@@ -150,7 +149,14 @@ export default function ReporteLegajoAlumno() {
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
-      <h2 className="mb-3">Legajo de Alumno</h2>
+      <h2 className="mb-2">Legajo de Alumno</h2>
+      <div className="mb-3">
+        {cicloLectivo?.id ? (
+          <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
+        ) : (
+          <Alert variant="warning" className="py-1 px-2 mb-0">Seleccioná un ciclo lectivo en Configuración &gt; Ciclo lectivo</Alert>
+        )}
+      </div>
 
       <Card className="mb-4">
         <Card.Body>
@@ -165,16 +171,18 @@ export default function ReporteLegajoAlumno() {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={5}>
+              <Col md={8}>
                 <Form.Label>Alumno</Form.Label>
-                <Form.Select value={alumnoId} onChange={(e)=>setAlumnoId(e.target.value)} disabled={loadingAlumnos}>
-                  <option value="">Seleccioná un alumno</option>
-                  {alumnos.map(a => (
-                    <option key={a.id} value={a.id}>{a.apellido}, {a.nombre} {a.dni?`- ${a.dni}`:""}</option>
-                  ))}
-                </Form.Select>
+                <AsyncAlumnoSelect
+                  token={token}
+                  value={alumnoOption}
+                  onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
+                  cursos={cursos}
+                  cursoId={cursoId}
+                  showDniSearch={true}
+                />
               </Col>
-              <Col md={3} className="d-flex align-items-end">
+              <Col md={12} className="d-flex align-items-end justify-content-end">
                 <Button type="submit" variant="primary" disabled={loading}>{loading ? <><Spinner size="sm" animation="border" className="me-2"/>Generando...</> : "Generar"}</Button>
               </Col>
             </Row>
