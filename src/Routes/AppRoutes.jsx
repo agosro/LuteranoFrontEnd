@@ -50,6 +50,8 @@ import ReporteDisponibilidadDocente from '../Pages/ReporteDisponibilidadDocente.
 import Actas from '../Pages/Actas.jsx';
 import PromocionMasiva from '../Pages/PromocionMasiva.jsx';
 import ReporteDesempenoDocente from '../Pages/ReporteDesempenoDocente.jsx';
+import ReporteRankingAlumnos from '../Pages/ReporteRankingAlumnos.jsx';
+import ReporteExamenesConsecutivos from '../Pages/ReporteExamenesConsecutivos.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -126,8 +128,8 @@ function AppRoutes() {
           <Route path="mesa-de-examen" element={<Mesas />} />
         </Route>
 
-        {/* Reportes -> ADMIN, DOCENTE, PRECEPTOR */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR']} />}>
+        {/* Reportes -> ADMIN, DOCENTE, PRECEPTOR, DIRECTOR */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR', 'ROLE_DIRECTOR']} />}>
           <Route path="reportes" element={<Reportes />} />
           <Route path="reportes/legajo-alumno" element={<ReporteLegajoAlumno />} />
           <Route path="reportes/notas-alumnos" element={<ReporteNotasAlumnos />} />
@@ -143,6 +145,16 @@ function AppRoutes() {
         {/* Desempeño docente -> ADMIN, DIRECTOR, PRECEPTOR (según backend) */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
           <Route path="reportes/desempeno-docente" element={<ReporteDesempenoDocente />} />
+        </Route>
+
+        {/* Ranking de alumnos -> ADMIN, DIRECTOR, PRECEPTOR, DOCENTE */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR', 'ROLE_DOCENTE']} />}>
+          <Route path="reportes/ranking-alumnos" element={<ReporteRankingAlumnos />} />
+        </Route>
+
+        {/* Exámenes consecutivos -> ADMIN, DIRECTOR, PRECEPTOR, DOCENTE (algunas vistas pueden requerir más permisos) */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR', 'ROLE_DOCENTE']} />}>
+          <Route path="reportes/examenes-consecutivos" element={<ReporteExamenesConsecutivos />} />
         </Route>
 
         {/* Actas -> ADMIN, DIRECTOR, PRECEPTOR */}
