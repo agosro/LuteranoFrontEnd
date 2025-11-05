@@ -106,6 +106,7 @@ const reportes = [
     titulo: "Desempeño Docente",
     descripcion: "Evaluá el trabajo docente con indicadores de asistencia y compromiso.",
     categoria: "Docentes"
+    , ruta: "/reportes/desempeno-docente"
   }
 ];
 

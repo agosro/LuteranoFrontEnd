@@ -48,6 +48,8 @@ import ReporteRinde from '../Pages/ReporteRinde.jsx';
 import ReporteAsistenciaPerfecta from '../Pages/ReporteAsistenciaPerfecta.jsx';
 import ReporteDisponibilidadDocente from '../Pages/ReporteDisponibilidadDocente.jsx';
 import Actas from '../Pages/Actas.jsx';
+import PromocionMasiva from '../Pages/PromocionMasiva.jsx';
+import ReporteDesempenoDocente from '../Pages/ReporteDesempenoDocente.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -138,6 +140,11 @@ function AppRoutes() {
           <Route path="reportes/disponibilidad-docente" element={<ReporteDisponibilidadDocente />} />
         </Route>
 
+        {/* Desempeño docente -> ADMIN, DIRECTOR, PRECEPTOR (según backend) */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
+          <Route path="reportes/desempeno-docente" element={<ReporteDesempenoDocente />} />
+        </Route>
+
         {/* Actas -> ADMIN, DIRECTOR, PRECEPTOR */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
           <Route path="actas" element={<Actas />} />
@@ -156,11 +163,16 @@ function AppRoutes() {
           <Route path="calificaciones" element={<Calificaciones />} />
         </Route>
 
-        {/* Configuracion -> ADMIN */}
+        {/* Configuracion general */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="configuracion/importar-alumnos" element={<ImportarAlumnos />} />
           <Route path="configuracion/importar-calificaciones" element={<ImportarCalificaciones />} />
           <Route path="configuracion/espacios-aulicos" element={<EspaciosAulicosGestion />} />
+        </Route>
+
+        {/* Promoción masiva -> ADMIN, DIRECTOR, PRECEPTOR (simulación). La ejecución real se valida en UI */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
+          <Route path="configuracion/promocion-masiva" element={<PromocionMasiva />} />
         </Route>
 
         {/* Espacios Áulicos */}

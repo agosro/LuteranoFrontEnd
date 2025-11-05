@@ -79,12 +79,13 @@ export const menuConfig = [
   {
     label: "Configuración",
     icon: FaCog,
-    roles: ["ROLE_ADMIN"],
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"],
     subItems: [
       { label: "Parámetros", path: "/configuracion", roles: ["ROLE_ADMIN"] },
       { label: "Importar Alumnos", path: "/configuracion/importar-alumnos", roles: ["ROLE_ADMIN"] },
       { label: "Importar Calificaciones", path: "/configuracion/importar-calificaciones", roles: ["ROLE_ADMIN"] },
       { label: "Gestionar Espacios", path: "/configuracion/espacios-aulicos", roles: ["ROLE_ADMIN"] },
+      { label: "Promoción Masiva", path: "/configuracion/promocion-masiva", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] },
 
     ],
   },
