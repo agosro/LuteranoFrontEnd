@@ -1,31 +1,27 @@
 // src/Services/ReporteDesempenoDocenteService.js
-const API_URL = 'http://localhost:8080';
+import { httpClient } from './httpClient'
 
-const auth = (token) => ({ 'Authorization': `Bearer ${token}` });
-
-const parseOrThrow = async (res) => {
-  let data = null;
-  try { data = await res.json(); } catch { data = null; }
-  const code = data?.code;
-  if (!res.ok || (typeof code === 'number' && code < 0)) {
-    throw new Error(data?.mensaje || 'Error al generar el reporte');
-  }
-  return data ?? {};
-};
+// httpClient maneja errores y token
 
 export const reporteCompleto = async (token, anio) => {
-  const res = await fetch(`${API_URL}/reportes/desempeno-docente/${anio}`, { headers: auth(token) });
-  return parseOrThrow(res);
+  void token
+  const data = await httpClient.get(`/api/reportes/desempeno-docente/${anio}`)
+  if (typeof data?.code === 'number' && data.code < 0) throw new Error(data?.mensaje || 'Error al generar el reporte')
+  return data
 };
 
 export const reportePorMateria = async (token, anio, materiaId) => {
-  const res = await fetch(`${API_URL}/reportes/desempeno-docente/${anio}/materia/${materiaId}`, { headers: auth(token) });
-  return parseOrThrow(res);
+  void token
+  const data = await httpClient.get(`/api/reportes/desempeno-docente/${anio}/materia/${materiaId}`)
+  if (typeof data?.code === 'number' && data.code < 0) throw new Error(data?.mensaje || 'Error al generar el reporte por materia')
+  return data
 };
 
 export const reportePorDocente = async (token, anio, docenteId) => {
-  const res = await fetch(`${API_URL}/reportes/desempeno-docente/${anio}/docente/${docenteId}`, { headers: auth(token) });
-  return parseOrThrow(res);
+  void token
+  const data = await httpClient.get(`/api/reportes/desempeno-docente/${anio}/docente/${docenteId}`)
+  if (typeof data?.code === 'number' && data.code < 0) throw new Error(data?.mensaje || 'Error al generar el reporte por docente')
+  return data
 };
 
 export default { reporteCompleto, reportePorMateria, reportePorDocente };

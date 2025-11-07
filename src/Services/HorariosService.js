@@ -1,23 +1,11 @@
-const API_URL = "http://localhost:8080"; // Cambiá si usás otro host/puerto
+import { httpClient } from './httpClient'
 
 // 🔹 Asignar horarios (día + módulo) a una materia del curso
 export const asignarHorario = async (token, cursoId, materiaId, slots) => {
   try {
-    const response = await fetch(`${API_URL}/horarios/cursos/${cursoId}/materias/${materiaId}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify(slots),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.mensaje || "Error al asignar horarios");
-    }
-
-    return await response.json();
+    void token
+    const data = await httpClient.post(`/api/horarios/cursos/${cursoId}/materias/${materiaId}`, slots)
+    return data
   } catch (error) {
     console.error("Error en asignarHorario:", error);
     throw error;
@@ -27,21 +15,9 @@ export const asignarHorario = async (token, cursoId, materiaId, slots) => {
 // 🔹 Desasignar horarios (día + módulo) de una materia del curso
 export const desasignarHorario = async (token, cursoId, materiaId, slots) => {
   try {
-    const response = await fetch(`${API_URL}/horarios/cursos/${cursoId}/materias/${materiaId}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify(slots),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.mensaje || "Error al desasignar horarios");
-    }
-
-    return await response.json();
+    void token
+    const data = await httpClient.delete(`/api/horarios/cursos/${cursoId}/materias/${materiaId}`, { body: slots })
+    return data
   } catch (error) {
     console.error("Error en desasignarHorario:", error);
     throw error;

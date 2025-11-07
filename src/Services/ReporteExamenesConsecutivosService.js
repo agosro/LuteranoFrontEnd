@@ -1,40 +1,34 @@
 // src/Services/ReporteExamenesConsecutivosService.js
-const API_URL = 'http://localhost:8080';
+import { httpClient } from './httpClient'
 
-const auth = (token) => ({ 'Authorization': `Bearer ${token}` });
-
-const parseOrThrow = async (res) => {
-  let data = null;
-  try { data = await res.json(); } catch { data = null; }
-  const code = data?.code;
-  if (!res.ok || (typeof code === 'number' && code < 0)) {
-    throw new Error(data?.mensaje || 'Error al generar el reporte');
-  }
-  return data ?? {};
-};
+// httpClient maneja autorización y errores
 
 export const institucional = async (token, anio) => {
-  const res = await fetch(`${API_URL}/reportes/examenes-consecutivos/institucional/${anio}`,
-    { headers: auth(token) });
-  return parseOrThrow(res);
+  void token
+  const data = await httpClient.get(`/api/reportes/examenes-consecutivos/institucional/${anio}`)
+  if (typeof data?.code === 'number' && data.code < 0) throw new Error(data?.mensaje || 'Error reporte institucional')
+  return data
 };
 
 export const porMateria = async (token, materiaId, anio) => {
-  const res = await fetch(`${API_URL}/reportes/examenes-consecutivos/materia/${materiaId}/${anio}`,
-    { headers: auth(token) });
-  return parseOrThrow(res);
+  void token
+  const data = await httpClient.get(`/api/reportes/examenes-consecutivos/materia/${materiaId}/${anio}`)
+  if (typeof data?.code === 'number' && data.code < 0) throw new Error(data?.mensaje || 'Error reporte por materia')
+  return data
 };
 
 export const porCurso = async (token, cursoId, anio) => {
-  const res = await fetch(`${API_URL}/reportes/examenes-consecutivos/curso/${cursoId}/${anio}`,
-    { headers: auth(token) });
-  return parseOrThrow(res);
+  void token
+  const data = await httpClient.get(`/api/reportes/examenes-consecutivos/curso/${cursoId}/${anio}`)
+  if (typeof data?.code === 'number' && data.code < 0) throw new Error(data?.mensaje || 'Error reporte por curso')
+  return data
 };
 
 export const resumen = async (token, anio) => {
-  const res = await fetch(`${API_URL}/reportes/examenes-consecutivos/resumen/${anio}`,
-    { headers: auth(token) });
-  return parseOrThrow(res);
+  void token
+  const data = await httpClient.get(`/api/reportes/examenes-consecutivos/resumen/${anio}`)
+  if (typeof data?.code === 'number' && data.code < 0) throw new Error(data?.mensaje || 'Error resumen')
+  return data
 };
 
 export default { institucional, porMateria, porCurso, resumen };
