@@ -14,8 +14,9 @@ export async function actualizarUsuario(token, datos) {
 }
 
 export const obtenerUsuarioPorEmail = async (token, email) => {
-  void token
-  return httpClient.post('/api/user/email', { email })
+  return httpClient.post('/api/user/email', { email }, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
 };
 
 // Eliminar usuario por email

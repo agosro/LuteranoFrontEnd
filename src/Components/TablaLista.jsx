@@ -18,6 +18,7 @@ export default function TablaGenerica({
   botonCrear,
   extraButtons,
   loading = false,
+  leftControls, // nuevo: render prop para insertar controles a la izquierda
 }) {
   // filtros por columna
   const [filtrosColumnas, setFiltrosColumnas] = useState(() => (
@@ -90,7 +91,13 @@ export default function TablaGenerica({
         
         {/* Controles superiores */}
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <div />
+          <div className="d-flex align-items-center gap-2">
+            {leftControls && (
+              <div className="me-2 d-flex align-items-center">
+                {leftControls()}
+              </div>
+            )}
+          </div>
 
           <div className="d-flex gap-2 align-items-center">
             <div className="d-flex align-items-center me-2">

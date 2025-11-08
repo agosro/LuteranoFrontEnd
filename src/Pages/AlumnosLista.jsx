@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
-import { listarAlumnosConFiltros, eliminarAlumno } from "../Services/AlumnoService";
+import { listarAlumnosConFiltros, eliminarAlumno, listarAlumnosEgresados, listarAlumnosExcluidos, reactivarAlumno } from "../Services/AlumnoService";
 import TablaGenerica from "../Components/TablaLista";
 import ModalVerEntidad from "../Components/Modals/ModalVerEntidad";
 import ConfirmarEliminar from "../Components/Modals/ConfirmarEliminar";
@@ -19,6 +19,9 @@ export default function ListaAlumnos() {
 
   const filtrosIniciales = location.state?.filtros || {};
   const [filtros] = useState(filtrosIniciales);
+
+  // modo de visualización: 'filtros' | 'egresados' | 'excluidos'
+  const [modo, setModo] = useState('filtros');
 
   const [alumnos, setAlumnos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +47,14 @@ export default function ListaAlumnos() {
   const cargarAlumnos = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listarAlumnosConFiltros(user?.token, filtros);
+  let data = [];
+      if (modo === 'filtros') {
+        data = await listarAlumnosConFiltros(user?.token, filtros);
+      } else if (modo === 'egresados') {
+        data = await listarAlumnosEgresados(user?.token);
+      } else if (modo === 'excluidos') {
+        data = await listarAlumnosExcluidos(user?.token);
+      }
       setAlumnos(data || []);
     } catch (error) {
       toast.error("Error cargando alumnos: " + error.message);
@@ -52,11 +62,12 @@ export default function ListaAlumnos() {
     } finally {
       setLoading(false);
     }
-  }, [user?.token, filtros]);
+  }, [user?.token, filtros, modo]);
 
   useEffect(() => {
     if (user?.token) cargarAlumnos();
-  }, [user?.token, filtros, cargarAlumnos]);
+  }, [user?.token, filtros, modo, cargarAlumnos]);
+
 
 
   const abrirModalVer = (alumno) => { setAlumnoSeleccionado(alumno); setModalVerShow(true); };
@@ -106,6 +117,32 @@ export default function ListaAlumnos() {
     },
   ];
 
+  const accionesExtraFila = (alumno) => {
+    const acciones = [
+      {
+        icon: <FaUserFriends />,
+        onClick: () => abrirModalAsignarTutor(alumno),
+        title: "Asignar Tutor",
+      }
+    ];
+    if (modo === 'excluidos') {
+      acciones.push({
+        label: 'Reactivar',
+        className: 'btn btn-sm btn-warning',
+        onClick: async () => {
+          try {
+            await reactivarAlumno(user?.token, alumno.id);
+            toast.success('Alumno reactivado');
+            cargarAlumnos();
+          } catch (e) {
+            toast.error(e.message || 'Error reactivando alumno');
+          }
+        }
+      });
+    }
+    return acciones;
+  };
+
   return (
     <>
       <TablaGenerica
@@ -116,14 +153,16 @@ export default function ListaAlumnos() {
         onDelete={abrirModalEliminar}
         camposFiltrado={["nombre", "apellido", "dni"]}
         placeholderBuscador="Buscar por nombre o DNI"
-        // 🆕 botón extra para asignar tutor
-        extraButtons={(alumno) => [
-          {
-            icon: <FaUserFriends />,
-            onClick: () => abrirModalAsignarTutor(alumno),
-            title: "Asignar Tutor",
-          }
-        ]}
+        // botones extra dinámicos
+        extraButtons={accionesExtraFila}
+        // insertar selector de modo a la izquierda del control Mostrar
+        leftControls={() => (
+          <div className="btn-group btn-group-sm" role="group" aria-label="Modo listado alumnos">
+            <button className={`btn ${modo==='filtros' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('filtros')}>Activos / Filtros</button>
+            <button className={`btn ${modo==='egresados' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('egresados')}>Egresados</button>
+            <button className={`btn ${modo==='excluidos' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('excluidos')}>Excluidos</button>
+          </div>
+        )}
       />
 
       <ModalVerEntidad

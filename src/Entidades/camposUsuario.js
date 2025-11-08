@@ -12,6 +12,7 @@ export const camposUsuario = [
       { label: 'Director', value: 'ROLE_DIRECTOR' },
       { label: 'Docente', value: 'ROLE_DOCENTE' },
       { label: 'Preceptor', value: 'ROLE_PRECEPTOR' },
+      { label: 'Auxiliar', value: 'ROLE_AUXILIAR' },
     ],
     required: true,
   },

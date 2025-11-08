@@ -55,6 +55,16 @@ El objetivo es brindar una solución integral para instituciones educativas, per
 - **Autenticación y Seguridad**  
   Login con JWT y control de accesos según el rol.
 
+### Roles disponibles
+
+Los roles del sistema y sus permisos principales en el frontend:
+
+- `ROLE_ADMIN`: Acceso completo a todas las funcionalidades.
+- `ROLE_DIRECTOR`: Gestión avanzada (usuarios clave, reportes, organización) según configuración.
+- `ROLE_PRECEPTOR`: Gestión de alumnos y asistencia; acceso a reportes específicos.
+- `ROLE_DOCENTE`: Calificaciones, reportes docentes y reservas de espacios.
+- `ROLE_AUXILIAR`: Solo puede gestionar los Espacios Áulicos (ruta: Configuración → Gestionar Espacios). No posee acceso a otras secciones.
+
 ---
 
 ## 📂 Estructura del proyecto

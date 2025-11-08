@@ -42,7 +42,8 @@ async function request(path, { method = 'GET', body = null, headers = {}, skipAu
   }
 
   const token = getStoredToken()
-  const authHeaders = token && !skipAuth ? { Authorization: `Bearer ${token}` } : {}
+  // Permitir que una cabecera Authorization explícita en headers sobrescriba la generada automáticamente
+  const authHeaders = (headers && headers.Authorization) ? {} : (token && !skipAuth ? { Authorization: `Bearer ${token}` } : {})
 
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData
   const isString = typeof body === 'string'

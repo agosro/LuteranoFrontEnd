@@ -53,6 +53,7 @@ import ReporteDesempenoDocente from '../Pages/ReporteDesempenoDocente.jsx';
 import ReporteRankingAlumnos from '../Pages/ReporteRankingAlumnos.jsx';
 import ReporteExamenesConsecutivos from '../Pages/ReporteExamenesConsecutivos.jsx';
 import ConfiguracionCicloLectivo from '../Pages/ConfiguracionCicloLectivo.jsx';
+import ReactivarAlumnos from '../Pages/ReactivarAlumnos.jsx';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -77,20 +78,20 @@ function AppRoutes() {
         <Route path="inicio" element={<Inicio />} />
 
         {/* Solo ADMIN puede ver lista de alumnos */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="alumnos" element={<AlumnosFiltro />} />
           <Route path="alumnos/lista" element={<AlumnosLista />} />
           <Route path="alumnos/:id" element={<AlumnoDetalle />} />
         </Route>
 
         {/* Docentes -> SOLO ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="docentes" element={<Docentes />} />
           <Route path="docentes/:id" element={<DocenteDetalle />} />
         </Route>
 
         {/* Usuarios -> SOLO ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="usuarios/:id" element={<UsuarioDetalle />} />
         </Route>
@@ -107,25 +108,25 @@ function AppRoutes() {
         </Route>
 
         {/* Aulas -> SOLO ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="aulas" element={<Aulas />} />
           <Route path="aulas/:id" element={<AulaDetalle />} />
         </Route>
 
         {/* Tutores -> SOLO ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="tutores" element={<Tutores />} />
           <Route path="tutores/:id" element={<TutorDetalle />} />
         </Route>
 
         {/* Preceptores -> SOLO ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="preceptores" element={<Preceptores />} />
           <Route path="preceptores/:id" element={<PreceptorDetalle />} />
         </Route>
 
         {/* Mesas de examen -> SOLO ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="mesa-de-examen" element={<Mesas />} />
         </Route>
 
@@ -167,7 +168,7 @@ function AppRoutes() {
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_PRECEPTOR']} />}>
           <Route path="asistencia/alumnos" element={<AsistenciaAlumnos />} />
         </Route>
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_AUXILIAR']} />}>
           <Route path="asistencia/docentes" element={<AsistenciaDocentes />} />
         </Route>
 
@@ -180,6 +181,14 @@ function AppRoutes() {
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
           <Route path="configuracion/importar-alumnos" element={<ImportarAlumnos />} />
           <Route path="configuracion/importar-calificaciones" element={<ImportarCalificaciones />} />
+          {/* Gestionar espacios áulicos -> ADMIN, DIRECTOR, AUXILIAR */}
+          <Route path="configuracion/espacios-aulicos" element={<EspaciosAulicosGestion />} />
+          {/* Reactivar alumnos excluidos */}
+          <Route path="configuracion/reactivar-alumnos" element={<ReactivarAlumnos />} />
+        </Route>
+
+        {/* Habilitar acceso a Gestionar Espacios para DIRECTOR y AUXILIAR también */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_DIRECTOR', 'ROLE_AUXILIAR']} />}>
           <Route path="configuracion/espacios-aulicos" element={<EspaciosAulicosGestion />} />
         </Route>
 
@@ -202,8 +211,8 @@ function AppRoutes() {
           <Route path="espacios-aulicos/gestionar" element={<GestionarReservas />} />
         </Route>
         
-        {/* Mi perfil-> ADMIN, DOCENTE, PRECEPTOR */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR']} />}>
+        {/* Mi perfil-> ADMIN, DOCENTE, PRECEPTOR, AUXILIAR */}
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR', 'ROLE_AUXILIAR']} />}>
           <Route path="mi-perfil" element={<MiPerfil />} />
         </Route>
       </Route>

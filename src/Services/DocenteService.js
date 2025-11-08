@@ -50,8 +50,9 @@ export const eliminarDocente = async (token, id) => {
 
 export const obtenerDocentePorUserId = async (token, userId) => {
   try {
-    void token
-    const data = await httpClient.get(`/api/docente/usuario/${userId}`)
+    const data = await httpClient.get(`/api/docente/usuario/${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
     return data.docente || null
   } catch (error) {
     console.error("Error en obtenerDocentePorUserId:", error);

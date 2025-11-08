@@ -50,8 +50,9 @@ export const eliminarPreceptor = async (id, token) => {
 
 export const obtenerPreceptorPorUserId = async (token, userId) => {
   try {
-    void token
-    const data = await httpClient.get(`/api/preceptor/usuario/${userId}`)
+    const data = await httpClient.get(`/api/preceptor/usuario/${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
     return data.preceptor || null
   } catch (error) {
     console.error("Error en obtenerPreceptorPorUserId:", error);
