@@ -73,6 +73,7 @@ export const menuConfig = [
     roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"],
     subItems: [
       { label: "Mesas", path: "/mesa-de-examen", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
+      { label: "Historial", path: "/mesa-de-examen/historial", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] },
       { label: "Turnos de examen", path: "/turnos", roles: ["ROLE_ADMIN"] },
       { label: "Actas", path: "/actas", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] },
     ],

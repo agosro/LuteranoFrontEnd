@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Container, Card, Row, Col, Form, Button, Table, Badge, Spinner, Modal } from 'react-bootstrap';
+import { Container, Card, Row, Col, Form, Button, Table, Badge, Spinner, Modal, Alert } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
@@ -23,7 +23,8 @@ export default function Actas() {
   const [turnos, setTurnos] = useState([]);
   const [cursos, setCursos] = useState([]);
 
-  const [filtros, setFiltros] = useState({ numero: '', turnoId: '', cursoId: '', desde: '', hasta: '' });
+  const currentYear = new Date().getFullYear();
+  const [filtros, setFiltros] = useState({ numero: '', turnoId: '', cursoId: '', desde: '', hasta: '', anio: String(currentYear) });
   const [actas, setActas] = useState([]);
   const [cargando, setCargando] = useState(false);
 
@@ -47,12 +48,30 @@ export default function Actas() {
     })();
   }, [token]);
 
+  // Recargar turnos cuando cambia el Año del filtro
+  useEffect(() => {
+    (async () => {
+      try {
+        const y = Number(filtros.anio) || new Date().getFullYear();
+        const t = await listarTurnos(token, y).catch(() => []);
+        const ts = Array.isArray(t) ? t : [];
+        setTurnos(ts);
+        // Si el turno seleccionado ya no existe para ese año, limpiarlo
+        if (filtros.turnoId && !ts.some(tt => String(tt.id) === String(filtros.turnoId))) {
+          setFiltros(v => ({ ...v, turnoId: '' }));
+        }
+      } catch {
+        setTurnos([]);
+      }
+    })();
+  }, [token, filtros.anio, filtros.turnoId]);
+
   const cursoLabel = (c) => `${c?.anio ?? ''}°${c?.division ?? ''}`;
 
   const buscar = async () => {
     setCargando(true);
     try {
-      const { numero, turnoId, cursoId, desde, hasta } = filtros;
+      const { numero, turnoId, cursoId, desde, hasta, anio } = filtros;
       let lista = [];
       if (numero && numero.trim()) {
         lista = await buscarActas(token, numero.trim());
@@ -62,11 +81,23 @@ export default function Actas() {
         lista = await listarActasPorCurso(token, Number(cursoId));
       } else if (desde && hasta) {
         lista = await listarActasEntreFechas(token, desde, hasta);
+      } else if (anio) {
+        // Solo año: traemos por rango del año
+        const desdeAnio = `${anio}-01-01`;
+        const hastaAnio = `${anio}-12-31`;
+        lista = await listarActasEntreFechas(token, desdeAnio, hastaAnio);
       } else {
+        // Si solo se seleccionó año, filtraremos luego (usamos combinaciones)
         lista = [];
       }
 
       // Filtros cruzados adicionales (si se llenaron varios campos)
+      if (anio) {
+        lista = lista.filter(a => {
+          const y = (a.fechaCierre || a.fecha || '').split('-')[0];
+            return String(y) === String(anio);
+        });
+      }
       if (cursoId) {
         lista = lista.filter(a => String(a.cursoId) === String(cursoId));
       }
@@ -92,18 +123,32 @@ export default function Actas() {
   };
 
   const limpiar = () => {
-    setFiltros({ numero: '', turnoId: '', cursoId: '', desde: '', hasta: '' });
+    setFiltros({ numero: '', turnoId: '', cursoId: '', desde: '', hasta: '', anio: String(currentYear) });
     setActas([]);
   };
 
-  const abrirActa = async (id) => {
+  const abrirActa = async (objOrId) => {
+    const isObj = typeof objOrId === 'object' && objOrId !== null;
+    const id = isObj ? objOrId.id : objOrId;
+    const fallback = isObj ? objOrId : null; // por si falla el fetch, mostramos lo que tenemos de la lista
     try {
       const a = await obtenerActaPorId(token, id);
       setActaSel(a);
       setFormActa({ id: a.id, numeroActa: a.numeroActa || '', observaciones: a.observaciones || '' });
       setShowModal(true);
     } catch (e) {
-      toast.error(e?.message || 'No se pudo abrir el acta');
+      // 422: Acta todavía no generada (lazy), intentar crear si hay datos mínimos (mesaId) o mostrar fallback
+      const statusText = e?.message || '';
+      if (/422|Unprocessable/i.test(statusText)) {
+        toast.warn('El backend no devolvió el acta completa (422). Podés reintentar más tarde o generar el acta desde la mesa.');
+      } else {
+        toast.error(e?.message || 'No se pudo abrir el acta');
+      }
+      if (fallback) {
+        setActaSel(fallback);
+        setFormActa({ id: fallback.id, numeroActa: fallback.numeroActa || '', observaciones: fallback.observaciones || '' });
+        setShowModal(true);
+      }
     }
   };
 
@@ -161,18 +206,27 @@ export default function Actas() {
     const encabezado = {
       numero: actaSel.numeroActa || '-',
       curso: actaSel.cursoAnio ? `${actaSel.cursoAnio}°${actaSel.cursoDivision || ''}` : (actaSel.cursoNombre || '-'),
+      cursoNivel: actaSel.cursoNivel || '',
       materia: actaSel.materiaNombre || '-',
       turno: actaSel.turnoNombre || actaSel.turnoId || '-',
-      fecha: actaSel.fechaCierre || actaSel.fecha || '-',
+      fechaMesa: actaSel.fecha || '',
+      fechaCierre: actaSel.fechaCierre || '',
       docentes: Array.isArray(actaSel.docentes)
-        ? actaSel.docentes.map(d => d.nombre || d.nombreCompleto || d.apellidoNombre || '').filter(Boolean).join(', ')
+        ? actaSel.docentes
+            .map(d => {
+              const nombre = d.nombre || d.nombreCompleto || d.apellidoNombre || '';
+              const dni = d.dni ? ` (${d.dni})` : '';
+              return (nombre + dni).trim();
+            })
+            .filter(Boolean)
+            .join(', ')
         : (actaSel.docente || actaSel.docenteNombre || '')
     };
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Acta de Examen</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>Acta de Examen</h3>`);
     win.document.write(`<div class="sub">
-      Número: <strong>${encabezado.numero}</strong> · Curso: <strong>${encabezado.curso}</strong> · Materia: <strong>${encabezado.materia}</strong><br/>
-      Turno: <strong>${encabezado.turno}</strong> · Fecha: <strong>${encabezado.fecha}</strong><br/>
+      Número: <strong>${encabezado.numero}</strong> · Curso: <strong>${encabezado.curso}${encabezado.cursoNivel ? ' · ' + encabezado.cursoNivel : ''}</strong> · Materia: <strong>${encabezado.materia}</strong><br/>
+      Turno: <strong>${encabezado.turno}</strong> · Fecha mesa: <strong>${encabezado.fechaMesa || '-'}</strong> · Fecha cierre: <strong>${encabezado.fechaCierre || '-'}</strong><br/>
       Docente/s a cargo: <strong>${encabezado.docentes || '-'}</strong>
     </div>`);
     if (Array.isArray(alumnos) && alumnos.length) {
@@ -212,15 +266,24 @@ export default function Actas() {
         <Card.Body>
           <h3 className="mb-4">Actas de examen</h3>
 
+          <Alert variant="info" className="py-2 mb-3">
+            Podés combinar los filtros libremente. Para limitar rápidamente, empezá por Año. Dejá campos vacíos para no aplicarlos.
+          </Alert>
           {/* Filtros */}
           <Row className="g-3 align-items-end">
-            <Col md={3} sm={6} xs={12}>
+            <Col md={2} sm={6} xs={12}>
+              <Form.Group>
+                <Form.Label>Año</Form.Label>
+                <Form.Control type="number" min={2000} max={2100} value={filtros.anio} onChange={(e)=>setFiltros(v=>({...v, anio: e.target.value }))} />
+              </Form.Group>
+            </Col>
+            <Col md={2} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Número</Form.Label>
                 <Form.Control value={filtros.numero} onChange={(e)=>setFiltros(v=>({...v, numero: e.target.value}))} placeholder="Ej: ACTA-2025-001" />
               </Form.Group>
             </Col>
-            <Col md={3} sm={6} xs={12}>
+            <Col md={2} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Turno</Form.Label>
                 <Form.Select value={filtros.turnoId} onChange={(e)=>setFiltros(v=>({...v, turnoId: e.target.value}))}>
@@ -229,7 +292,7 @@ export default function Actas() {
                 </Form.Select>
               </Form.Group>
             </Col>
-            <Col md={3} sm={6} xs={12}>
+            <Col md={2} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Curso</Form.Label>
                 <Form.Select value={filtros.cursoId} onChange={(e)=>setFiltros(v=>({...v, cursoId: e.target.value}))}>
@@ -238,13 +301,13 @@ export default function Actas() {
                 </Form.Select>
               </Form.Group>
             </Col>
-            <Col md={3} sm={6} xs={12}>
+            <Col md={2} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Desde</Form.Label>
                 <Form.Control type="date" value={filtros.desde} onChange={(e)=>setFiltros(v=>({...v, desde: e.target.value}))} />
               </Form.Group>
             </Col>
-            <Col md={3} sm={6} xs={12}>
+            <Col md={2} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Hasta</Form.Label>
                 <Form.Control type="date" value={filtros.hasta} onChange={(e)=>setFiltros(v=>({...v, hasta: e.target.value}))} />
@@ -288,7 +351,7 @@ export default function Actas() {
                     <td>{a.fechaCierre || '-'}</td>
                     <td>{a.cerrada ? <Badge bg="secondary">Cerrada</Badge> : <Badge bg="success">Abierta</Badge>}</td>
                     <td className="text-end">
-                      <Button size="sm" variant="outline-primary" className="me-2" onClick={()=>abrirActa(a.id)}>Ver/Editar</Button>
+                      <Button size="sm" variant="outline-primary" className="me-2" onClick={()=>abrirActa(a)}>Ver/Editar</Button>
                       <Button size="sm" variant="outline-danger" onClick={async ()=>{ setActaSel(a); setFormActa({ id: a.id, numeroActa: a.numeroActa || '', observaciones: a.observaciones || '' }); if (window.confirm('¿Eliminar acta?')) { try { await eliminarActa(token, a.id); toast.success('Acta eliminada'); await buscar(); } catch (e) { toast.error(e?.message || 'No se pudo eliminar'); } } }}>Eliminar</Button>
                     </td>
                   </tr>
@@ -324,7 +387,16 @@ export default function Actas() {
                 </Col>
               </Row>
               <div className="mt-3 text-muted" style={{fontSize:'.9rem'}}>
-                Turno: {actaSel?.turnoNombre || actaSel?.turnoId || '-'} — Curso: {actaSel?.cursoAnio ? `${actaSel.cursoAnio}°${actaSel.cursoDivision || ''}` : (actaSel?.cursoId || '-')}
+                Número: <strong>{actaSel?.numeroActa || '-'}</strong><br/>
+                Curso: <strong>{actaSel?.cursoAnio ? `${actaSel.cursoAnio}°${actaSel.cursoDivision || ''}` : (actaSel?.cursoId || '-')}</strong>{actaSel?.cursoNivel ? ` · ${actaSel.cursoNivel}` : ''}<br/>
+                Materia: <strong>{actaSel?.materiaNombre || '-'}</strong><br/>
+                Turno: <strong>{actaSel?.turnoNombre || actaSel?.turnoId || '-'}</strong><br/>
+                Fecha mesa: <strong>{actaSel?.fecha || '-'}</strong> · Fecha cierre: <strong>{actaSel?.fechaCierre || '-'}</strong><br/>
+                Docentes: <strong>{Array.isArray(actaSel?.docentes) ? actaSel.docentes.map(d => {
+                  const nombre = d.nombre || d.nombreCompleto || d.apellidoNombre || '';
+                  const dni = d.dni ? ` (${d.dni})` : '';
+                  return (nombre + dni).trim();
+                }).filter(Boolean).join(', ') : (actaSel?.docenteNombre || '-')}</strong>
               </div>
               {/* Si el backend trae detalle de alumnos, lo mostramos también aquí */}
               {Array.isArray((actaSel?.alumnos || actaSel?.items || actaSel?.detalle)) && (actaSel?.alumnos || actaSel?.items || actaSel?.detalle)?.length > 0 && (
@@ -365,6 +437,9 @@ export default function Actas() {
               <Button variant="primary" onClick={guardarActa} disabled={saving}>{saving ? <Spinner size="sm"/> : 'Guardar'}</Button>
               <Button variant="outline-danger" onClick={borrarActa} disabled={saving}>Eliminar</Button>
               <Button variant="outline-secondary" onClick={imprimirActa} disabled={saving}>Imprimir / PDF</Button>
+              {(!actaSel?.id || !actaSel?.numeroActa) && (
+                <Button variant="outline-warning" disabled className="ms-2">Acta parcial (datos incompletos)</Button>
+              )}
             </>
           )}
         </Modal.Footer>

@@ -17,6 +17,8 @@ import AulaDetalle from '../Pages/AulaDetalle.jsx';
 import Tutores from '../Pages/Tutores.jsx';
 import TutorDetalle from '../Pages/TutorDetalle.jsx';
 import Mesas from '../Pages/Mesas.jsx';
+import MesasHistorial from '../Pages/MesasHistorial.jsx';
+import MesaGestion from '../Pages/MesaGestion.jsx';
 import Turnos from '../Pages/Turnos.jsx';
 import Reportes from '../Pages/Reportes.jsx';
 import ReservarEspacio from '../Pages/Reservar.jsx';
@@ -125,9 +127,13 @@ function AppRoutes() {
           <Route path="preceptores/:id" element={<PreceptorDetalle />} />
         </Route>
 
-        {/* Mesas de examen -> SOLO ADMIN */}
+        {/* Mesas de examen -> SOLO ADMIN y DIRECTOR (historial también PRECEPTOR para consulta) */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="mesa-de-examen" element={<Mesas />} />
+          <Route path="mesa-de-examen/:mesaId/gestionar" element={<MesaGestion />} />
+        </Route>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
+          <Route path="mesa-de-examen/historial" element={<MesasHistorial />} />
         </Route>
 
         {/* Reportes -> ADMIN, DOCENTE, PRECEPTOR, DIRECTOR */}

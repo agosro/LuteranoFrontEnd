@@ -8,9 +8,7 @@ import ConfirmarEliminar from "../Components/Modals/ConfirmarEliminar";
 import { toast } from "react-toastify";
 
 // 🆕 imports para asignar tutor
-import ModalSeleccionSimple from "../Components/Modals/ModalSeleccionSimple";
-import { listarTutores } from "../Services/TutorService";
-import { asignarTutorAAlumno, desasignarTutorDeAlumno } from "../Services/TutorAlumnoService";
+import ModalAsignarTutores from "../Components/Modals/ModalAsignarTutores";
 import { FaUserFriends } from "react-icons/fa";
 
 export default function ListaAlumnos() {
@@ -106,9 +104,9 @@ export default function ListaAlumnos() {
     { name: 'email', label: 'Email', type: 'email' },
     { name: 'telefono', label: 'Teléfono', type: 'text' },
     {
-      name: 'tutor',
-      label: 'Tutor',
-      render: (t) => t ? `${t.nombre} ${t.apellido}` : '-',
+      name: 'tutores',
+      label: 'Tutores',
+      render: (lista) => Array.isArray(lista) && lista.length ? lista.map(t => `${t.apellido} ${t.nombre}`).join(', ') : '-',
     },
     {
       name: 'cursoActual',
@@ -182,25 +180,13 @@ export default function ListaAlumnos() {
         tipo="alumno"
       />
 
-      {/* 🆕 Modal Asignar Tutor */}
-      <ModalSeleccionSimple
+      {/* Modal para gestionar múltiples tutores */}
+      <ModalAsignarTutores
         show={modalAsignarTutorShow}
         onClose={cerrarModalAsignarTutor}
-        titulo={`Asignar tutor a ${alumnoParaAsignar?.nombre} ${alumnoParaAsignar?.apellido}`}
-        entidad={alumnoParaAsignar}
-        campoAsignado="tutor"
-        obtenerOpciones={async (token) => {
-          const lista = await listarTutores(token);
-          return lista.map(t => ({ value: t.id, label: `${t.nombre} ${t.apellido}` }));
-        }}
-        onAsignar={(token, tutorId, alumnoId) =>
-          asignarTutorAAlumno(token, tutorId, alumnoId)
-        }
-        onDesasignar={(token, alumnoId) =>
-          desasignarTutorDeAlumno(token, alumnoParaAsignar?.tutor?.id, alumnoId)
-        }
-        token={user.token}
-        onActualizar={cargarAlumnos}
+        alumno={alumnoParaAsignar}
+        token={user?.token}
+        onAlumnoActualizado={() => cargarAlumnos()}
       />
     </>
   );

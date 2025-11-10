@@ -36,9 +36,15 @@ export const listarMesasPorMateriaCurso = async (token, materiaCursoId) => {
   return Array.isArray(data.mesas) ? data.mesas : []
 };
 
-export const listarMesasPorCurso = async (token, cursoId) => {
+export const listarMesasPorCurso = async (token, cursoId, opts = {}) => {
   void token
-  const data = await httpClient.get(`/api/mesas/curso/${cursoId}`)
+  const params = new URLSearchParams();
+  if (opts.anio) params.set('anio', String(opts.anio));
+  if (opts.estado) params.set('estado', String(opts.estado));
+  if (opts.materiaCursoId) params.set('materiaCursoId', String(opts.materiaCursoId));
+  const qs = params.toString();
+  const url = qs ? `/api/mesas/curso/${cursoId}?${qs}` : `/api/mesas/curso/${cursoId}`;
+  const data = await httpClient.get(url)
   if (data.code < 0) throw new Error(data.mensaje || 'Error al listar mesas')
   return Array.isArray(data.mesas) ? data.mesas : []
 };

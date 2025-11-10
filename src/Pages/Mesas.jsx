@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../Context/AuthContext.jsx';
 import { listarCursos } from '../Services/CursoService.js';
 import { listarMateriasDeCurso } from '../Services/MateriaCursoService.js';
@@ -7,33 +7,59 @@ import { listarTurnos } from '../Services/TurnoExamenService.js';
 import { crearMesa, listarMesasPorCurso, eliminarMesa, finalizarMesa, actualizarMesa, obtenerMesa, agregarConvocados, quitarConvocado, cargarNotasFinales } from '../Services/MesaExamenService.js';
 import { obtenerActaPorMesa, generarActa, actualizarActa, eliminarActa } from '../Services/ActaExamenService.js';
 import { Container, Row, Col, Card, Form, Button, Table, Spinner, Alert, Badge, Modal } from 'react-bootstrap';
+import Paginacion from '../Components/Botones/Paginacion.jsx';
+import { useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs.jsx';
 import BackButton from '../Components/Botones/BackButton.jsx';
 import { toast } from 'react-toastify';
-import { listarRindenPorCurso } from '../Services/ReporteRindeService.js';
 import { listarDocentesDisponibles, listarDocentesAsignados, asignarDocentes } from '../Services/MesaExamenDocenteService.js';
+import { useCicloIdOrWarn } from '../Context/useCicloIdOrWarn.js';
 
 export default function Mesas() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const token = user?.token;
-  const thisYear = new Date().getFullYear();
+  const { cicloNombre } = useCicloIdOrWarn();
+  const cicloYear = useMemo(() => {
+    const n = parseInt(String(cicloNombre), 10);
+    return Number.isFinite(n) ? n : new Date().getFullYear();
+  }, [cicloNombre]);
   const [cursos, setCursos] = useState([]);
-  const [cursoId, setCursoId] = useState(null);
-  const [materias, setMaterias] = useState([]); // de un curso
+  // Materias dinámicas según el curso en contexto (creación / edición / convocados)
+  const [materias, setMaterias] = useState([]);
   const [aulas, setAulas] = useState([]);
   const [turnos, setTurnos] = useState([]);
 
   const [mesas, setMesas] = useState([]);
+  // Nuevo flujo de búsqueda
+  const [alcance, setAlcance] = useState('ALL'); // 'ALL' | 'CURSO'
+  const [cursoBusquedaId, setCursoBusquedaId] = useState(''); // usado cuando alcance==='CURSO'
+  const [tablaFiltroEstado, setTablaFiltroEstado] = useState('');
+  const [tablaFiltroMateriaSel, setTablaFiltroMateriaSel] = useState(''); // nombre exacto
+  const [tablaMateriaOpciones, setTablaMateriaOpciones] = useState([]); // array de nombres
+  const [tablaFiltroTurno, setTablaFiltroTurno] = useState(''); // nombre exacto de turno
+  const [filtrosVisibles, setFiltrosVisibles] = useState(false);
+  const buscarBtnRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: null, text: '' });
+  const [hasSearched, setHasSearched] = useState(false);
+  // Paginación
+  const [pagina, setPagina] = useState(1);
+  const pageSize = 10;
 
-  const [form, setForm] = useState({ materiaCursoId: '', turnoId: '', fecha: '', aulaId: '' });
+  // Estado antiguo de creación inline eliminado; nuevo modal de creación:
+  const [showCrearMesa, setShowCrearMesa] = useState(false);
+  const [crearMesaForm, setCrearMesaForm] = useState({ anio: '', cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '' });
+  const [turnosPorAnio, setTurnosPorAnio] = useState(new Map()); // anio -> turnos
+  const [crearMesaLoading, setCrearMesaLoading] = useState(false);
+  const [crearMesaError, setCrearMesaError] = useState('');
 
   // Estado para modales
   const [showConv, setShowConv] = useState(false);
   const [showNotas, setShowNotas] = useState(false);
   const [mesaSel, setMesaSel] = useState(null);
-  const [alumnosCurso, setAlumnosCurso] = useState([]);
+  // Eliminado flujo de convocatoria en esta vista (se gestiona en página dedicada)
+  const [alumnosCurso] = useState([]);
   const [seleccionConvocados, setSeleccionConvocados] = useState(new Set());
   const [notasEdit, setNotasEdit] = useState({});
   const [showEditMesa, setShowEditMesa] = useState(false);
@@ -52,12 +78,8 @@ export default function Mesas() {
   const [docentesSeleccionados, setDocentesSeleccionados] = useState(new Set());
 
   // Helpers de rol (tolera prefijo ROLE_)
-  const hasRole = (role) => {
-    const r = String(role || '').toUpperCase();
-    const ur = String(user?.rol || '').toUpperCase();
-    return ur === r || ur === `ROLE_${r}`;
-  };
-  const hasAnyRole = (roles) => roles?.some(r => hasRole(r));
+  // hasRole ya no requerido en esta vista (permisos manejados vía rutas y página de gestión)
+  // hasAnyRole ya no usado en acciones directas aquí
 
   useEffect(() => {
     (async () => {
@@ -65,57 +87,103 @@ export default function Mesas() {
         const [c, a, t] = await Promise.all([
           listarCursos(token),
           listarAulas(token),
-          listarTurnos(token, thisYear),
+          listarTurnos(token, cicloYear),
         ]);
         setCursos(c);
         setAulas(a);
         setTurnos(t);
+        setTurnosPorAnio(prev => new Map(prev).set(String(cicloYear), t));
       } catch (e) {
         setMsg({ type: 'danger', text: e.message });
         toast.error(e.message);
       }
     })();
-  }, [token, thisYear]);
+  }, [token, cicloYear]);
 
-  useEffect(() => {
-    (async () => {
-      if (!cursoId) return;
-      setLoading(true);
-      try {
-        const m = await listarMateriasDeCurso(token, cursoId);
-        setMaterias(m);
-        const resp = await listarMesasPorCurso(token, cursoId);
-        setMesas(resp);
-      } catch (e) {
-        setMsg({ type: 'danger', text: e.message });
-        toast.error(e.message);
-      }
-      finally { setLoading(false); }
-    })();
-  }, [cursoId, token]);
+  // Ya no existe cursoId global; materias se cargan on-demand según el curso seleccionado en el modal o el curso de la mesa editada.
 
-  const onCrearMesa = async (e) => {
-    e.preventDefault();
-    if (!form.materiaCursoId || !form.turnoId || !form.fecha) {
-      alert('Completá Materia, Turno y Fecha'); return;
-    }
+  const buscarMesas = async () => {
+    setLoading(true);
+    setMsg({ type: null, text: '' });
     try {
-      const payload = {
-        materiaCursoId: Number(form.materiaCursoId),
-        turnoId: Number(form.turnoId),
-        fecha: form.fecha,
-      };
-      if (form.aulaId) payload.aulaId = Number(form.aulaId);
-      await crearMesa(token, payload);
-      // reload mesas
-      const resp = await listarMesasPorCurso(token, cursoId);
-      setMesas(resp);
-      setForm({ materiaCursoId: '', turnoId: '', fecha: '', aulaId: '' });
-      toast.success('Mesa creada');
+      if (alcance === 'ALL') {
+        const all = [];
+        for (const c of cursos) {
+          try {
+            const resp = await listarMesasPorCurso(token, c.id, { anio: cicloYear });
+            resp.forEach(r => all.push({ ...r, curso: c }));
+          } catch { /* ignorar error curso */ }
+        }
+        setMesas(all);
+        // Opciones de materia: todas las presentes en el resultado
+        const nombres = Array.from(new Set(all.map(m => String(m.materiaNombre || '').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'es'));
+        setTablaMateriaOpciones(nombres);
+  setFiltrosVisibles(true);
+  setHasSearched(true);
+        setPagina(1);
+      } else if (alcance === 'CURSO') {
+        if (!cursoBusquedaId) {
+          toast.warn('Seleccioná un curso para buscar');
+          setMesas([]);
+          setTablaMateriaOpciones([]);
+          setFiltrosVisibles(false);
+          setHasSearched(false);
+          setPagina(1);
+        } else {
+          const c = cursos.find(x => Number(x.id) === Number(cursoBusquedaId));
+          const resp = await listarMesasPorCurso(token, cursoBusquedaId, { anio: cicloYear });
+            const enr = c ? resp.map(r => ({ ...r, curso: c })) : resp;
+            setMesas(enr);
+            try {
+              // Cargar materias del curso para el combo de filtro
+              const mats = await listarMateriasDeCurso(token, cursoBusquedaId);
+              const nombres = Array.from(new Set(mats.map(mt => String(mt.nombreMateria || '').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'es'));
+              setTablaMateriaOpciones(nombres);
+            } catch { setTablaMateriaOpciones([]); }
+            setFiltrosVisibles(true);
+            setHasSearched(true);
+            setPagina(1);
+        }
+      }
+      setTablaFiltroEstado('');
+      setTablaFiltroMateriaSel('');
+      if (buscarBtnRef.current) buscarBtnRef.current.blur();
     } catch (e) {
       setMsg({ type: 'danger', text: e.message });
       toast.error(e.message);
+    } finally { setLoading(false); }
+  };
+
+  const refreshMesas = async () => {
+    if (alcance === 'ALL') return buscarMesas();
+    if (alcance === 'CURSO' && cursoBusquedaId) return buscarMesas();
+    // Si no hay búsqueda activa, no hace nada.
+  };
+
+  const submitCrearMesa = async () => {
+    setCrearMesaError('');
+    if (!crearMesaForm.cursoId || !crearMesaForm.materiaCursoId || !crearMesaForm.turnoId || !crearMesaForm.fecha) {
+      setCrearMesaError('Completá Curso, Materia, Turno y Fecha');
+      toast.error('Completá Curso, Materia, Turno y Fecha');
+      return;
     }
+    try {
+      setCrearMesaLoading(true);
+      const payload = {
+        materiaCursoId: Number(crearMesaForm.materiaCursoId),
+        turnoId: Number(crearMesaForm.turnoId),
+        fecha: crearMesaForm.fecha,
+      };
+      if (crearMesaForm.aulaId) payload.aulaId = Number(crearMesaForm.aulaId);
+      await crearMesa(token, payload);
+      await refreshMesas();
+      toast.success('Mesa creada');
+      setShowCrearMesa(false);
+      setCrearMesaForm({ cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '' });
+    } catch (e) {
+      setCrearMesaError(e.message || 'No se pudo crear la mesa');
+      toast.error(e.message);
+    } finally { setCrearMesaLoading(false); }
   };
 
   // Eliminación ahora se realiza mediante modal de confirmación
@@ -124,7 +192,7 @@ export default function Mesas() {
     if (!window.confirm('¿Finalizar mesa? Esto impedirá futuras ediciones.')) return;
   try {
     await finalizarMesa(token, m.id);
-    setMesas(await listarMesasPorCurso(token, cursoId));
+    await refreshMesas();
     toast.success('Mesa finalizada');
   } catch (e) { setMsg({ type: 'danger', text: e.message }); toast.error(e.message); }
   };
@@ -155,7 +223,7 @@ export default function Mesas() {
     return new Date(y, m - 1, d);
   };
 
-  const turnoPorFecha = (isoFecha) => {
+  const turnoPorFecha = useCallback((isoFecha) => {
     if (!isoFecha || !Array.isArray(turnos) || !turnos.length) return '-';
     const f = parseLocalDate(isoFecha);
     if (!f) return '-';
@@ -165,7 +233,18 @@ export default function Mesas() {
       return d1 && d2 && f >= d1 && f <= d2;
     });
     return hit ? hit.nombre : '-';
-  };
+  }, [turnos]);
+
+  const mesasFiltradas = useMemo(() => {
+    return mesas
+      .filter(m => !tablaFiltroEstado || m.estado === tablaFiltroEstado)
+      .filter(m => !tablaFiltroMateriaSel || String(m.materiaNombre || materiaNombrePorId.get(m.materiaCursoId) || '').trim() === tablaFiltroMateriaSel)
+      .filter(m => !tablaFiltroTurno || (m.turnoNombre || turnoPorFecha(m.fecha) || '').trim() === tablaFiltroTurno);
+  }, [mesas, tablaFiltroEstado, tablaFiltroMateriaSel, tablaFiltroTurno, materiaNombrePorId, turnoPorFecha]);
+  const totalPaginas = Math.max(1, Math.ceil(mesasFiltradas.length / pageSize));
+  const items = mesasFiltradas.slice((pagina - 1) * pageSize, pagina * pageSize);
+  const onPaginaChange = (p) => setPagina(Math.max(1, Math.min(totalPaginas, p)));
+
   return (
     <Container className="py-4">
       <div className="mb-3">
@@ -187,234 +266,170 @@ export default function Mesas() {
             </Row>
           )}
 
-          {/* Selector de curso */}
-          <Row className="mb-3">
-            <Col md={6} lg={4}>
-              <Form.Group>
-                <Form.Label>Curso</Form.Label>
-                <Form.Select value={cursoId || ''} onChange={(e)=>setCursoId(e.target.value? Number(e.target.value): null)}>
-                  <option value="">-- Seleccionar --</option>
-                  {cursos.map(c => <option key={c.id} value={c.id}>{`${c.anio ?? ''}°${c.division ?? ''}`}</option>)}
-                </Form.Select>
-              </Form.Group>
+          {/* Aviso arriba del selector (solo ALL) */}
+          {alcance === 'ALL' && (
+            <div className="mb-2">
+              <Alert variant="info" className="py-2 mb-0">
+                Mostrando solo mesas del año {cicloYear}. Para ver años anteriores, usá el botón "Historial".
+              </Alert>
+            </div>
+          )}
+
+          {/* Fila de alcance y acciones */}
+          <Row className="mb-3 g-2 align-items-end">
+            <Col md={8}>
+              <Row className="g-2">
+                <Col sm={6} md={4}>
+                  <Form.Group>
+                    <Form.Label>Alcance</Form.Label>
+                    <Form.Select value={alcance} onChange={(e)=> setAlcance(e.target.value)}>
+                      <option value="ALL">Todas</option>
+                      <option value="CURSO">Por curso</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                {alcance === 'CURSO' && (
+                  <Col sm={6} md={4}>
+                    <Form.Group>
+                      <Form.Label>Curso</Form.Label>
+                      <Form.Select value={cursoBusquedaId} onChange={(e)=> setCursoBusquedaId(e.target.value)}>
+                        <option value="">-- Seleccionar --</option>
+                        {cursos.map(c => <option key={c.id} value={c.id}>{`${c.anio ?? ''}°${c.division ?? ''}`}</option>)}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                )}
+                <Col sm="auto" className="d-flex align-items-end">
+                  <Button ref={buscarBtnRef} onClick={buscarMesas} variant="primary">Buscar</Button>
+                </Col>
+              </Row>
+            </Col>
+            <Col className="text-md-end">
+              <Button variant="outline-dark" className="me-2" onClick={()=> navigate('/mesa-de-examen/historial')}>Ver historial</Button>
+              <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
             </Col>
           </Row>
 
-          {cursoId && (
-            <>
-              {/* Crear mesa */}
-              <h5 className="mb-3">Crear mesa</h5>
-              <Form onSubmit={onCrearMesa} className="mb-4">
-                <Row className="g-3">
-                  <Col md={3} sm={6} xs={12}>
-                    <Form.Group>
-                      <Form.Label>Materia</Form.Label>
-                      <Form.Select value={form.materiaCursoId} onChange={(e)=>setForm(v=>({...v, materiaCursoId: e.target.value}))}>
-                        <option value="">-- Seleccionar --</option>
-                        {materias.map(m => (
-                          <option key={m.materiaCursoId} value={m.materiaCursoId}>{m.nombreMateria}</option>
-                        ))}
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                  <Col md={3} sm={6} xs={12}>
-                    <Form.Group>
-                      <Form.Label>Turno</Form.Label>
-                      <Form.Select value={form.turnoId} onChange={(e)=>setForm(v=>({...v, turnoId: e.target.value}))}>
-                        <option value="">-- Seleccionar --</option>
-                        {turnos.map(t => (
-                          <option key={t.id} value={t.id}>{t.nombre}</option>
-                        ))}
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                  <Col md={3} sm={6} xs={12}>
-                    <Form.Group>
-                      <Form.Label>Fecha</Form.Label>
-                      <Form.Control type="date" value={form.fecha} onChange={(e)=>setForm(v=>({...v, fecha: e.target.value}))} />
-                    </Form.Group>
-                  </Col>
-                  <Col md={3} sm={6} xs={12}>
-                    <Form.Group>
-                      <Form.Label>Aula (opcional)</Form.Label>
-                      <Form.Select value={form.aulaId} onChange={(e)=>setForm(v=>({...v, aulaId: e.target.value}))}>
-                        <option value="">-- Sin aula --</option>
-                        {aulas.map(a => (
-                          <option key={a.id} value={a.id}>{a.nombre || a.id}</option>
-                        ))}
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                  <Col md="auto" className="d-flex align-items-end">
-                    <Button type="submit">Crear mesa</Button>
-                  </Col>
-                </Row>
-              </Form>
+          {/* Formulario de creación removido: ahora se usa modal */}
 
-              {/* Listado */}
-              {loading ? (
-                <div className="p-3"><Spinner animation="border" /></div>
-              ) : (
-                <Table striped hover responsive>
-                  <thead>
-                    <tr>
-                      <th>Fecha</th>
-                      <th>Materia</th>
-                      <th>Turno</th>
-                      <th>Aula</th>
-                      <th>Estado</th>
-                      <th>Convocados</th>
-                      <th className="text-end">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mesas.map(m => {
-                      const tieneAlumnos = Array.isArray(m.alumnos) && m.alumnos.length > 0;
-                      const notasCompletas = tieneAlumnos && (m.alumnos.every(a => a.notaFinal !== null && a.notaFinal !== undefined));
-                      const puedeActa = m.estado === 'FINALIZADA' && tieneAlumnos && notasCompletas;
-                      const hint = m.estado !== 'FINALIZADA'
-                        ? 'La mesa debe estar FINALIZADA'
-                        : !tieneAlumnos
-                          ? 'La mesa no tiene convocados'
-                          : !notasCompletas
-                            ? 'Faltan notas finales en algunos alumnos'
-                            : '';
-                      return (
-                        <tr key={m.id}>
-                          <td>{fmtDate(m.fecha)}</td>
-                          <td>{m.materiaNombre || materiaNombrePorId.get(m.materiaCursoId) || '-'}</td>
-                          <td>{m.turnoNombre || turnoPorFecha(m.fecha) || '-'}</td>
-                          <td>{aulaNombrePorId.get(m.aulaId) || '-'}</td>
-                          <td>
-                            {m.estado === 'FINALIZADA' ? <Badge bg="secondary">Finalizada</Badge> : <Badge bg="success">Creada</Badge>}
-                          </td>
-                          <td>{Array.isArray(m.alumnos) ? m.alumnos.length : 0}</td>
-                          <td className="text-end">
-                            <Button size="sm" variant="outline-primary" className="me-2" onClick={()=>{
-                              setMesaSel(m);
-                              setEditMesaForm({ id: m.id, materiaCursoId: m.materiaCursoId || '', fecha: m.fecha || '', aulaId: m.aulaId || '' });
-                              setShowEditMesa(true);
-                            }} disabled={m.estado==='FINALIZADA'}>Editar</Button>
-                            <Button size="sm" variant="outline-primary" className="me-2" onClick={async ()=>{
-                              // Abrir Convocados solo si hay docentes asignados
-                              setMesaSel(null);
-                              try {
-                                const asignados = await listarDocentesAsignados(token, m.id);
-                                if (!Array.isArray(asignados) || asignados.length === 0) {
-                                  toast.warn('Asigná al menos un docente a la mesa antes de convocar alumnos');
-                                  const mesaFreshDoc = await obtenerMesa(token, m.id);
-                                  setMesaSel(mesaFreshDoc);
-                                  const [asig, disp] = await Promise.all([
-                                    listarDocentesAsignados(token, m.id),
-                                    listarDocentesDisponibles(token, m.id),
-                                  ]);
-                                  setDocentesAsignados(asig);
-                                  setDocentesDisponibles(disp);
-                                  setDocentesSeleccionados(new Set());
-                                  setShowDocentes(true);
-                                  return;
-                                }
-                                // Abrimos modal con datos frescos y usando ReporteRinde para listar elegibles por materia
-                                setShowConv(true);
-                                const mesaFresh = await obtenerMesa(token, m.id);
-                                setMesaSel(mesaFresh);
-                                const yearStr = String(mesaFresh.fecha || '').split('-')[0];
-                                const anio = yearStr ? Number(yearStr) : new Date().getFullYear();
-                                const mat = materias.find(mt => Number(mt.materiaCursoId) === Number(mesaFresh.materiaCursoId));
-                                const materiaId = mat?.materiaId;
-                                const rep = await listarRindenPorCurso(token, { cursoId: mesaFresh.cursoId, anio });
-                                const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
-                                const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
-                                const lista = filtradas.map(r => ({ id: Number(r.alumnoId), alumnoId: Number(r.alumnoId), dni: r.dni, apellido: r.apellido, nombre: r.nombre, condicion: r.condicion }));
-                                setAlumnosCurso(lista);
-                                const current = new Set((mesaFresh.alumnos||[]).map(a=>Number(a.alumnoId)));
-                                setSeleccionConvocados(current);
-                              } catch (e) {
-                                toast.error(e.message || 'No se pudo cargar elegibles para esta mesa');
-                                setAlumnosCurso([]);
-                                setShowConv(false);
-                              }
-                            }} disabled={m.estado==='FINALIZADA'}>Convocados</Button>
-                            <Button size="sm" variant="outline-warning" className="me-2" onClick={async ()=>{
-                              try {
-                                // Validaciones previas: docentes asignados y permisos de docente
-                                const asignados = await listarDocentesAsignados(token, m.id);
-                                if (!Array.isArray(asignados) || asignados.length === 0) {
-                                  toast.warn('Asigná al menos un docente antes de cargar notas');
-                                  return;
-                                }
-                                if (hasRole('DOCENTE')) {
-                                  const ok = asignados.some(d => Number(d.id) === Number(user?.docenteId));
-                                  if (!ok) { toast.warn('No estás asignado a esta mesa'); return; }
-                                }
-                                const mesaFresh = await obtenerMesa(token, m.id);
-                                setMesaSel(mesaFresh);
-                                if (!mesaFresh?.alumnos || mesaFresh.alumnos.length === 0) {
-                                  toast.warn('Primero convocá al menos un alumno para habilitar notas');
-                                  return;
-                                }
-                                const initNotas = {};
-                                (mesaFresh.alumnos||[]).forEach(a=>{ initNotas[a.alumnoId] = a.notaFinal ?? ''});
-                                setNotasEdit(initNotas);
-                                setShowNotas(true);
-                              } catch (e) {
-                                toast.error(e.message || 'No se pudo abrir Notas');
-                              }
-                            }} disabled={false}>Notas</Button>
-                            {hasAnyRole(['ADMIN','DIRECTOR','PRECEPTOR']) && (
-                              <Button size="sm" variant="outline-info" className="me-2" onClick={async ()=>{
-                                try {
-                                  const mesaFresh = await obtenerMesa(token, m.id);
-                                  setMesaSel(mesaFresh);
-                                  const [asig, disp] = await Promise.all([
-                                    listarDocentesAsignados(token, m.id),
-                                    listarDocentesDisponibles(token, m.id),
-                                  ]);
-                                  setDocentesAsignados(asig);
-                                  setDocentesDisponibles(disp);
-                                  setDocentesSeleccionados(new Set());
-                                  setShowDocentes(true);
-                                } catch (e) {
-                                  toast.error(e.message || 'No se pudo cargar docentes');
-                                }
-                              }}>Docentes</Button>
-                            )}
-                            <Button size="sm" variant="outline-dark" className="me-2" title={hint} onClick={async ()=>{
-                              if (!puedeActa) {
-                                toast.warn(hint || 'No es posible generar/ver el acta aún');
-                                return;
-                              }
-                              setMesaSel(m);
-                              try {
-                                let a = null;
-                                try {
-                                  a = await obtenerActaPorMesa(token, m.id);
-                                } catch {
-                                  a = await generarActa(token, { mesaId: m.id });
-                                }
-                                setActa(a);
-                                setActaForm({ id: a.id, numeroActa: a.numeroActa || '', observaciones: a.observaciones || '' });
-                                setShowActa(true);
-                              } catch (e) {
-                                toast.error(e.message);
-                              }
-                            }} disabled={!puedeActa}>Acta</Button>
-                            <Button size="sm" variant="outline-success" className="me-2" onClick={()=>onFinalizar(m)} disabled={m.estado==='FINALIZADA'}>Finalizar</Button>
-                            <Button size="sm" variant="outline-danger" onClick={()=>{ setDelMesa(m); setDelMesaError(''); setShowDelMesa(true); }} disabled={m.estado==='FINALIZADA'}>Eliminar</Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {mesas.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="text-center py-4 text-muted">No hay mesas para este curso</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </Table>
-              )}
-            </>
+          {/* Filtros de tabla (aparecen luego de Buscar) */}
+          {filtrosVisibles && (
+            <Row className="g-3 mb-3">
+              <Col md={3} sm={6} xs={12}>
+                <Form.Group>
+                  <Form.Label>Estado</Form.Label>
+                  <Form.Select value={tablaFiltroEstado} onChange={(e)=> { setTablaFiltroEstado(e.target.value); setPagina(1); }}>
+                    <option value="">Todos</option>
+                    <option value="CREADA">Creada</option>
+                    <option value="FINALIZADA">Finalizada</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={3} sm={6} xs={12}>
+                <Form.Group>
+                  <Form.Label>Materia</Form.Label>
+                  <Form.Select value={tablaFiltroMateriaSel} onChange={(e)=> { setTablaFiltroMateriaSel(e.target.value); setPagina(1); }}>
+                    <option value="">Todas</option>
+                    {tablaMateriaOpciones.map(n => <option key={n} value={n}>{n}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={3} sm={6} xs={12}>
+                <Form.Group>
+                  <Form.Label>Turno</Form.Label>
+                  <Form.Select value={tablaFiltroTurno} onChange={(e)=> { setTablaFiltroTurno(e.target.value); setPagina(1); }}>
+                    <option value="">Todos</option>
+                    {turnos.map(t => <option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md="auto" className="d-flex align-items-end">
+                <Button variant="secondary" onClick={()=>{ setTablaFiltroEstado(''); setTablaFiltroMateriaSel(''); setTablaFiltroTurno(''); setPagina(1); }}>Limpiar filtros</Button>
+              </Col>
+            </Row>
           )}
+
+          {/* Listado (solo después de buscar) */}
+          {hasSearched && (loading ? (
+            <div className="p-3"><Spinner animation="border" /></div>
+          ) : (
+            <>
+            <Table striped hover responsive>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Materia</th>
+                  <th>Turno</th>
+                  <th>Aula</th>
+                  <th>Estado</th>
+                  <th>Convocados</th>
+                  <th className="text-end">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                  {items.map(m => {
+                  const tieneAlumnos = Array.isArray(m.alumnos) && m.alumnos.length > 0;
+                  const notasCompletas = tieneAlumnos && (m.alumnos.every(a => a.notaFinal !== null && a.notaFinal !== undefined));
+                  const puedeActa = m.estado === 'FINALIZADA' && tieneAlumnos && notasCompletas;
+                  const hint = m.estado !== 'FINALIZADA'
+                    ? 'La mesa debe estar FINALIZADA'
+                    : !tieneAlumnos
+                      ? 'La mesa no tiene convocados'
+                      : !notasCompletas
+                        ? 'Faltan notas finales en algunos alumnos'
+                        : '';
+                  return (
+                    <tr key={m.id}>
+                      <td>{fmtDate(m.fecha)}</td>
+                      <td>{m.materiaNombre || materiaNombrePorId.get(m.materiaCursoId) || '-'}</td>
+                      <td>{m.turnoNombre || turnoPorFecha(m.fecha) || '-'}</td>
+                      <td>{aulaNombrePorId.get(m.aulaId) || '-'}</td>
+                      <td>
+                        {m.estado === 'FINALIZADA' ? <Badge bg="secondary">Finalizada</Badge> : <Badge bg="success">Creada</Badge>}
+                      </td>
+                      <td>{Array.isArray(m.alumnos) ? m.alumnos.length : 0}</td>
+                      <td className="text-end">
+                        <Button size="sm" variant="outline-primary" className="me-2" onClick={()=> navigate(`/mesa-de-examen/${m.id}/gestionar`)}>Gestionar</Button>
+                        <Button size="sm" variant="outline-dark" className="me-2" title={hint} onClick={async ()=>{
+                          if (!puedeActa) {
+                            toast.warn(hint || 'No es posible generar/ver el acta aún');
+                            return;
+                          }
+                          setMesaSel(m);
+                          try {
+                            let a = null;
+                            try {
+                              a = await obtenerActaPorMesa(token, m.id);
+                            } catch {
+                              a = await generarActa(token, { mesaId: m.id });
+                            }
+                            setActa(a);
+                            setActaForm({ id: a.id, numeroActa: a.numeroActa || '', observaciones: a.observaciones || '' });
+                            setShowActa(true);
+                          } catch (e) {
+                            toast.error(e.message);
+                          }
+                        }} disabled={!puedeActa}>Acta</Button>
+                        <Button size="sm" variant="outline-success" className="me-2" onClick={()=>onFinalizar(m)} disabled={m.estado==='FINALIZADA'}>Finalizar</Button>
+                        <Button size="sm" variant="outline-danger" onClick={()=>{ setDelMesa(m); setDelMesaError(''); setShowDelMesa(true); }} disabled={m.estado==='FINALIZADA'}>Eliminar</Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {mesasFiltradas.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="text-center py-4 text-muted">No hay mesas para este curso</td>
+                  </tr>
+                )}
+              </tbody>
+            </Table>
+            {mesasFiltradas.length > 0 && (
+              <div className="mt-3">
+                <Paginacion paginaActual={pagina} totalPaginas={totalPaginas} onPaginaChange={onPaginaChange} />
+              </div>
+            )}
+            </>
+          ))}
         </Card.Body>
       </Card>
       {/* Modal Docentes */}
@@ -482,8 +497,8 @@ export default function Mesas() {
               setDocentesDisponibles(disp);
               setDocentesSeleccionados(new Set());
               toast.success('Docentes asignados');
-              // Refrescar mesas para que cualquier conteo dependiente quede actualizado
-              if (cursoId) setMesas(await listarMesasPorCurso(token, cursoId));
+              // Refrescar listado según búsqueda activa
+              await refreshMesas();
             } catch (e) { toast.error(e.message); }
           }}>Asignar</Button>
         </Modal.Footer>
@@ -554,12 +569,9 @@ export default function Mesas() {
                 }
               }
               // Refrescar mesa y listado para asegurar contador correcto
-              const [mesaRefrescada, resp] = await Promise.all([
-                obtenerMesa(token, mesaSel.id),
-                listarMesasPorCurso(token, cursoId)
-              ]);
+              const mesaRefrescada = await obtenerMesa(token, mesaSel.id);
               setMesaSel(mesaRefrescada);
-              setMesas(resp);
+              await refreshMesas();
               setShowConv(false);
               toast.success('Convocados actualizados');
             } catch (e) {
@@ -591,8 +603,7 @@ export default function Mesas() {
             try {
               setDelMesaLoading(true);
               await eliminarMesa(token, delMesa.id);
-              const resp = await listarMesasPorCurso(token, cursoId);
-              setMesas(resp);
+              await refreshMesas();
               toast.success('Mesa eliminada');
               setShowDelMesa(false);
               setDelMesa(null);
@@ -656,8 +667,7 @@ export default function Mesas() {
                 payload[a.alumnoId] = Number(v);
               });
               await cargarNotasFinales(token, mesaSel.id, payload);
-              const resp = await listarMesasPorCurso(token, cursoId);
-              setMesas(resp);
+              await refreshMesas();
               setShowNotas(false);
               toast.success('Notas guardadas');
             } catch (e) {
@@ -719,7 +729,7 @@ export default function Mesas() {
               if (editMesaForm.materiaCursoId) payload.materiaCursoId = Number(editMesaForm.materiaCursoId);
               if (editMesaForm.aulaId) payload.aulaId = Number(editMesaForm.aulaId);
               await actualizarMesa(token, payload);
-              setMesas(await listarMesasPorCurso(token, cursoId));
+              await refreshMesas();
               toast.success('Mesa actualizada');
               setShowEditMesa(false);
             } catch (e) {
@@ -787,6 +797,91 @@ export default function Mesas() {
               }}>Eliminar acta</Button>
             </>
           )}
+        </Modal.Footer>
+      </Modal>
+      {/* Modal Crear Mesa */}
+      <Modal show={showCrearMesa} onHide={()=> setShowCrearMesa(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Crear mesa</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {crearMesaError && (<Alert variant="danger" className="mb-3">{crearMesaError}</Alert>)}
+          <Form>
+            <Row className="g-3">
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Año</Form.Label>
+                  <Form.Control type="number" min={2000} max={2100} value={crearMesaForm.anio}
+                    onChange={async (e)=> {
+                      const anioNuevo = String(e.target.value);
+                      setCrearMesaForm(f=>({...f, anio: anioNuevo, turnoId: '' }));
+                      if (!anioNuevo) return;
+                      if (!turnosPorAnio.has(anioNuevo)) {
+                        try {
+                          const ts = await listarTurnos(token, Number(anioNuevo));
+                          setTurnosPorAnio(prev => new Map(prev).set(anioNuevo, ts));
+                        } catch { /* ignore */ }
+                      }
+                    }} />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Curso</Form.Label>
+                  <Form.Select value={crearMesaForm.cursoId} onChange={async (e)=>{
+                    const v = e.target.value;
+                    setCrearMesaForm(f=>({...f, cursoId: v, materiaCursoId: '' }));
+                    if (v) {
+                      try { const mats = await listarMateriasDeCurso(token, v); setMaterias(mats); } catch { setMaterias([]); }
+                    } else { setMaterias([]); }
+                  }}>
+                    <option value="">-- Seleccionar --</option>
+                    {cursos.map(c => <option key={c.id} value={c.id}>{`${c.anio ?? ''}°${c.division ?? ''}`}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Materia</Form.Label>
+                  <Form.Select value={crearMesaForm.materiaCursoId} onChange={(e)=> setCrearMesaForm(f=>({...f, materiaCursoId: e.target.value}))} disabled={!crearMesaForm.cursoId}>
+                    <option value="">-- Seleccionar --</option>
+                    {materias.map(m => <option key={m.materiaCursoId} value={m.materiaCursoId}>{m.nombreMateria}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Turno</Form.Label>
+                  <Form.Select value={crearMesaForm.turnoId} onChange={(e)=> setCrearMesaForm(f=>({...f, turnoId: e.target.value}))}>
+                    <option value="">-- Seleccionar --</option>
+                    {(turnosPorAnio.get(String(crearMesaForm.anio)) || turnos).map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Fecha</Form.Label>
+                  <Form.Control type="date" value={crearMesaForm.fecha} onChange={(e)=> setCrearMesaForm(f=>({...f, fecha: e.target.value}))} />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Aula (opcional)</Form.Label>
+                  <Form.Select value={crearMesaForm.aulaId} onChange={(e)=> setCrearMesaForm(f=>({...f, aulaId: e.target.value}))}>
+                    <option value="">-- Sin aula --</option>
+                    {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre || a.id}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+          </Form>
+          <div className="mt-2 text-muted" style={{fontSize: '.85rem'}}>
+            Debe seleccionar un Curso y su Materia asociada. La Fecha debe caer dentro del rango del Turno.
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={()=> setShowCrearMesa(false)} disabled={crearMesaLoading}>Cancelar</Button>
+          <Button variant="success" onClick={submitCrearMesa} disabled={crearMesaLoading}>Guardar</Button>
         </Modal.Footer>
       </Modal>
     </Container>
