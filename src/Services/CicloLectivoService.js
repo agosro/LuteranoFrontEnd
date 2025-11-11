@@ -4,7 +4,7 @@ import { httpClient } from './httpClient'
 export const listarCiclosLectivos = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/ciclos-lectivos/list')
+    const data = await httpClient.get('/ciclos-lectivos/list')
     const list = data.CicloLectivoDtos || data.cicloLectivoDtos || data.ciclos || []
     return Array.isArray(list) ? list : []
   } catch (err) {
@@ -17,7 +17,7 @@ export const listarCiclosLectivos = async (token) => {
 export const crearSiguienteCicloLectivo = async (token) => {
   try {
     void token
-    const data = await httpClient.post('/api/ciclos-lectivos/siguiente')
+    const data = await httpClient.post('/ciclos-lectivos/siguiente')
     return data
   } catch (err) {
     console.error('Error crear siguiente ciclo lectivo:', err);
@@ -29,7 +29,7 @@ export const crearSiguienteCicloLectivo = async (token) => {
 export const crearCicloLectivoManual = async (token, anio) => {
   try {
     void token
-    const data = await httpClient.post(`/api/ciclos-lectivos/manual/${anio}`)
+    const data = await httpClient.post(`/ciclos-lectivos/manual/${anio}`)
     return data
   } catch (err) {
     console.error('Error crear ciclo lectivo manual:', err);
@@ -41,7 +41,7 @@ export const crearCicloLectivoManual = async (token, anio) => {
 export const obtenerCicloLectivoPorId = async (token, id) => {
   try {
     void token
-    const data = await httpClient.get(`/api/ciclos-lectivos/${id}`)
+    const data = await httpClient.get(`/ciclos-lectivos/${id}`)
     return data
   } catch (err) {
     console.error('Error obtener ciclo lectivo por ID:', err);

@@ -6,7 +6,7 @@ export const upsertAsistenciaDocente = async (token, req) => {
   try {
     void token
     try {
-      const data = await httpClient.post('/api/asistencia-docente/upsert', req)
+      const data = await httpClient.post('/asistencia-docente/upsert', req)
       return data
     } catch (e) {
       if (e.status === 403) throw new Error('No autorizado (403)')
@@ -23,7 +23,7 @@ export const listarAsistenciasDocentesPorFecha = async (token, fechaISO) => {
   try {
     void token
     try {
-      const data = await httpClient.get(`/api/asistencia-docente/fecha?fecha=${encodeURIComponent(fechaISO)}`)
+      const data = await httpClient.get(`/asistencia-docente/fecha?fecha=${encodeURIComponent(fechaISO)}`)
       return Array.isArray(data?.items) ? data.items : []
     } catch (e) {
       if (e.status === 403) throw new Error('No autorizado (403)')
@@ -40,7 +40,7 @@ export const listarAsistenciasPorDocenteYFecha = async (token, docenteId, fechaI
   try {
     void token
     try {
-      const data = await httpClient.get(`/api/asistencia-docente/docente/${docenteId}?fecha=${encodeURIComponent(fechaISO)}`)
+      const data = await httpClient.get(`/asistencia-docente/docente/${docenteId}?fecha=${encodeURIComponent(fechaISO)}`)
       return Array.isArray(data?.items) ? data.items : []
     } catch (e) {
       if (e.status === 403) throw new Error('No autorizado (403)')

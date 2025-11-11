@@ -38,8 +38,13 @@ export default function Usuarios() {
     async function fetchUsuarios() {
       if (!token) return;
       try {
-        const data = await obtenerUsuarios(token);
-        setUsuarios(data);
+        const raw = await obtenerUsuarios(token);
+        // Adaptar distintos posibles formatos ya normalizados por el service (debería ser array)
+        const lista = Array.isArray(raw) ? raw : [];
+        if (!Array.isArray(raw)) {
+          console.warn('Respuesta /user no es array. Valor crudo:', raw);
+        }
+        setUsuarios(lista);
       } catch (error) {
         console.error('Error al obtener usuarios:', error);
       } finally {

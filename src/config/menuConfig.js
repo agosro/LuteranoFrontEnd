@@ -29,7 +29,7 @@ export const menuConfig = [
     roles: ["ROLE_ADMIN", "ROLE_DOCENTE"],
     subItems: [
       { label: "Materias", path: "/materias", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
-      { label: "Cursos", path: "/cursos", roles: ["ROLE_ADMIN", "ROLE_DOCENTE", "ROLE_DIRECTOR"] },
+      { label: "Cursos", path: "/cursos", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Calificaciones", path: "/calificaciones", roles: ["ROLE_DOCENTE","ROLE_ADMIN"] }, // 🆕
     ],
   },
@@ -61,7 +61,7 @@ export const menuConfig = [
   {
     label: "Asistencia",
     icon: FaCheckSquare, // 🆕
-    roles: ["ROLE_ADMIN", "ROLE_DOCENTE", "ROLE_PRECEPTOR", "ROLE_AUXILIAR"],
+    roles: ["ROLE_ADMIN", "ROLE_PRECEPTOR", "ROLE_AUXILIAR"],
     subItems: [
       { label: "Alumnos", path: "/asistencia/alumnos", roles: ["ROLE_PRECEPTOR","ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Docentes", path: "/asistencia/docentes", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_AUXILIAR"] },

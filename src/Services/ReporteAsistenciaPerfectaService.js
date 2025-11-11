@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient'
-const API_URL = '/api/reporteAsistenciaPerfecta'
+const API_URL = '/reporteAsistenciaPerfecta'
 
 export const obtenerAsistenciaPerfecta = async (token, anio) => {
   void token

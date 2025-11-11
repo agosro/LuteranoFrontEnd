@@ -4,7 +4,7 @@ import { httpClient } from './httpClient'
 export const listarCursos = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/curso/list')
+    const data = await httpClient.get('/curso/list')
     return Array.isArray(data.cursoDtos) ? data.cursoDtos : []
   } catch (error) {
     console.error('Error al listar cursos:', error);
@@ -16,7 +16,7 @@ export const listarCursos = async (token) => {
 export const crearCurso = async (token, curso) => {
   try {
     void token
-    const data = await httpClient.post('/api/curso/create', curso)
+    const data = await httpClient.post('/curso/create', curso)
     return data
   } catch (error) {
     console.error('Error al crear curso:', error);
@@ -28,7 +28,7 @@ export const crearCurso = async (token, curso) => {
 export const editarCurso = async (token, curso) => {
   try {
     void token
-    const data = await httpClient.put('/api/curso/update', curso)
+    const data = await httpClient.put('/curso/update', curso)
     return data
   } catch (error) {
     console.error('Error al editar curso:', error);
@@ -40,7 +40,7 @@ export const editarCurso = async (token, curso) => {
 export const eliminarCurso = async (token, id) => {
   try {
     void token
-    const data = await httpClient.delete(`/api/curso/delete/${id}`)
+    const data = await httpClient.delete(`/curso/delete/${id}`)
     return data
   } catch (error) {
     console.error('Error al eliminar curso:', error);
@@ -52,7 +52,7 @@ export const eliminarCurso = async (token, id) => {
 export const obtenerCursoPorId = async (token, id) => {
   try {
     void token
-    const data = await httpClient.get(`/api/curso/${id}`)
+    const data = await httpClient.get(`/curso/${id}`)
     return data
   } catch (error) {
     console.error('Error al obtener curso por ID:', error);
@@ -64,7 +64,7 @@ export const obtenerCursoPorId = async (token, id) => {
 export const listarCursosPorDocente = async (token, docenteId) => {
   try {
     void token
-    const data = await httpClient.get(`/api/curso/list/docente/${docenteId}`)
+    const data = await httpClient.get(`/curso/list/docente/${docenteId}`)
     return data.cursoDtos || []
   } catch (error) {
     console.error("Error al listar cursos por docente:", error);
@@ -76,7 +76,7 @@ export const listarCursosPorDocente = async (token, docenteId) => {
 export const listarCursosPorPreceptor = async (token, preceptorId) => {
   try {
     void token
-    const data = await httpClient.get(`/api/curso/list/preceptor/${preceptorId}`)
+    const data = await httpClient.get(`/curso/list/preceptor/${preceptorId}`)
     return data.cursoDtos || []
   } catch (error) {
     console.error("Error al listar cursos por preceptor:", error);

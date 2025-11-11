@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient'
-const BASE = '/api/calificaciones'
+const BASE = '/calificaciones'
 
 export async function crearCalificacion(token, payload) {
   void token

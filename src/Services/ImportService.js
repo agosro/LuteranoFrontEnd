@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient'
-const BASE = '/api/import'
+const BASE = '/import'
 /**
  * Importa alumnos vía CSV.
  * @param {File} file Archivo CSV

@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient'
-const BASE = `/api/notas-finales`;
+const BASE = `/notas-finales`;
 
 // GET /notas-finales/simple/alumno/{alumnoId}/materia/{materiaId}?anio=YYYY
 export async function obtenerNotaFinalSimple(token, alumnoId, materiaId, anio) {
