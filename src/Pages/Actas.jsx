@@ -431,7 +431,6 @@ export default function Actas() {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={()=>setShowModal(false)} disabled={saving}>Cerrar</Button>
           {actaSel && (
             <>
               <Button variant="primary" onClick={guardarActa} disabled={saving}>{saving ? <Spinner size="sm"/> : 'Guardar'}</Button>
