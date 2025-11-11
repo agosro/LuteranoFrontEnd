@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import TablaGenerica from '../Components/TablaLista';
 import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
 import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad';
@@ -37,6 +37,28 @@ export default function ListaMaterias() {
   const { user } = useAuth();
   const token = user?.token;
 
+  // Filtro por nivel
+  const [filtroNivel, setFiltroNivel] = useState('');
+  const opcionesNivel = [
+    { value: '', label: 'Todos los niveles' },
+    { value: 'BASICO', label: 'Básico' },
+    { value: 'ORIENTADO', label: 'Orientado' },
+  ];
+
+  // Filtro por curso (select)
+  const [filtroCurso, setFiltroCurso] = useState('');
+  const opcionesCurso = useMemo(() => {
+    const nombres = Array.from(new Set((materias || []).map(m => m.cursoNombre || 'Sin curso')));
+    const opts = nombres
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
+      .map(n => ({ value: n, label: n }));
+    return [{ value: '', label: 'Todos los cursos' }, ...opts];
+  }, [materias]);
+
+  // Orden
+  const [orden, setOrden] = useState('RECIENTES'); // RECIENTES | ANTIGUOS | AZ | ZA
+
   const [formDataCrear, setFormDataCrear] = useState({
     nombreMateria: "",
     descripcion: "",
@@ -69,9 +91,9 @@ export default function ListaMaterias() {
   };
 
   // 🆕 Cargar materias duplicadas por curso
-  const cargarMaterias = useCallback(async () => {
+  const cargarMaterias = useCallback(async (silent = false) => {
     if (!token) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [materiasData, cursosData] = await Promise.all([
         listarMaterias(token),
@@ -136,7 +158,7 @@ export default function ListaMaterias() {
     } catch (error) {
       toast.error("Error cargando materias: " + error.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [token]);
 
@@ -151,7 +173,8 @@ export default function ListaMaterias() {
       toast.success(creadoResponse.mensaje || 'Materia creada con éxito');
       setModalCrearShow(false);
       setFormDataCrear({ nombreMateria: "", descripcion: "", nivel: "" });
-      cargarMaterias();
+      // refresco silencioso para evitar que "se reinicie la página"
+      cargarMaterias(true);
     } catch (error) {
       toast.error(error.message || 'Error creando materia');
     }
@@ -163,7 +186,8 @@ export default function ListaMaterias() {
       toast.success(editResponse.mensaje || 'Materia actualizada con éxito');
       setModalEditarShow(false);
       setMateriaSeleccionada(null);
-      cargarMaterias();
+      // refresco silencioso
+      cargarMaterias(true);
     } catch (error) {
       toast.error(error.message || 'Error al actualizar materia');
     }
@@ -195,36 +219,150 @@ export default function ListaMaterias() {
   const handleEdit = (materia) => {
     setMateriaSeleccionada(materia);
     setFormDataEditar({
+      id: materia.id,
       nombreMateria: materia.nombreMateria || '',
       descripcion: materia.descripcion || '',
       nivel: materia.nivel || ''
     });
     setModalEditarShow(true);
   };
-
-  if (loading) return <p>Cargando materias...</p>;
+ 
 
   // columnas ahora simples
   const columnasMaterias = [
     { key: 'nombreMateria', label: 'Materia' },
     { key: 'descripcion', label: 'Descripción' },
     { key: 'nivel', label: 'Nivel', render: (m) => m.nivel ?? 'Sin nivel' },
-    { key: 'curso', label: 'Curso', render: (m) => m.cursoNombre },
+    { key: 'cursoNombre', label: 'Curso', render: (m) => m.cursoNombre },
     { key: 'docente', label: 'Docente(s)', render: (m) => m.docenteNombre }
   ];
+
+  const materiasFiltradas = useMemo(() => {
+    let base = Array.isArray(materias) ? materias : [];
+    if (filtroNivel) {
+      base = base.filter(m => (m.nivel || '').toUpperCase() === filtroNivel);
+    }
+    if (filtroCurso) {
+      base = base.filter(m => (m.cursoNombre || 'Sin curso') === filtroCurso);
+    }
+
+    // Ordenar
+    const getClaveFecha = (m) => m.createdAt || m.fechaCreacion || m.fecha || m.created_on || m.creationDate || null;
+    const getTime = (m) => {
+      const f = getClaveFecha(m);
+      if (f) {
+        const t = Date.parse(f);
+        if (!Number.isNaN(t)) return t;
+      }
+      // fallback: usa id numérico si existe
+      return typeof m.id === 'number' ? m.id : 0;
+    };
+
+    const byNombre = (a, b) => (a.nombreMateria || '').localeCompare(b.nombreMateria || '', 'es', { sensitivity: 'base' });
+    const byFechaAsc = (a, b) => getTime(a) - getTime(b);
+    const byFechaDesc = (a, b) => getTime(b) - getTime(a);
+
+    const ordenada = [...base];
+    switch (orden) {
+      case 'AZ':
+        ordenada.sort(byNombre);
+        break;
+      case 'ZA':
+        ordenada.sort((a, b) => -byNombre(a, b));
+        break;
+      case 'ANTIGUOS':
+        ordenada.sort(byFechaAsc);
+        break;
+      case 'RECIENTES':
+      default:
+        ordenada.sort(byFechaDesc);
+        break;
+    }
+    return ordenada;
+  }, [materias, filtroNivel, filtroCurso, orden]);
 
   return (
     <>
       <TablaGenerica
         titulo="Materias"
         columnas={columnasMaterias}
-        datos={materias}
+        datos={materiasFiltradas}
+        loading={loading}
         onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDeleteClick}
         camposFiltrado={['nombreMateria', 'descripcion', 'cursoNombre', 'docenteNombre']}
         botonCrear={<BotonCrear texto="Crear materia" onClick={() => setModalCrearShow(true)} />}
         placeholderBuscador="Buscar por nombre, descripción o curso"
+  hideIdFilter={true}
+  omitColumnFilters={['nombreMateria','descripcion','docente','nivel','cursoNombre']}
+  showColumnFiltersBar={false}
+        leftControls={() => (
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            {/* Nivel */}
+            <div className="d-flex align-items-center gap-2">
+              <select
+                className="form-select form-select-sm"
+                style={{ minWidth: 160 }}
+                value={filtroNivel}
+                onChange={(e) => setFiltroNivel(e.target.value)}
+              >
+                {opcionesNivel.map(op => (
+                  <option key={op.value || 'all'} value={op.value}>{op.label}</option>
+                ))}
+              </select>
+              {filtroNivel && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-decoration-none"
+                  style={{ padding: '0 4px' }}
+                  onClick={() => setFiltroNivel('')}
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+
+            {/* Curso */}
+            <div className="d-flex align-items-center gap-2">
+              <select
+                className="form-select form-select-sm"
+                style={{ minWidth: 180 }}
+                value={filtroCurso}
+                onChange={(e) => setFiltroCurso(e.target.value)}
+              >
+                {opcionesCurso.map(op => (
+                  <option key={op.value || 'all'} value={op.value}>{op.label}</option>
+                ))}
+              </select>
+              {filtroCurso && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-decoration-none"
+                  style={{ padding: '0 4px' }}
+                  onClick={() => setFiltroCurso('')}
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+
+            {/* Orden */}
+            <div className="d-flex align-items-center gap-2">
+              <select
+                className="form-select form-select-sm"
+                style={{ minWidth: 180 }}
+                value={orden}
+                onChange={(e) => setOrden(e.target.value)}
+              >
+                <option value="RECIENTES">Más recientes</option>
+                <option value="ANTIGUOS">Más antiguos</option>
+                <option value="AZ">Alfabético (A-Z)</option>
+                <option value="ZA">Alfabético (Z-A)</option>
+              </select>
+            </div>
+          </div>
+        )}
         extraButtons={(materia) => {
           const puedeAsignar = !!materia.cursoId;
           const btn = {

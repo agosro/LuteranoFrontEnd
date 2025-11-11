@@ -1,5 +1,5 @@
 import TablaGenerica from '../Components/TablaLista';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { obtenerUsuarios, eliminarUsuario, registrarUsuario, actualizarUsuario } from '../Services/UsuarioService';
 import ModalVerEntidad from '../Components/Modals/ModalVerEntidad';
 import ModalEditarEntidad from '../Components/Modals/ModalEditarEntidad';
@@ -19,6 +19,17 @@ export default function Usuarios() {
   const [modalEditarShow, setModalEditarShow] = useState(false);
   const [modalCrearShow, setModalCrearShow] = useState(false);
   const [mostrarModalEliminar, setMostrarModalEliminar] = useState(false);
+
+  // Filtro por rol (select)
+  const [filtroRol, setFiltroRol] = useState('');
+  const opcionesRol = [
+    { value: '', label: 'Todos los roles' },
+    { value: 'ROLE_ADMIN', label: 'Admin' },
+    { value: 'ROLE_DIRECTOR', label: 'Director' },
+    { value: 'ROLE_DOCENTE', label: 'Docente' },
+    { value: 'ROLE_PRECEPTOR', label: 'Preceptor' },
+    { value: 'ROLE_AUXILIAR', label: 'Auxiliar' },
+  ];
 
   // Estado para el formulario (crear y editar)
   const [formData, setFormData] = useState({
@@ -234,7 +245,7 @@ export default function Usuarios() {
 }
 };
 
-  if (loading) return <p>Cargando usuarios...</p>;
+  // Usamos loading dentro de la tabla para evitar romper el orden de hooks
 
   const columnasUsuarios = [
     {
@@ -260,18 +271,99 @@ export default function Usuarios() {
     },
   ];
 
+  // Ordenado de usuarios
+  const [orden, setOrden] = useState('RECIENTES'); // RECIENTES | ANTIGUOS | AZ | ZA
+
+  const usuariosFiltradosPorRol = useMemo(() => {
+    const base = filtroRol
+      ? usuarios.filter(u => {
+          const roleValue = typeof u.role === 'string' ? u.role : u.role?.name;
+          return roleValue === filtroRol;
+        })
+      : usuarios;
+
+    const nombreCompleto = (u) => `${u.name || ''} ${u.lastName || ''}`.trim();
+    const byNombre = (a, b) => nombreCompleto(a).localeCompare(nombreCompleto(b), 'es', { sensitivity: 'base' });
+    const getTime = (u) => {
+      const f = u.createdAt || u.fechaCreacion || u.created_on || null;
+      if (f) {
+        const t = Date.parse(f);
+        if (!Number.isNaN(t)) return t;
+      }
+      return typeof u.id === 'number' ? u.id : 0;
+    };
+    const byFechaAsc = (a, b) => getTime(a) - getTime(b);
+    const byFechaDesc = (a, b) => getTime(b) - getTime(a);
+
+    const ordenada = [...base];
+    switch (orden) {
+      case 'AZ':
+        ordenada.sort(byNombre);
+        break;
+      case 'ZA':
+        ordenada.sort((a, b) => -byNombre(a, b));
+        break;
+      case 'ANTIGUOS':
+        ordenada.sort(byFechaAsc);
+        break;
+      case 'RECIENTES':
+      default:
+        ordenada.sort(byFechaDesc);
+        break;
+    }
+    return ordenada;
+  }, [usuarios, filtroRol, orden]);
+
   return (
     <>
       <TablaGenerica
         titulo="Usuarios"
         columnas={columnasUsuarios}
-        datos={usuarios}
+        datos={usuariosFiltradosPorRol}
+        loading={loading}
         onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDeleteClick}
         camposFiltrado={['nombreApellido', 'email']}
         botonCrear={<BotonCrear texto="Crear usuario" onClick={abrirModalCrear} />}
         placeholderBuscador="Buscar por nombre o email"
+        hideIdFilter={true}
+        omitColumnFilters={['role']}
+        leftControls={() => (
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <select
+              className="form-select form-select-sm"
+              style={{ minWidth: 160 }}
+              value={filtroRol}
+              onChange={e => setFiltroRol(e.target.value)}
+            >
+              {opcionesRol.map(op => (
+                <option key={op.value || 'all'} value={op.value}>{op.label}</option>
+              ))}
+            </select>
+            {filtroRol && (
+              <button
+                type="button"
+                className="btn btn-sm btn-link text-decoration-none"
+                style={{ padding: '0 4px' }}
+                onClick={() => setFiltroRol('')}
+              >
+                Limpiar
+              </button>
+            )}
+            <select
+              className="form-select form-select-sm"
+              style={{ minWidth: 180 }}
+              value={orden}
+              onChange={(e) => setOrden(e.target.value)}
+            >
+              <option value="RECIENTES">Más recientes</option>
+              <option value="ANTIGUOS">Más antiguos</option>
+              <option value="AZ">Alfabético (A-Z)</option>
+              <option value="ZA">Alfabético (Z-A)</option>
+            </select>
+          </div>
+        )}
       />
 
       <ModalVerEntidad

@@ -18,12 +18,19 @@ export default function TablaGenerica({
   botonCrear,
   extraButtons,
   loading = false,
-  leftControls, // nuevo: render prop para insertar controles a la izquierda
+  leftControls, // render prop para insertar controles a la izquierda
+  hideIdFilter = false, // ocultar filtro por ID
+  omitColumnFilters = [], // array de keys de columnas a las que NO se les crea input de texto
+  camposFiltrado = [], // campos a considerar en el buscador global
+  placeholderBuscador = 'Buscar...',
+  showColumnFiltersBar = false, // default: oculto en todas las tablas; habilitar explícitamente donde se necesite
 }) {
   // filtros por columna
   const [filtrosColumnas, setFiltrosColumnas] = useState(() => (
     columnas.reduce((acc, c) => ({ ...acc, [c.key]: "" }), { id: "" })
   ));
+  // buscador global
+  const [buscador, setBuscador] = useState('');
   const [paginaActual, setPaginaActual] = useState(1);
   const [itemsPorPagina, setItemsPorPagina] = useState(10);
 
@@ -31,8 +38,30 @@ export default function TablaGenerica({
   const safeDatos = useMemo(() => (Array.isArray(datos) ? datos : []), [datos])
 
   // Filtrar datos (solo filtros por columna)
+  const normalize = (str) =>
+    (str ?? "")
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+
   const datosFiltrados = useMemo(() => {
   return safeDatos.filter((item) => {
+    // filtro global (OR entre campos)
+    if (buscador) {
+      const needle = normalize(buscador);
+      const campos = Array.isArray(camposFiltrado) && camposFiltrado.length ? camposFiltrado : columnas.map(c => c.key);
+      const matchGlobal = campos.some(cKey => {
+        let valorCampo;
+        if (cKey === 'nombreApellido') {
+          valorCampo = `${item.nombre ?? item.name ?? ''} ${item.apellido ?? item.lastName ?? ''}`;
+        } else {
+          valorCampo = item[cKey];
+        }
+        return normalize(valorCampo).includes(needle);
+      });
+      if (!matchGlobal) return false;
+    }
     // filtros por columna (AND)
     for (const [k, fv] of Object.entries(filtrosColumnas)) {
       if (!fv) continue;
@@ -41,21 +70,21 @@ export default function TablaGenerica({
 
       // 🔹 Casos especiales
       if (k === "nombreApellido") {
-        // Concatenar nombre + apellido para el filtro
-        val = `${item.nombre ?? ""} ${item.apellido ?? ""}`;
+        // Concatenar nombre + apellido para el filtro (acepta español o inglés)
+        val = `${item.nombre ?? item.name ?? ""} ${item.apellido ?? item.lastName ?? ""}`;
       } else if (k === "id") {
         val = item.id;
       } else {
         val = item[k];
       }
 
-      const txt = (val ?? "").toString().toLowerCase();
-      if (!txt.includes(fv.toLowerCase())) return false;
+      const txt = normalize(val);
+      if (!txt.includes(normalize(fv))) return false;
     }
 
     return true;
   });
-}, [safeDatos, filtrosColumnas]);
+ }, [safeDatos, filtrosColumnas, buscador, camposFiltrado, columnas]);
 
   // Paginación
   const totalPaginas = Math.ceil(datosFiltrados.length / itemsPorPagina);
@@ -93,13 +122,36 @@ export default function TablaGenerica({
       <div className="tabla-visual-externa">
         
         {/* Controles superiores */}
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <div className="d-flex align-items-center gap-2">
+        <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
             {leftControls && (
-              <div className="me-2 d-flex align-items-center">
+              <div className="d-flex align-items-center gap-2">
                 {leftControls()}
               </div>
             )}
+            {/* Buscador global */}
+            <div className="d-flex align-items-center gap-1">
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                style={{ minWidth: 200 }}
+                placeholder={placeholderBuscador}
+                value={buscador}
+                onChange={(e) => {
+                  setBuscador(e.target.value);
+                  setPaginaActual(1);
+                }}
+              />
+              {buscador && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-decoration-none"
+                  onClick={() => setBuscador('')}
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="d-flex gap-2 align-items-center">
@@ -128,37 +180,46 @@ export default function TablaGenerica({
           </div>
         </div>
 
-        {/* Barra de filtros por columna */}
-        <div className="card card-body mb-3" style={{ background: '#fff' }}>
-          <div className="row g-2">
-            <div className="col-2">
-              <input
-                className="form-control form-control-sm"
-                placeholder="Filtrar ID"
-                value={filtrosColumnas.id}
-                onChange={(e) => handleFiltroColumna('id', e.target.value)}
-              />
-            </div>
-            {columnas.map((col) => (
-              <div className="col" key={`filter-${col.key}`}>
-                <input
-                  className="form-control form-control-sm"
-                  placeholder={`Filtrar ${col.label}`}
-                  value={filtrosColumnas[col.key]}
-                  onChange={(e) => handleFiltroColumna(col.key, e.target.value)}
-                />
+        {/* Barra de filtros por columna (personalizable) */}
+        {showColumnFiltersBar && (
+          <div className="card card-body mb-3" style={{ background: '#fff' }}>
+            <div className="row g-2">
+              {!hideIdFilter && (
+                <div className="col-2">
+                  <input
+                    className="form-control form-control-sm"
+                    placeholder="Filtrar ID"
+                    value={filtrosColumnas.id}
+                    onChange={(e) => handleFiltroColumna('id', e.target.value)}
+                  />
+                </div>
+              )}
+              {columnas.map((col) => (
+                omitColumnFilters.includes(col.key) ? null : (
+                  <div className="col" key={`filter-${col.key}`}>
+                    <input
+                      className="form-control form-control-sm"
+                      placeholder={`Filtrar ${col.label}`}
+                      value={filtrosColumnas[col.key]}
+                      onChange={(e) => handleFiltroColumna(col.key, e.target.value)}
+                    />
+                  </div>
+                )
+              ))}
+              <div className="col-auto d-flex align-items-center">
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => {
+                    setFiltrosColumnas(columnas.reduce((acc, c) => ({ ...acc, [c.key]: '' }), { id: '' }));
+                    setBuscador('');
+                  }}
+                >
+                  Limpiar filtros
+                </button>
               </div>
-            ))}
-            <div className="col-auto d-flex align-items-center">
-              <button
-                className="btn btn-sm btn-outline-secondary"
-                onClick={() => setFiltrosColumnas(columnas.reduce((acc, c) => ({ ...acc, [c.key]: '' }), { id: '' }))}
-              >
-                Limpiar filtros
-              </button>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Tabla o loader */}
         {loading ? (
