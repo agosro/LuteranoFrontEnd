@@ -8,6 +8,7 @@ import { useAuth } from '../../Context/AuthContext';
 // 👇 importamos los services
 import { obtenerDocentePorUserId } from '../../Services/DocenteService';
 import { obtenerPreceptorPorUserId } from '../../Services/PreceptorService';
+import { httpClient } from '../../Services/httpClient';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -25,15 +26,10 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      // Usamos httpClient para unificar manejo de base URL, errores y JSON
+      const data = await httpClient.post('/api/auth/login', { email, password }, { skipAuth: true });
 
-      const data = await response.json();
-
-      if (response.ok && data.token) {
+      if (data?.token) {
         const decoded = jwtDecode(data.token);
         const role = decoded.role;
   // const correo = decoded.sub; // 👈 mail del usuario en el token (ya no se usa para pedir userId)
@@ -73,15 +69,12 @@ function Login() {
 
       navigate("/inicio");
       } else {
-        if (response.status === 422) {
-          setErrorMessage('Credenciales incorrectas.');
-        } else {
-          setErrorMessage(data.mensaje || 'Error inesperado.');
-        }
+        setErrorMessage(data?.mensaje || 'Credenciales incorrectas.');
       }
     } catch (error) {
-      setErrorMessage('Error de conexión con el servidor.');
-      console.error(error);
+      // httpClient normaliza el mensaje cuando es posible
+      setErrorMessage(error?.message || 'Error de conexión con el servidor.');
+      console.error('Login error:', error);
     }
 
     setLoading(false);
