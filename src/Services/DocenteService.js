@@ -1,19 +1,11 @@
-const API_URL = 'http://localhost:8080'; // Cambialo si usás otro host/puerto
+import { httpClient } from './httpClient'
 
 // Obtener lista de docentes
 export const listarDocentes = async (token) => {
   try {
-    const response = await fetch(`${API_URL}/docente/list`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al obtener docentes');
-
-    return Array.isArray(data.docenteDtos) ? data.docenteDtos : [];
+    void token
+    const data = await httpClient.get('/api/docente/list')
+    return Array.isArray(data.docenteDtos) ? data.docenteDtos : []
   } catch (error) {
     console.error('Error al listar docentes:', error);
     throw error;
@@ -23,19 +15,9 @@ export const listarDocentes = async (token) => {
 // Crear un nuevo docente
 export const crearDocente = async (token, docente) => {
   try {
-    const response = await fetch(`${API_URL}/docente/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(docente),
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al crear docente');
-
-    return data;
+    void token
+    const data = await httpClient.post('/api/docente/create', docente)
+    return data
   } catch (error) {
     console.error('Error al crear docente:', error);
     throw error;
@@ -45,19 +27,9 @@ export const crearDocente = async (token, docente) => {
 // Editar docente
 export const editarDocente = async (token, docente) => {
   try {
-    const response = await fetch(`${API_URL}/docente/update`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(docente),
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al editar docente');
-
-    return data;
+    void token
+    const data = await httpClient.put('/api/docente/update', docente)
+    return data
   } catch (error) {
     console.error('Error al editar docente:', error);
     throw error;
@@ -67,18 +39,9 @@ export const editarDocente = async (token, docente) => {
 // Eliminar docente por ID
 export const eliminarDocente = async (token, id) => {
   try {
-    const response = await fetch(`${API_URL}/docente/delete/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al eliminar docente');
-
-    return data;
+    void token
+    const data = await httpClient.delete(`/api/docente/delete/${id}`)
+    return data
   } catch (error) {
     console.error('Error al eliminar docente:', error);
     throw error;
@@ -87,18 +50,10 @@ export const eliminarDocente = async (token, id) => {
 
 export const obtenerDocentePorUserId = async (token, userId) => {
   try {
-    const response = await fetch(`${API_URL}/docente/usuario/${userId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) throw new Error("Error al obtener docente por userId");
-
-    const data = await response.json();
-    return data.docente || null; // devuelve el objeto docente o null
+    const data = await httpClient.get(`/api/docente/usuario/${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+    return data.docente || null
   } catch (error) {
     console.error("Error en obtenerDocentePorUserId:", error);
     throw error;

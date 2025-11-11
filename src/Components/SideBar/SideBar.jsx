@@ -23,6 +23,7 @@ export default function SidebarLayout() {
       case "ROLE_DOCENTE": return "Docente";
       case "ROLE_PRECEPTOR": return "Preceptor";
       case "ROLE_DIRECTOR": return "Director";
+      case "ROLE_AUXILIAR": return "Auxiliar";
       case "ROLE_TUTOR": return "Tutor";
       default: return rol.replace("ROLE_", "").toLowerCase();
     }

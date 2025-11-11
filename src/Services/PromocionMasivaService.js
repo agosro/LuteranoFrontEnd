@@ -1,38 +1,24 @@
 // src/Services/PromocionMasivaService.js
-const API_URL = 'http://localhost:8080';
+import { httpClient } from './httpClient'
 
-const auth = (token) => ({ 'Authorization': `Bearer ${token}` });
-const authJson = (token) => ({ 'Content-Type': 'application/json', ...auth(token) });
-
-const okOrThrow = async (res) => {
-  let data = null;
-  try { data = await res.json(); } catch { /* ignore parse error */ }
-  const code = data?.code;
-  if (!res.ok || (typeof code === 'number' && code < 0)) {
-    const msg = data?.mensaje || 'Error en la operación de promoción';
-    throw new Error(msg);
-  }
-  return data ?? {};
-};
+// auth helpers ya no son necesarios: httpClient añade Authorization y maneja errores
 
 // Ejecuta la promoción real (requiere ADMIN o DIRECTOR)
 export const ejecutarPromocionMasiva = async (token, payload) => {
-  const res = await fetch(`${API_URL}/promocion/masiva`, {
-    method: 'POST',
-    headers: authJson(token),
-    body: JSON.stringify(payload)
-  });
-  return okOrThrow(res);
+  void token
+  const data = await httpClient.post('/api/promocion/masiva', payload)
+  const code = data?.code
+  if (typeof code === 'number' && code < 0) throw new Error(data?.mensaje || 'Error en la operación de promoción')
+  return data
 };
 
 // Simula la promoción (accesible para PRECEPTOR también)
 export const simularPromocionMasiva = async (token, payload) => {
-  const res = await fetch(`${API_URL}/promocion/masiva/simulacion`, {
-    method: 'POST',
-    headers: authJson(token),
-    body: JSON.stringify(payload)
-  });
-  return okOrThrow(res);
+  void token
+  const data = await httpClient.post('/api/promocion/masiva/simulacion', payload)
+  const code = data?.code
+  if (typeof code === 'number' && code < 0) throw new Error(data?.mensaje || 'Error en la simulación de promoción')
+  return data
 };
 
 export default {

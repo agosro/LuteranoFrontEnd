@@ -21,10 +21,23 @@ export const camposAlumno = (modoVista = false, esCreacion = false) => {
     { name: "fechaIngreso", label: "Fecha de ingreso", type: "date", required: true, readOnly: modoVista },
   ];
 
-  // 👉 Tutor y curso solo se muestran si NO es creación
+  // 👉 Tutores (plural) y curso solo se muestran si NO es creación.
+  // Ahora soporta múltiples tutores, se renderiza lista simple.
   if (!esCreacion) {
     camposBase.push(
-      { name: "tutor", label: "Tutor", type: "custom", required: false, readOnly: true, render: (val) => val ? `${val.nombre} ${val.apellido}` : "-" },
+      {
+        name: "tutores",
+        label: "Tutores",
+        type: "custom",
+        required: false,
+        readOnly: true,
+        render: (val) => {
+          if (!val || !Array.isArray(val) || val.length === 0) return "-";
+            return val
+              .map(t => `${t.apellido ?? ''} ${t.nombre ?? ''}`.trim())
+              .join(', ');
+        }
+      },
       {
         name: "cursoActual",
         label: "Curso Actual",

@@ -1,21 +1,11 @@
-const API_URL = 'http://localhost:8080';
+import { httpClient } from './httpClient'
 
 // 📌 Listar todos los preceptores
 export const listarPreceptores = async (token) => {
   try {
-    const response = await fetch(`${API_URL}/preceptor/list`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) throw new Error("Error al listar preceptores");
-
-    const data = await response.json();
-    // 👇 aseguramos que siempre devuelva array
-    return Array.isArray(data.preceptores) ? data.preceptores : [];
+    void token
+    const data = await httpClient.get('/api/preceptor/list')
+    return Array.isArray(data.preceptores) ? data.preceptores : []
   } catch (error) {
     console.error("Error al listar preceptores:", error);
     throw error;
@@ -25,17 +15,9 @@ export const listarPreceptores = async (token) => {
 // 📌 Crear preceptor
 export const crearPreceptor = async (preceptor, token) => {
   try {
-    const response = await fetch(`${API_URL}/preceptor/create`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(preceptor),
-    });
-
-    if (!response.ok) throw new Error("Error al crear preceptor");
-    return await response.json();
+    void token
+    const data = await httpClient.post('/api/preceptor/create', preceptor)
+    return data
   } catch (error) {
     console.error("Error al crear preceptor:", error);
     throw error;
@@ -45,17 +27,9 @@ export const crearPreceptor = async (preceptor, token) => {
 // 📌 Actualizar preceptor
 export const editarPreceptor = async (token, preceptor) => {
   try {
-    const response = await fetch(`${API_URL}/preceptor/update`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(preceptor),
-    });
-
-    if (!response.ok) throw new Error("Error al actualizar preceptor");
-    return await response.json();
+    void token
+    const data = await httpClient.put('/api/preceptor/update', preceptor)
+    return data
   } catch (error) {
     console.error("Error al actualizar preceptor:", error);
     throw error;
@@ -65,16 +39,9 @@ export const editarPreceptor = async (token, preceptor) => {
 // 📌 Eliminar preceptor por ID
 export const eliminarPreceptor = async (id, token) => {
   try {
-    const response = await fetch(`${API_URL}/preceptor/delete/${id}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) throw new Error("Error al eliminar preceptor");
-    return await response.json();
+    void token
+    const data = await httpClient.delete(`/api/preceptor/delete/${id}`)
+    return data
   } catch (error) {
     console.error("Error al eliminar preceptor:", error);
     throw error;
@@ -83,18 +50,10 @@ export const eliminarPreceptor = async (id, token) => {
 
 export const obtenerPreceptorPorUserId = async (token, userId) => {
   try {
-    const response = await fetch(`${API_URL}/preceptor/usuario/${userId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) throw new Error("Error al obtener preceptor por userId");
-
-    const data = await response.json();
-    return data.preceptor || null; // devuelve el objeto preceptor o null
+    const data = await httpClient.get(`/api/preceptor/usuario/${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+    return data.preceptor || null
   } catch (error) {
     console.error("Error en obtenerPreceptorPorUserId:", error);
     throw error;

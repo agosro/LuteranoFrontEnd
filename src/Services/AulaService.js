@@ -1,19 +1,11 @@
-const API_URL = 'http://localhost:8080'; // Cambialo si usás otro host/puerto
+import { httpClient } from './httpClient'
 
 // Obtener lista de aulas
 export const listarAulas = async (token) => {
   try {
-    const response = await fetch(`${API_URL}/aula/list`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al obtener aulas');
-
-    return Array.isArray(data.aulaDtos) ? data.aulaDtos : [];
+    void token
+    const data = await httpClient.get('/api/aula/list')
+    return Array.isArray(data.aulaDtos) ? data.aulaDtos : []
   } catch (error) {
     console.error('Error al listar aulas:', error);
     throw error;
@@ -23,17 +15,9 @@ export const listarAulas = async (token) => {
 // Obtener lista de aulas libres (no asignadas a cursos)
 export const listarAulasLibres = async (token) => {
   try {
-    const response = await fetch(`${API_URL}/aula/list/libres`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al obtener aulas libres');
-
-    return Array.isArray(data.aulaDtos) ? data.aulaDtos : [];
+    void token
+    const data = await httpClient.get('/api/aula/list/libres')
+    return Array.isArray(data.aulaDtos) ? data.aulaDtos : []
   } catch (error) {
     console.error('Error al listar aulas libres:', error);
     throw error;
@@ -43,19 +27,9 @@ export const listarAulasLibres = async (token) => {
 // Crear un aula
 export const crearAula = async (token, aula) => {
   try {
-    const response = await fetch(`${API_URL}/aula/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(aula),
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al crear aula');
-
-    return data;
+    void token
+    const data = await httpClient.post('/api/aula/create', aula)
+    return data
   } catch (error) {
     console.error('Error al crear aula:', error);
     throw error;
@@ -65,19 +39,9 @@ export const crearAula = async (token, aula) => {
 // Editar un aula
 export const editarAula = async (token, aula) => {
   try {
-    const response = await fetch(`${API_URL}/aula/update`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(aula),
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al editar aula');
-
-    return data;
+    void token
+    const data = await httpClient.put('/api/aula/update', aula)
+    return data
   } catch (error) {
     console.error('Error al editar aula:', error);
     throw error;
@@ -87,18 +51,9 @@ export const editarAula = async (token, aula) => {
 // Eliminar un aula
 export const eliminarAula = async (token, id) => {
   try {
-    const response = await fetch(`${API_URL}/aula/delete/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al eliminar aula');
-
-    return data;
+    void token
+    const data = await httpClient.delete(`/api/aula/delete/${id}`)
+    return data
   } catch (error) {
     console.error('Error al eliminar aula:', error);
     throw error;
@@ -108,17 +63,9 @@ export const eliminarAula = async (token, id) => {
 // Obtener aula por ID
 export const obtenerAulaPorId = async (token, id) => {
   try {
-    const response = await fetch(`${API_URL}/aula/${id}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || 'Error al obtener aula');
-
-    return data;
+    void token
+    const data = await httpClient.get(`/api/aula/${id}`)
+    return data
   } catch (error) {
     console.error('Error al obtener aula por ID:', error);
     throw error;

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Select from "react-select";
+import AsyncSelect from "react-select/async";
 import { isoToInputLocal } from "../../utils/fechas";
 
 export default function ModalCrearEntidad({
@@ -100,7 +101,7 @@ export default function ModalCrearEntidad({
             onSubmit(formData);
           }}
         >
-          {Array.isArray(campos) && campos.filter(Boolean).map(({ name, label, type, opciones, disabled, required }) => (
+          {Array.isArray(campos) && campos.filter(Boolean).map(({ name, label, type, opciones, disabled, required, loadOptions, onChangeSelected, selectedOptions }) => (
             <div className="mb-3" key={name}>
               <label htmlFor={name} className="form-label">
                 {label}
@@ -125,6 +126,35 @@ export default function ModalCrearEntidad({
                       boxShadow: errors[name] ? '0 0 0 0.25rem rgba(220,53,69,.25)' : base.boxShadow,
                     }),
                   }}
+                />
+              ) : type === 'async-multiselect' ? (
+                <AsyncSelect
+                  cacheOptions
+                  defaultOptions={[]}
+                  isMulti
+                  loadOptions={loadOptions || (() => Promise.resolve([]))}
+                  onChange={(selected) => {
+                    const valores = Array.isArray(selected) ? selected.map(s => s.value) : [];
+                    onInputChange(name, valores);
+                    if (onChangeSelected) {
+                      const objetosTutor = Array.isArray(selected)
+                        ? selected.map(s => s.data || { id: s.value, nombre: s.label })
+                        : [];
+                      onChangeSelected(objetosTutor);
+                    }
+                  }}
+                  value={selectedOptions || []}
+                  classNamePrefix="react-select"
+                  placeholder={`Buscar y seleccionar ${label.toLowerCase()}...`}
+                  isDisabled={disabled}
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: errors[name] ? '#dc3545' : base.borderColor,
+                      boxShadow: errors[name] ? '0 0 0 0.25rem rgba(220,53,69,.25)' : base.boxShadow,
+                    }),
+                  }}
+                  noOptionsMessage={() => 'Escribe al menos 2 caracteres'}
                 />
               ) : type === "select" ? (
                 <Select

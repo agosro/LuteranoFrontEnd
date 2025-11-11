@@ -1,54 +1,23 @@
-const API_URL = "http://localhost:8080";
+import { httpClient } from './httpClient'
 
-const parseCursoResponse = async (response, defaultErrorMsg) => {
-  let body = null;
-  try { body = await response.json(); } catch { /* ignorar parse json */ }
-  if (!response.ok) {
-    const msg = body?.mensaje || defaultErrorMsg;
-    throw new Error(msg);
+const parseCursoResponse = (data, defaultErrorMsg) => {
+  if (!data) throw new Error(defaultErrorMsg)
+  if (typeof data.code !== 'undefined' && data.code < 0) {
+    throw new Error(data.mensaje || defaultErrorMsg)
   }
-  if (body && typeof body.code !== 'undefined' && body.code < 0) {
-    throw new Error(body.mensaje || defaultErrorMsg);
-  }
-  return body;
-};
+  return data
+}
 
 // Asignar preceptor a curso
 export const asignarPreceptorACurso = async (token, cursoId, preceptorId) => {
-  try {
-    const response = await fetch(
-      `${API_URL}/preceptorCurso/${cursoId}/preceptor/${preceptorId}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    return await parseCursoResponse(response, "Error al asignar preceptor al curso");
-  } catch (error) {
-    console.error("Error en asignarPreceptorACurso:", error);
-    throw error;
-  }
+  void token
+  const data = await httpClient.post(`/api/preceptorCurso/${cursoId}/preceptor/${preceptorId}`)
+  return parseCursoResponse(data, 'Error al asignar preceptor al curso')
 };
 
 // Desasignar preceptor de curso
 export const desasignarPreceptorDeCurso = async (token, cursoId) => {
-  try {
-    const response = await fetch(
-      `${API_URL}/preceptorCurso/${cursoId}/preceptor`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    return await parseCursoResponse(response, "Error al desasignar preceptor del curso");
-  } catch (error) {
-    console.error("Error en desasignarPreceptorDeCurso:", error);
-    throw error;
-  }
+  void token
+  const data = await httpClient.delete(`/api/preceptorCurso/${cursoId}/preceptor`)
+  return parseCursoResponse(data, 'Error al desasignar preceptor del curso')
 };

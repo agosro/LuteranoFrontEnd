@@ -1,41 +1,52 @@
 // src/Services/TutorService.js
-const API_URL = 'http://localhost:8080';
+import { httpClient } from './httpClient'
+
+// Cache simple en memoria para evitar pedir toda la lista repetidamente
+let _cacheTutores = null;
+let _cacheTimestamp = 0;
+const CACHE_TTL_MS = 60_000; // 1 minuto
 
 // 📌 Listar todos los tutores
-export const listarTutores = async (token) => {
+export const listarTutores = async (token, { force = false } = {}) => {
   try {
-    const response = await fetch(`${API_URL}/tutor/list`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) throw new Error("Error al listar tutores");
-
-    const data = await response.json();
-    return data.tutores || []; // 👈 devolvemos siempre un array
+    void token;
+    const now = Date.now();
+    if (!force && _cacheTutores && (now - _cacheTimestamp) < CACHE_TTL_MS) {
+      return _cacheTutores;
+    }
+    const data = await httpClient.get('/api/tutor/list');
+    _cacheTutores = data.tutores || [];
+    _cacheTimestamp = now;
+    return _cacheTutores;
   } catch (error) {
-    console.error("Error al listar tutores:", error);
+    console.error('Error al listar tutores:', error);
     throw error;
+  }
+};
+
+// 🆕 Búsqueda client-side (placeholder hasta que exista endpoint backend)
+export const buscarTutores = async (query, token) => {
+  try {
+    void token;
+    if (!query || query.trim().length < 2) return [];
+    const lista = await listarTutores(token);
+    const q = query.trim().toLowerCase();
+    return lista.filter(t =>
+      (t.nombre && t.nombre.toLowerCase().includes(q)) ||
+      (t.apellido && t.apellido.toLowerCase().includes(q)) ||
+      (t.dni && t.dni.toLowerCase().includes(q))
+    ).slice(0, 20); // limitar resultados visibles
+  } catch (error) {
+    console.error('Error en buscarTutores:', error);
+    return [];
   }
 };
 
 // 📌 Crear tutor
 export const crearTutor = async (tutor, token) => {
   try {
-    const response = await fetch(`${API_URL}/tutor/create`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(tutor),
-    });
-
-    if (!response.ok) throw new Error("Error al crear tutor");
-    return await response.json();
+    void token
+    return await httpClient.post('/api/tutor/create', tutor)
   } catch (error) {
     console.error("Error al crear tutor:", error);
     throw error;
@@ -45,17 +56,8 @@ export const crearTutor = async (tutor, token) => {
 // 📌 Actualizar tutor
 export const editarTutor = async (tutor, token) => {
   try {
-    const response = await fetch(`${API_URL}/tutor/update`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(tutor),
-    });
-
-    if (!response.ok) throw new Error("Error al actualizar tutor");
-    return await response.json();
+    void token
+    return await httpClient.put('/api/tutor/update', tutor)
   } catch (error) {
     console.error("Error al actualizar tutor:", error);
     throw error;
@@ -65,16 +67,8 @@ export const editarTutor = async (tutor, token) => {
 // 📌 Eliminar tutor por ID
 export const eliminarTutor = async (id, token) => {
   try {
-    const response = await fetch(`${API_URL}/tutor/delete/${id}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) throw new Error("Error al eliminar tutor");
-    return await response.json();
+    void token
+    return await httpClient.delete(`/api/tutor/delete/${id}`)
   } catch (error) {
     console.error("Error al eliminar tutor:", error);
     throw error;

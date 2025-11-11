@@ -1,20 +1,11 @@
-const API_URL = "http://localhost:8080";
+import { httpClient } from './httpClient'
 
 // Listar alumnos
 export const listarAlumnos = async (token) => {
   try {
-    const response = await fetch(`${API_URL}/alumno/list`, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!response.ok) throw new Error(data?.mensaje || `Error ${response.status}`);
-    return Array.isArray(data) ? data : [];
+    void token
+    const data = await httpClient.get('/api/alumno/list')
+    return Array.isArray(data) ? data : []
   } catch (error) {
     console.error("Error al listar alumnos:", error);
     throw error;
@@ -24,20 +15,9 @@ export const listarAlumnos = async (token) => {
 // Crear alumno
 export const crearAlumno = async (token, alumno) => {
   try {
-    const response = await fetch(`${API_URL}/alumno/create`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(alumno),
-    });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!response.ok) throw new Error(data?.mensaje || `Error ${response.status}`);
-    return data;
+    void token
+    const data = await httpClient.post('/api/alumno/create', alumno)
+    return data
   } catch (error) {
     console.error("Error al crear alumno:", error);
     throw error;
@@ -47,20 +27,9 @@ export const crearAlumno = async (token, alumno) => {
 // Editar alumno
 export const editarAlumno = async (token, alumno) => {
   try {
-    const response = await fetch(`${API_URL}/alumno/update`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(alumno),
-    });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!response.ok) throw new Error(data?.mensaje || `Error ${response.status}`);
-    return data;
+    void token
+    const data = await httpClient.put('/api/alumno/update', alumno)
+    return data
   } catch (error) {
     console.error("Error al editar alumno:", error);
     throw error;
@@ -70,19 +39,9 @@ export const editarAlumno = async (token, alumno) => {
 // Eliminar alumno
 export const eliminarAlumno = async (token, id) => {
   try {
-    const response = await fetch(`${API_URL}/alumno/delete/${id}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!response.ok) throw new Error(data?.mensaje || `Error ${response.status}`);
-    return data;
+    void token
+    const data = await httpClient.delete(`/api/alumno/delete/${id}`)
+    return data
   } catch (error) {
     console.error("Error al eliminar alumno:", error);
     throw error;
@@ -96,21 +55,9 @@ export const listarAlumnosConFiltros = async (token, filtros) => {
     const filtrosLimpios = Object.fromEntries(
       Object.entries(filtros).filter(([, v]) => v !== undefined && v !== null && v !== "")
     );
-
-    const response = await fetch(`${API_URL}/alumno/filtros`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(filtrosLimpios),
-    });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-
-    if (!response.ok) throw new Error(data?.mensaje || `Error ${response.status}`);
-    return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : [];
+    void token
+    const data = await httpClient.post('/api/alumno/filtros', filtrosLimpios)
+    return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : []
   } catch (error) {
     console.error("Error al listar alumnos con filtros:", error);
     throw error;
@@ -119,30 +66,75 @@ export const listarAlumnosConFiltros = async (token, filtros) => {
 
 export const asignarCursoAlumno = async (token, request) => {
 	try {
-		const resp = await fetch(`${API_URL}/alumno/asignarCursoAlumno`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${token}`,
-			},
-			body: JSON.stringify(request),
-		});
-
-		const text = await resp.text();
-		const data = text ? JSON.parse(text) : null;
-
-		if (!resp.ok) {
-			const base = data?.mensaje || `Error ${resp.status}`;
-			// Mensaje más claro para 403
-			if (resp.status === 403) {
-				throw new Error(`${base}: no autorizado para asignar curso (403)`);
-			}
-			throw new Error(base);
-		}
-		// Backend respondió AlumnoResponse
-		return data; // { code, mensaje, alumnoDto? }
+    void token
+    try {
+      const data = await httpClient.post('/api/alumno/asignarCursoAlumno', request)
+      return data
+    } catch (e) {
+      if (e.status === 403) {
+        throw new Error('No autorizado para asignar curso (403)')
+      }
+      throw e
+    }
 	} catch (error) {
 		console.error('Error al asignar curso a alumno:', error);
 		throw error;
 	}
 };
+
+// Listar alumnos egresados
+export const listarAlumnosEgresados = async (token) => {
+  try {
+    void token
+    const data = await httpClient.get('/api/alumno/egresados')
+    return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : []
+  } catch (error) {
+    console.error('Error al listar alumnos egresados:', error)
+    throw error
+  }
+}
+
+// Listar alumnos excluidos
+export const listarAlumnosExcluidos = async (token) => {
+  try {
+    void token
+    const data = await httpClient.get('/api/alumno/excluidos')
+    return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : []
+  } catch (error) {
+    console.error('Error al listar alumnos excluidos:', error)
+    throw error
+  }
+}
+
+// Buscar alumno por DNI
+export const buscarAlumnoPorDni = async (token, dni) => {
+  try {
+    if (!dni) return null
+    void token
+    const data = await httpClient.get(`/api/alumno/dni/${dni}`)
+    return data?.alumno ?? null
+  } catch (error) {
+    console.error('Error al buscar alumno por DNI:', error)
+    throw error
+  }
+}
+
+// Reactivar alumno excluido
+export const reactivarAlumno = async (token, id) => {
+  try {
+    if (!id) throw new Error('ID de alumno requerido')
+    void token
+    try {
+      const data = await httpClient.post(`/api/alumno/${id}/reactivar`)
+      return data
+    } catch (e) {
+      if (e.status === 403) {
+        throw new Error('No autorizado para reactivar alumno (403)')
+      }
+      throw e
+    }
+  } catch (error) {
+    console.error('Error al reactivar alumno:', error)
+    throw error
+  }
+}

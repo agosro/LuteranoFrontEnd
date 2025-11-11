@@ -12,8 +12,7 @@ import { listarHistorialAlumnoFiltrado, obtenerHistorialActualAlumno } from "../
 import { asignarCursoAlumno } from "../Services/AlumnoService";
 import ModalSeleccionSimple from "../Components/Modals/ModalSeleccionSimple";
 import { listarCursos } from "../Services/CursoService";
-import { listarTutores } from "../Services/TutorService";
-import { asignarTutorAAlumno, desasignarTutorDeAlumno } from "../Services/TutorAlumnoService";
+import ModalAsignarTutores from "../Components/Modals/ModalAsignarTutores";
 import { getTituloCurso } from "../utils/cursos";
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
@@ -35,10 +34,8 @@ function AlumnoDetalle() {
   const [cursoId] = useState(null);
 
   const [showAsignarCurso, setShowAsignarCurso] = useState(false);
-  // Tutor asignación
-  const [tutores, setTutores] = useState([]);
-  const [tutoresLoading, setTutoresLoading] = useState(false);
-  const [tutorIdSeleccionado, setTutorIdSeleccionado] = useState(alumno?.tutor?.id || "");
+  // Tutores: modal y gestión multi
+  const [showTutoresModal, setShowTutoresModal] = useState(false);
 
   // Historial completo
   useEffect(() => {
@@ -101,22 +98,7 @@ function AlumnoDetalle() {
     }
   }, [histActual]);
 
-  // Cargar tutores para asignación en modo edición
-  useEffect(() => {
-    const fetchTutores = async () => {
-      if (!user?.token) return;
-      setTutoresLoading(true);
-      try {
-        const lista = await listarTutores(user.token);
-        setTutores(Array.isArray(lista) ? lista : []);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setTutoresLoading(false);
-      }
-    };
-    fetchTutores();
-  }, [user?.token]);
+  // ya no se cargan todos los tutores; se buscan desde el modal con debounce
 
   if (!alumno) return <p>Cargando...</p>;
 
@@ -169,70 +151,19 @@ function AlumnoDetalle() {
                     setFormData={setFormData}
                   />
 
-                  {/* Asignación de Tutor */}
+                  {/* Gestión de Tutores (multi) */}
                   <div className="card p-3 shadow-sm mt-3">
                     <div className="d-flex justify-content-between align-items-center mb-2">
-                      <div className="fw-bold">Tutor asignado</div>
-                      {formData.tutor ? (
-                        <span className="badge bg-success">{formData.tutor.nombre} {formData.tutor.apellido}</span>
-                      ) : (
-                        <span className="badge bg-secondary">Sin tutor</span>
-                      )}
+                      <div className="fw-bold">Tutores asignados</div>
+                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setShowTutoresModal(true)}>
+                        Gestionar tutores
+                      </button>
                     </div>
-
-                    <div className="row g-2 align-items-end">
-                      <div className="col-md-8">
-                        <label className="form-label">Seleccionar tutor</label>
-                        <select
-                          className="form-control"
-                          value={tutorIdSeleccionado}
-                          disabled={tutoresLoading}
-                          onChange={(e) => setTutorIdSeleccionado(e.target.value)}
-                        >
-                          <option value="">Seleccionar...</option>
-                          {tutores.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.nombre} {t.apellido} {t.dni ? `(DNI: ${t.dni})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="col-md-4 d-flex gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-outline-primary w-50"
-                          disabled={!tutorIdSeleccionado || tutoresLoading}
-                          onClick={async () => {
-                            try {
-                              await asignarTutorAAlumno(user.token, Number(tutorIdSeleccionado), alumno.id);
-                              const tutorObj = tutores.find(t => String(t.id) === String(tutorIdSeleccionado)) || null;
-                              setFormData(prev => ({ ...prev, tutor: tutorObj }));
-                              toast.success("Tutor asignado correctamente");
-                            } catch (e) {
-                              toast.error(e.message || "Error al asignar tutor");
-                            }
-                          }}
-                        >
-                          Asignar
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline-danger w-50"
-                          disabled={!formData.tutor}
-                          onClick={async () => {
-                            try {
-                              await desasignarTutorDeAlumno(user.token, formData.tutor.id, alumno.id);
-                              setFormData(prev => ({ ...prev, tutor: null }));
-                              setTutorIdSeleccionado("");
-                              toast.success("Tutor desasignado correctamente");
-                            } catch (e) {
-                              toast.error(e.message || "Error al desasignar tutor");
-                            }
-                          }}
-                        >
-                          Desasignar
-                        </button>
-                      </div>
+                    <div className="d-flex flex-wrap gap-2">
+                      {(formData.tutores || []).length === 0 && <span className="text-muted">Sin tutores</span>}
+                      {(formData.tutores || []).map(t => (
+                        <span key={t.id} className="badge bg-success">{t.apellido} {t.nombre}</span>
+                      ))}
                     </div>
                   </div>
                 </>
@@ -425,6 +356,15 @@ function AlumnoDetalle() {
         onDesasignar={async () => { toast.info("Para desasignar, reasigná a otro curso"); }}
         token={user?.token}
         onActualizar={() => {}}
+      />
+
+      {/* Modal multi-tutores */}
+      <ModalAsignarTutores
+        show={showTutoresModal}
+        onClose={() => setShowTutoresModal(false)}
+        alumno={formData}
+        token={user?.token}
+        onAlumnoActualizado={(nuevo) => setFormData(prev => ({ ...prev, ...nuevo }))}
       />
     </>
   );

@@ -14,6 +14,7 @@ export const camposUsuarioVista = [
         case 'ROLE_DIRECTOR': return 'Director';
         case 'ROLE_DOCENTE': return 'Docente';
         case 'ROLE_PRECEPTOR': return 'Preceptor';
+        case 'ROLE_AUXILIAR': return 'Auxiliar';
         default: return 'Sin rol';
       }
     },
