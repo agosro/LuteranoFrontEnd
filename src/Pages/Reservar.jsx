@@ -197,9 +197,6 @@ export default function ReservarEspacio() {
                     </option>
                   ))}
                 </Form.Select>
-                {espacios.length === 0 && (
-                  <small className="text-muted">No hay espacios o no tenés permisos para listarlos.</small>
-                )}
               </Form.Group>
             </div>
           </Form>
