@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient'
-const BASE = `/api/reporteLibres/libres`;
+const BASE = `/reporteLibres/libres`;
 
 export const fetchAlumnosLibres = async (anio, cursoId = null, token) => {
   void token

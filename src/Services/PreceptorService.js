@@ -4,7 +4,7 @@ import { httpClient } from './httpClient'
 export const listarPreceptores = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/preceptor/list')
+    const data = await httpClient.get('/preceptor/list')
     return Array.isArray(data.preceptores) ? data.preceptores : []
   } catch (error) {
     console.error("Error al listar preceptores:", error);
@@ -16,7 +16,7 @@ export const listarPreceptores = async (token) => {
 export const crearPreceptor = async (preceptor, token) => {
   try {
     void token
-    const data = await httpClient.post('/api/preceptor/create', preceptor)
+    const data = await httpClient.post('/preceptor/create', preceptor)
     return data
   } catch (error) {
     console.error("Error al crear preceptor:", error);
@@ -28,7 +28,7 @@ export const crearPreceptor = async (preceptor, token) => {
 export const editarPreceptor = async (token, preceptor) => {
   try {
     void token
-    const data = await httpClient.put('/api/preceptor/update', preceptor)
+    const data = await httpClient.put('/preceptor/update', preceptor)
     return data
   } catch (error) {
     console.error("Error al actualizar preceptor:", error);
@@ -40,7 +40,7 @@ export const editarPreceptor = async (token, preceptor) => {
 export const eliminarPreceptor = async (id, token) => {
   try {
     void token
-    const data = await httpClient.delete(`/api/preceptor/delete/${id}`)
+    const data = await httpClient.delete(`/preceptor/delete/${id}`)
     return data
   } catch (error) {
     console.error("Error al eliminar preceptor:", error);
@@ -50,7 +50,7 @@ export const eliminarPreceptor = async (id, token) => {
 
 export const obtenerPreceptorPorUserId = async (token, userId) => {
   try {
-    const data = await httpClient.get(`/api/preceptor/usuario/${userId}`, {
+    const data = await httpClient.get(`/preceptor/usuario/${userId}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     })
     return data.preceptor || null

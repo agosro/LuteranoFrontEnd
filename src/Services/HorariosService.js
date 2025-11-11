@@ -4,7 +4,7 @@ import { httpClient } from './httpClient'
 export const asignarHorario = async (token, cursoId, materiaId, slots) => {
   try {
     void token
-    const data = await httpClient.post(`/api/horarios/cursos/${cursoId}/materias/${materiaId}`, slots)
+    const data = await httpClient.post(`/horarios/cursos/${cursoId}/materias/${materiaId}`, slots)
     return data
   } catch (error) {
     console.error("Error en asignarHorario:", error);
@@ -16,7 +16,7 @@ export const asignarHorario = async (token, cursoId, materiaId, slots) => {
 export const desasignarHorario = async (token, cursoId, materiaId, slots) => {
   try {
     void token
-    const data = await httpClient.delete(`/api/horarios/cursos/${cursoId}/materias/${materiaId}`, { body: slots })
+    const data = await httpClient.delete(`horarios/cursos/${cursoId}/materias/${materiaId}`, { body: slots })
     return data
   } catch (error) {
     console.error("Error en desasignarHorario:", error);

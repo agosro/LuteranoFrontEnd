@@ -3,7 +3,7 @@ import { httpClient } from './httpClient'
 
 export const listarTurnos = async (token, anio) => {
   void token
-  const url = anio ? `/api/turnos?anio=${anio}` : '/api/turnos'
+  const url = anio ? `/turnos?anio=${anio}` : '/turnos'
   const data = await httpClient.get(url)
   const arr = Array.isArray(data.turnos) ? data.turnos : []
   return arr.map(t => ({
@@ -18,21 +18,21 @@ export const listarTurnos = async (token, anio) => {
 
 export const crearTurno = async (token, payload) => {
   void token
-  const data = await httpClient.post('/api/turnos', payload)
+  const data = await httpClient.post('/turnos', payload)
   if (data.code < 0) throw new Error(data.mensaje || 'Error al crear turno')
   return data.turno
 }
 
 export const actualizarTurno = async (token, id, payload) => {
   void token
-  const data = await httpClient.put(`/api/turnos/${id}`, payload)
+  const data = await httpClient.put(`/turnos/${id}`, payload)
   if (data.code < 0) throw new Error(data.mensaje || 'Error al actualizar turno')
   return data.turno
 }
 
 export const eliminarTurno = async (token, id) => {
   void token
-  const data = await httpClient.delete(`/api/turnos/${id}`)
+  const data = await httpClient.delete(`/turnos/${id}`)
   if (data.code < 0) throw new Error(data.mensaje || 'Error al eliminar turno')
   return true
 }

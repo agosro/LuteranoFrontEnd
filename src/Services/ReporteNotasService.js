@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient'
-const BASE = '/api/reporteNotas'
+const BASE = '/reporteNotas'
 
 // GET /reporteNotas/alumnos/{alumnoId}/notas/resumen?anio=YYYY
 export async function resumenNotasAlumnoPorAnio(token, alumnoId, anio) {

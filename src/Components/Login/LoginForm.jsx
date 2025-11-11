@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../Context/AuthContext';
 
 // 👇 importamos los services
-import { obtenerUsuarioPorEmail } from '../../Services/UsuarioService';
 import { obtenerDocentePorUserId } from '../../Services/DocenteService';
 import { obtenerPreceptorPorUserId } from '../../Services/PreceptorService';
 
@@ -37,27 +36,29 @@ function Login() {
       if (response.ok && data.token) {
         const decoded = jwtDecode(data.token);
         const role = decoded.role;
-        const correo = decoded.sub; // 👈 el mail del usuario
+  // const correo = decoded.sub; // 👈 mail del usuario en el token (ya no se usa para pedir userId)
 
-        // 1. Traemos el usuario completo por email
-        const usuario = await obtenerUsuarioPorEmail(data.token, correo);
+        // Ahora el token incluye siempre userId y, según el rol, docenteId o preceptorId
+        let userId = decoded.userId || decoded.id || decoded.uid || decoded.user_id || null;
+        let docenteId = decoded.docenteId ?? null;
+        let preceptorId = decoded.preceptorId ?? null;
 
-        if (!usuario || !usuario.id) {
-          setErrorMessage("No se pudo obtener el usuario");
-          setLoading(false);
-          return;
-        }
-
-        let docenteId = null;
-        let preceptorId = null;
-
-        // SOLO si es docente o preceptor traigo su entidad
-        if (role === "ROLE_DOCENTE") {
-          const docente = await obtenerDocentePorUserId(data.token, usuario.id);
-          docenteId = docente?.id;
-        } else if (role === "ROLE_PRECEPTOR") {
-          const preceptor = await obtenerPreceptorPorUserId(data.token, usuario.id);
-          preceptorId = preceptor?.id;
+        // Fallback defensivo: si por algún motivo no vienen los IDs específicos en el token,
+        // consultamos por userId para obtenerlos.
+        if (role === "ROLE_DOCENTE" && !docenteId && userId) {
+          try {
+            const docente = await obtenerDocentePorUserId(data.token, userId);
+            docenteId = docente?.id ?? null;
+          } catch (e) {
+            console.warn('No se pudo obtener docenteId por userId:', e?.message || e);
+          }
+        } else if (role === "ROLE_PRECEPTOR" && !preceptorId && userId) {
+          try {
+            const preceptor = await obtenerPreceptorPorUserId(data.token, userId);
+            preceptorId = preceptor?.id ?? null;
+          } catch (e) {
+            console.warn('No se pudo obtener preceptorId por userId:', e?.message || e);
+          }
         }
 
         // ✅ Para ADMIN/DIRECTOR no se busca nada extra
@@ -65,7 +66,7 @@ function Login() {
           nombre: data.mensaje.replace("hola ", ""),
           rol: role,
           token: data.token,
-          userId: usuario.id,
+          userId: userId,
           docenteId,
           preceptorId,
         });

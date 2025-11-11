@@ -4,7 +4,10 @@ import { httpClient } from './httpClient'
 export const listarAlumnos = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/alumno/list')
+    const data = await httpClient.get('/alumno/list')
+    // Normalizamos distintas posibles formas de respuesta del backend
+    if (Array.isArray(data?.alumnoDtos)) return data.alumnoDtos
+    if (Array.isArray(data?.items)) return data.items
     return Array.isArray(data) ? data : []
   } catch (error) {
     console.error("Error al listar alumnos:", error);
@@ -16,7 +19,7 @@ export const listarAlumnos = async (token) => {
 export const crearAlumno = async (token, alumno) => {
   try {
     void token
-    const data = await httpClient.post('/api/alumno/create', alumno)
+    const data = await httpClient.post('/alumno/create', alumno)
     return data
   } catch (error) {
     console.error("Error al crear alumno:", error);
@@ -28,7 +31,7 @@ export const crearAlumno = async (token, alumno) => {
 export const editarAlumno = async (token, alumno) => {
   try {
     void token
-    const data = await httpClient.put('/api/alumno/update', alumno)
+    const data = await httpClient.put('/alumno/update', alumno)
     return data
   } catch (error) {
     console.error("Error al editar alumno:", error);
@@ -40,7 +43,7 @@ export const editarAlumno = async (token, alumno) => {
 export const eliminarAlumno = async (token, id) => {
   try {
     void token
-    const data = await httpClient.delete(`/api/alumno/delete/${id}`)
+    const data = await httpClient.delete(`/alumno/delete/${id}`)
     return data
   } catch (error) {
     console.error("Error al eliminar alumno:", error);
@@ -56,7 +59,7 @@ export const listarAlumnosConFiltros = async (token, filtros) => {
       Object.entries(filtros).filter(([, v]) => v !== undefined && v !== null && v !== "")
     );
     void token
-    const data = await httpClient.post('/api/alumno/filtros', filtrosLimpios)
+    const data = await httpClient.post('/alumno/filtros', filtrosLimpios)
     return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : []
   } catch (error) {
     console.error("Error al listar alumnos con filtros:", error);
@@ -68,7 +71,7 @@ export const asignarCursoAlumno = async (token, request) => {
 	try {
     void token
     try {
-      const data = await httpClient.post('/api/alumno/asignarCursoAlumno', request)
+      const data = await httpClient.post('/alumno/asignarCursoAlumno', request)
       return data
     } catch (e) {
       if (e.status === 403) {
@@ -86,7 +89,7 @@ export const asignarCursoAlumno = async (token, request) => {
 export const listarAlumnosEgresados = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/alumno/egresados')
+    const data = await httpClient.get('/alumno/egresados')
     return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : []
   } catch (error) {
     console.error('Error al listar alumnos egresados:', error)
@@ -98,7 +101,7 @@ export const listarAlumnosEgresados = async (token) => {
 export const listarAlumnosExcluidos = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/alumno/excluidos')
+    const data = await httpClient.get('/alumno/excluidos')
     return Array.isArray(data?.alumnoDtos) ? data.alumnoDtos : []
   } catch (error) {
     console.error('Error al listar alumnos excluidos:', error)
@@ -111,7 +114,7 @@ export const buscarAlumnoPorDni = async (token, dni) => {
   try {
     if (!dni) return null
     void token
-    const data = await httpClient.get(`/api/alumno/dni/${dni}`)
+    const data = await httpClient.get(`/alumno/dni/${dni}`)
     return data?.alumno ?? null
   } catch (error) {
     console.error('Error al buscar alumno por DNI:', error)
@@ -125,7 +128,7 @@ export const reactivarAlumno = async (token, id) => {
     if (!id) throw new Error('ID de alumno requerido')
     void token
     try {
-      const data = await httpClient.post(`/api/alumno/${id}/reactivar`)
+      const data = await httpClient.post(`/alumno/${id}/reactivar`)
       return data
     } catch (e) {
       if (e.status === 403) {

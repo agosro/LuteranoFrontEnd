@@ -6,7 +6,7 @@ export const listarHistorialAlumnoFiltrado = async (token, alumnoId, { cicloLect
     if (cicloLectivoId == null) {
       throw new Error('Debe seleccionar un ciclo lectivo');
     }
-    let url = `/api/historial-curso/alumno/${alumnoId}/historial-completo`;
+    let url = `/historial-curso/alumno/${alumnoId}/historial-completo`;
 
     const params = [];
     params.push(`cicloLectivoId=${cicloLectivoId}`);
@@ -37,7 +37,7 @@ export const obtenerHistorialActualAlumno  = async (token, alumnoId) => {
   try {
     void token
     try {
-      const data = await httpClient.get(`/api/historial-curso/alumno/${alumnoId}`)
+      const data = await httpClient.get(`/historial-curso/alumno/${alumnoId}`)
       return data
     } catch (e) {
       if (e.status && [404, 422].includes(e.status)) {
@@ -58,7 +58,7 @@ export const listarAlumnosPorCurso = async (token, cursoId, cicloLectivoId = nul
     if (cicloLectivoId == null) {
       throw new Error('Debe seleccionar un ciclo lectivo');
     }
-    const url = `/api/historial-curso/${cursoId}/alumnos?cicloLectivoId=${cicloLectivoId}`;
+    const url = `/historial-curso/${cursoId}/alumnos?cicloLectivoId=${cicloLectivoId}`;
     void token
     try {
       const data = await httpClient.get(url)

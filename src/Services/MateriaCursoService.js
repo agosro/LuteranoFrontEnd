@@ -4,19 +4,19 @@ import { httpClient } from './httpClient'
 // Asignar materias a un curso
 export const asignarMateriasACurso = async (token, cursoId, materiaIds) => {
   void token
-  return httpClient.post(`/api/materiasCurso/asignarMaterias/${cursoId}`, materiaIds)
+  return httpClient.post(`/materiasCurso/asignarMaterias/${cursoId}`, materiaIds)
 };
 
 // Quitar materias de un curso
 export const quitarMateriasDeCurso = async (token, cursoId, materiaIds) => {
   void token
-  return httpClient.delete(`/api/materiasCurso/quitarMaterias/${cursoId}`, { body: materiaIds })
+  return httpClient.delete(`/materiasCurso/quitarMaterias/${cursoId}`, { body: materiaIds })
 };
 
 // Listar materias de un curso
 export const listarMateriasDeCurso = async (token, cursoId) => {
   void token
-  const data = await httpClient.get(`/api/materiasCurso/listarMateriasDeCurso/${cursoId}`)
+  const data = await httpClient.get(`/materiasCurso/listarMateriasDeCurso/${cursoId}`)
   const lista = Array.isArray(data.materiaCursoDtoLis) ? data.materiaCursoDtoLis : []
   return lista.map(m => {
     const materiaId = m.materia?.id ?? null
@@ -36,7 +36,7 @@ export const listarMateriasDeCurso = async (token, cursoId) => {
 // Listar cursos de una materia
 export const listarCursosDeMateria = async (token, materiaId) => {
   void token
-  const data = await httpClient.get(`/api/materiasCurso/listarCursosDeMateria/${materiaId}`)
+  const data = await httpClient.get(`/materiasCurso/listarCursosDeMateria/${materiaId}`)
   const lista = Array.isArray(data.materiaCursoDtoLis) ? data.materiaCursoDtoLis : []
   return lista.map(mc => {
     const cursoId = mc.cursoId ?? mc.curso?.id ?? null
@@ -54,11 +54,11 @@ export const listarCursosDeMateria = async (token, materiaId) => {
 // Asignar docente a una materia de un curso
 export const asignarDocente = async (token, materiaId, cursoId, docenteId) => {
   void token
-  return httpClient.post(`/api/materiasCurso/asignarDocente/${materiaId}/${cursoId}/${docenteId}`)
+  return httpClient.post(`/materiasCurso/asignarDocente/${materiaId}/${cursoId}/${docenteId}`)
 };
 
 // Desasignar docente de una materia de un curso
 export const desasignarDocente = async (token, materiaId, cursoId) => {
   void token
-  return httpClient.post(`/api/materiasCurso/desasignarDocente/${materiaId}/${cursoId}`)
+  return httpClient.post(`/materiasCurso/desasignarDocente/${materiaId}/${cursoId}`)
 };

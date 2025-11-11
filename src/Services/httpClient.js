@@ -14,31 +14,31 @@ const getStoredToken = () => {
   }
 }
 
+// Sanitizamos la base para evitar terminar con doble /api (si alguien pone accidentalmente .../api en el .env)
 const baseApiUrl = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
+  ? import.meta.env.VITE_API_URL
+      .replace(/\/$/, '')        // quitar slash final simple
+      .replace(/\/api$/i, '')    // si termina exactamente en /api lo quitamos
   : ''
 
 async function request(path, { method = 'GET', body = null, headers = {}, skipAuth = false, signal } = {}) {
-  // path can be:
-  // - absolute URL (starts with http)
-  // - absolute path starting with /api (during dev the vite proxy will forward to backend)
-  // - or any other relative path; in production we prefix with VITE_API_URL
+  // Normalización de la URL:
+  // Siempre usamos la variable de entorno VITE_API_URL (dev y prod) para construir la URL base.
+  // IMPORTANTE: Respetamos el path tal cual lo envían los Services (algunos empiezan con /api y otros no),
+  // porque el backend mezcla prefijos (p.ej.: /api/auth/* y /user/*).
+  // Casos:
+  // 1. path absoluto (http/https) -> se usa tal cual.
+  // 2. path que empieza con '/' -> se concatena directo a baseApiUrl.
+  // 3. path relativo -> se asegura un '/'.
 
   let url = path
   if (!/^https?:\/\//i.test(path)) {
-    // if path starts with /api, in dev the proxy will handle it; in production prefix with baseApiUrl
-    if (path.startsWith('/api')) {
-      if (import.meta.env && import.meta.env.DEV) {
-        // En desarrollo usamos el prefijo /api para el proxy y lo dejamos tal cual
-        url = path
-      } else {
-        // En producción removemos el prefijo /api para mantener las rutas reales del backend
-        url = `${baseApiUrl}${path.slice(4)}`
-      }
-    } else {
-      // other relative paths: prefix with baseApiUrl if available
-      url = baseApiUrl ? `${baseApiUrl}${path.startsWith('/') ? '' : '/'}${path}` : path
+    let effectivePath = path
+    // Ensure leading slash for joining
+    if (!effectivePath.startsWith('/')) {
+      effectivePath = `/${effectivePath}`
     }
+    url = baseApiUrl ? `${baseApiUrl}${effectivePath}` : effectivePath
   }
 
   const token = getStoredToken()

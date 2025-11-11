@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient'
-const API_URL = '/api/reporteDisponibilidad'
+const API_URL = '/reporteDisponibilidad'
 
 export const obtenerDisponibilidadDocente = async (token, docenteId) => {
   if (!docenteId) throw new Error('Falta docente')

@@ -7,7 +7,7 @@ export const listarTardanzasPorCurso = async (token, { cursoId, desde, hasta, li
   if (desde) params.set('desde', desde);
   if (hasta) params.set('hasta', hasta);
   if (limit != null) params.set('limit', String(limit));
-  const url = `/api/reportesTardanza/curso/${cursoId}${params.toString() ? `?${params.toString()}` : ''}`
+  const url = `/reportesTardanza/curso/${cursoId}${params.toString() ? `?${params.toString()}` : ''}`
   void token
   const data = await httpClient.get(url)
   return Array.isArray(data?.items) ? data.items : []
@@ -19,7 +19,7 @@ export const listarTardanzasTodos = async (token, { desde, hasta, limit } = {}) 
   if (desde) params.set('desde', desde);
   if (hasta) params.set('hasta', hasta);
   if (limit != null) params.set('limit', String(limit));
-  const url = `/api/reportesTardanza/todos${params.toString() ? `?${params.toString()}` : ''}`
+  const url = `/reportesTardanza/todos${params.toString() ? `?${params.toString()}` : ''}`
   void token
   const data = await httpClient.get(url)
   return Array.isArray(data?.items) ? data.items : []

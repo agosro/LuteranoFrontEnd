@@ -4,7 +4,7 @@ import { httpClient } from './httpClient'
 export const listarRindenPorCurso = async (token, { cursoId, anio }) => {
   if (!cursoId) throw new Error('cursoId es obligatorio');
   if (!anio) throw new Error('anio es obligatorio');
-  const url = `/api/reporteRinde/cursos/${cursoId}/rinden?anio=${encodeURIComponent(anio)}`
+  const url = `/reporteRinde/cursos/${cursoId}/rinden?anio=${encodeURIComponent(anio)}`
   void token
   return httpClient.get(url)
 };
