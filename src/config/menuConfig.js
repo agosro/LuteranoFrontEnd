@@ -19,7 +19,7 @@ export const menuConfig = [
       { label: "Usuarios", path: "/usuarios", roles: ["ROLE_ADMIN"] },
       { label: "Alumnos", path: "/alumnos", roles: ["ROLE_ADMIN", "ROLE_PRECEPTOR"] },
       { label: "Docentes", path: "/docentes", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
-      { label: "Tutores", path: "/tutores", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
+      { label: "Tutores", path: "/tutores", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] },
       { label: "Preceptores", path: "/preceptores", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
     ],
   },
@@ -36,7 +36,7 @@ export const menuConfig = [
   {
     label: "Organización",
     icon: FaChalkboardTeacher,
-    roles: ["ROLE_ADMIN", "ROLE_PRECEPTOR"],
+    roles: ["ROLE_ADMIN","ROLE_DIRECTOR",],
     subItems: [
       { label: "Horarios", path: "/horarios", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Aulas", path: "/aulas", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
@@ -56,7 +56,7 @@ export const menuConfig = [
     label: "Reportes",
     icon: FaChartBar, // 🆕
     path: "/reportes",
-    roles: ["ROLE_ADMIN", "ROLE_PRECEPTOR", "ROLE_DIRECTOR"],
+    roles: ["ROLE_ADMIN", "ROLE_PRECEPTOR", "ROLE_DIRECTOR", "ROLE_DOCENTE"],
   },
   {
     label: "Asistencia",
@@ -70,19 +70,19 @@ export const menuConfig = [
   {
     label: "Mesa de examen",
     icon: FaClipboardList,
-    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"],
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"],
     subItems: [
       { label: "Mesas", path: "/mesa-de-examen", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
-      { label: "Historial", path: "/mesa-de-examen/historial", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] },
+      { label: "Historial", path: "/mesa-de-examen/historial", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Turnos de examen", path: "/turnos", roles: ["ROLE_ADMIN"] },
-      { label: "Actas", path: "/actas", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] },
+      { label: "Actas", path: "/actas", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
     ],
   },
   {
     label: "Configuración",
     icon: FaCog,
     // Agregamos ROLE_AUXILIAR únicamente para gestionar espacios áulicos
-    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR", "ROLE_AUXILIAR"],
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_AUXILIAR"],
     subItems: [
       { label: "Ciclo lectivo", path: "/configuracion/ciclo-lectivo", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Parámetros", path: "/configuracion", roles: ["ROLE_ADMIN"] },
