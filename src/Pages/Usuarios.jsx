@@ -330,10 +330,9 @@ export default function Usuarios() {
         hideIdFilter={true}
         omitColumnFilters={['role']}
         leftControls={() => (
-          <div className="d-flex align-items-center gap-2 flex-wrap">
+          <div className="d-flex align-items-center gap-2 flex-wrap filtros-usuarios">
             <select
-              className="form-select form-select-sm"
-              style={{ minWidth: 160 }}
+              className="form-select form-select-sm w-auto"
               value={filtroRol}
               onChange={e => setFiltroRol(e.target.value)}
             >
@@ -352,8 +351,7 @@ export default function Usuarios() {
               </button>
             )}
             <select
-              className="form-select form-select-sm"
-              style={{ minWidth: 180 }}
+              className="form-select form-select-sm w-auto"
               value={orden}
               onChange={(e) => setOrden(e.target.value)}
             >

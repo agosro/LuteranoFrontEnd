@@ -426,12 +426,33 @@ export default function ListaMaterias() {
           const data = await listarDocentes(token);
           return data.map(d => ({ value: d.id, label: `${d.nombre} ${d.apellido}` }));
         }}
-        onAsignar={(token, docenteId, materiaId) =>
-          asignarDocente(token, materiaId, materiaParaAsignar.cursoId, docenteId)
-        }
-        onDesasignar={(token, materiaId) =>
-          desasignarDocente(token, materiaId, materiaParaAsignar.cursoId)
-        }
+        onAsignar={async (token, docenteId, materiaId) => {
+          await asignarDocente(token, materiaId, materiaParaAsignar.cursoId, docenteId);
+          // Optimistic update: actualizar solo la fila correspondiente sin recargar todo
+          setMaterias(prev => prev.map(m => {
+            if (m.id === materiaId && m.cursoId === materiaParaAsignar.cursoId) {
+              return {
+                ...m,
+                // Optimista: marcamos que tiene docente mientras refresca
+                docentes: m.docentes && m.docentes.length ? m.docentes : [{ id: docenteId }],
+                docenteNombre: 'Docente asignado',
+              };
+            }
+            return m;
+          }));
+          // Luego refresco silencioso para datos consistentes
+          cargarMaterias(true);
+        }}
+        onDesasignar={async (token, materiaId) => {
+          await desasignarDocente(token, materiaId, materiaParaAsignar.cursoId);
+          setMaterias(prev => prev.map(m => {
+            if (m.id === materiaId && m.cursoId === materiaParaAsignar.cursoId) {
+              return { ...m, docentes: [], docenteNombre: 'Sin docente' };
+            }
+            return m;
+          }));
+          cargarMaterias(true);
+        }}
         token={token}
         onActualizar={cargarMaterias}
       />
