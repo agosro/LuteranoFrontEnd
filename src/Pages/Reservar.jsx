@@ -4,7 +4,7 @@ import BackButton from "../Components/Botones/BackButton";
 import { Button, Modal, Form, Table, Alert, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useAuth } from "../Context/AuthContext";
-import { listarCursosPorDocente, listarCursos } from "../Services/CursoService";
+import { listarCursosPorDocente, listarCursosPorPreceptor, listarCursos } from "../Services/CursoService";
 import { listarEspaciosAulicos } from "../Services/EspacioAulicoService";
 import { getModulosReservaEstado } from "../Services/ModuloService";
 import { solicitarReserva } from "../Services/ReservaService";
@@ -15,6 +15,8 @@ export default function ReservarEspacio() {
   const { user } = useAuth();
   const token = user?.token;
   const docenteId = user?.docenteId;
+  const preceptorId = user?.preceptorId;
+  const rol = user?.rol;
 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -33,7 +35,7 @@ export default function ReservarEspacio() {
   const [moduloSeleccionado, setModuloSeleccionado] = useState(null); // objeto ModuloEstadoDto
   const [show, setShow] = useState(false);
 
-  // Carga inicial: cursos del docente y espacios
+  // Carga inicial: cursos del docente/preceptor y espacios
   useEffect(() => {
     let mounted = true;
     async function bootstrap() {
@@ -41,12 +43,20 @@ export default function ReservarEspacio() {
       setError(null);
       try {
         let cursosData = [];
-        if (docenteId) {
+        
+        // 🔹 Si es DOCENTE, traer sus cursos
+        if (rol === 'ROLE_DOCENTE' && docenteId) {
           cursosData = await listarCursosPorDocente(token, docenteId);
+        } 
+        // 🔹 Si es PRECEPTOR, traer sus cursos
+        else if (rol === 'ROLE_PRECEPTOR' && preceptorId) {
+          cursosData = await listarCursosPorPreceptor(token, preceptorId);
         }
-        if (!docenteId || cursosData.length === 0) {
+        // 🔹 Si es ADMIN/DIRECTOR o no tiene cursos asignados, traer todos
+        else {
           cursosData = await listarCursos(token);
         }
+        
         if (mounted) setCursos(cursosData);
 
         // Espacios áulicos (puede requerir permisos; capturamos error y continuamos)
@@ -65,7 +75,7 @@ export default function ReservarEspacio() {
     }
     bootstrap();
     return () => { mounted = false; };
-  }, [token, docenteId]);
+  }, [token, docenteId, preceptorId, rol]);
 
   // Cargar módulos (estado de reserva) cuando tengo fecha y espacio áulico
   useEffect(() => {

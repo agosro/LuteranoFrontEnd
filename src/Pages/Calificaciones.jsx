@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../Context/AuthContext";
-import { listarCursos } from "../Services/CursoService";
+import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
 import { listarMateriasDeCurso } from "../Services/MateriaCursoService";
 import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import {
@@ -36,11 +36,25 @@ export default function Calificaciones() {
   const [mensajeError, setMensajeError] = useState("");
   // Nota Final se muestra solo en reportes; en esta pantalla de carga no se utiliza
 
-  // 1️⃣ Traer cursos disponibles
+  // 1️⃣ Traer cursos disponibles (según el rol)
   useEffect(() => {
     const fetchCursos = async () => {
       try {
-        const data = await listarCursos(token);
+        let data = [];
+        
+        // Si es DOCENTE, traer solo sus cursos
+        if (user?.rol === 'ROLE_DOCENTE' && user?.docenteId) {
+          data = await listarCursosPorDocente(token, user.docenteId);
+        } 
+        // Si es PRECEPTOR, traer solo sus cursos
+        else if (user?.rol === 'ROLE_PRECEPTOR' && user?.preceptorId) {
+          data = await listarCursosPorPreceptor(token, user.preceptorId);
+        }
+        // Si es ADMIN/DIRECTOR, traer todos
+        else {
+          data = await listarCursos(token);
+        }
+
         const sorted = [...(data || [])].sort((a, b) => {
           const anioDiff = (Number(a.anio) || 0) - (Number(b.anio) || 0);
           if (anioDiff !== 0) return anioDiff;
@@ -58,7 +72,7 @@ export default function Calificaciones() {
       }
     };
     fetchCursos();
-  }, [token]);
+  }, [token, user?.rol, user?.docenteId, user?.preceptorId]);
 
   // 2️⃣ Cuando selecciona curso → traer materias y (si hay permiso) alumnos
   const [alumnosError, setAlumnosError] = useState(null);
@@ -71,7 +85,16 @@ export default function Calificaciones() {
       setAlumnosError(null);
       try {
         const mats = await listarMateriasDeCurso(token, cursoSeleccionado);
-        setMaterias(mats);
+        
+        // 🔹 Si es DOCENTE, filtrar solo las materias que él dicta
+        let materiasDisponibles = mats;
+        if (user?.rol === 'ROLE_DOCENTE' && user?.docenteId) {
+          materiasDisponibles = mats.filter(m => 
+            m.docente?.id === user.docenteId || m.docenteId === user.docenteId
+          );
+        }
+        
+        setMaterias(materiasDisponibles);
       } catch (err) {
         console.error("Error al cargar materias", err);
         setMaterias([]);
@@ -99,7 +122,7 @@ export default function Calificaciones() {
     };
 
     fetchMateriasYAlumnos();
-  }, [cursoSeleccionado, token, cicloLectivo?.id]);
+  }, [cursoSeleccionado, token, cicloLectivo?.id, user?.rol, user?.docenteId]);
 
   // (NF removida de esta pantalla)
 
