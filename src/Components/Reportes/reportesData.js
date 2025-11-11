@@ -5,49 +5,56 @@ const reportes = [
     titulo: "Legajo de Alumnos",
     descripcion: "Accedé a toda la información personal y académica de cada alumno en un solo lugar.",
     categoria: "Alumnos",
-    ruta: "/reportes/legajo-alumno"
+    ruta: "/reportes/legajo-alumno",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteHistorialAlumnoController
   },
   {
     id: 17,
     titulo: "Exámenes Consecutivos",
     descripcion: "Detectá alumnos que desaprobaron dos exámenes consecutivos y accedé a estadísticas y recomendaciones.",
     categoria: "Alumnos",
-    ruta: "/reportes/examenes-consecutivos"
+    ruta: "/reportes/examenes-consecutivos",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR", "ROLE_DOCENTE"] // ReporteExamenesConsecutivosController - endpoint /materia permite DOCENTE
   },
   {
     id: 2,
     titulo: "Alumnos Libres",
     descripcion: "Identificá rápidamente qué estudiantes perdieron la regularidad y el motivo.",
     categoria: "Alumnos",
-    ruta: "/reportes/alumnos-libres"
+    ruta: "/reportes/alumnos-libres",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteLibresController
   },
   {
     id: 3,
     titulo: "Notas por Curso/Materia",
     descripcion: "Calificaciones por curso y materia (E1/E2, PG y estado) con filtros y exportación.",
     categoria: "Alumnos",
-    ruta: "/reportes/notas-por-curso"
+    ruta: "/reportes/notas-por-curso",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR", "ROLE_DOCENTE"] // ReporteNotasController
   },
   {
     id: 16,
     titulo: "Notas de un Alumno",
     descripcion: "Notas de un alumno individual: por materia o informe completo del año.",
     categoria: "Alumnos",
-    ruta: "/reportes/notas-alumnos"
+    ruta: "/reportes/notas-alumnos",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteNotasController
   },
   {
     id: 4,
     titulo: "Alumnos que rinden en Diciembre y Febrero",
     descripcion: "Revisá qué alumnos deben presentarse a mesas de examen final.",
     categoria: "Alumnos",
-    ruta: "/reportes/rinden"
+    ruta: "/reportes/rinden",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteRindeController
   },
   {
     id: 5,
     titulo: "Alumnos que llegan tarde regularmente",
     descripcion: "Detectá a los alumnos con reincidencias de llegadas tarde.",
     categoria: "Alumnos",
-    ruta: "/reportes/tardanzas"
+    ruta: "/reportes/tardanzas",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteTardanzaController
   },
   // {
   //   id: 6,
@@ -60,7 +67,8 @@ const reportes = [
     titulo: "Informe Anual de Alumno",
     descripcion: "Generá un informe completo con notas, inasistencias y conducta de todo el año.",
     categoria: "Alumnos",
-    ruta: "/reportes/reporte-anual-alumno"
+    ruta: "/reportes/reporte-anual-alumno",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteAnualController
   },
   // {
   //   id: 8,
@@ -73,20 +81,23 @@ const reportes = [
     titulo: "Ranking de Alumnos",
     descripcion: "Conocé quiénes son los alumnos con mejores promedios y posiciones destacadas.",
     categoria: "Alumnos",
-    ruta: "/reportes/ranking-alumnos"
+    ruta: "/reportes/ranking-alumnos",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteRankingAlumnoController
   },
   {
     id: 10,
     titulo: "Alumnos con Asistencia Perfecta",
     descripcion: "Identificá a los estudiantes que no faltaron nunca en el período.",
     categoria: "Alumnos",
-    ruta: "/reportes/asistencia-perfecta"
+    ruta: "/reportes/asistencia-perfecta",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteAsistenciaPerfectaController
   },
   {
     id: 11,
     titulo: "Alumnos que Recuperan Etapa",
     descripcion: "Registrá qué alumnos aprobaron después de instancias de recuperación.",
-    categoria: "Alumnos"
+    categoria: "Alumnos",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // Sin backend aún
   },
   // {
   //   id: 12,
@@ -101,7 +112,8 @@ const reportes = [
     titulo: "Disponibilidad Docente",
     descripcion: "Revisá los horarios libres de los docentes para organizar clases o mesas.",
     categoria: "Docentes",
-    ruta: "/reportes/disponibilidad-docente"
+    ruta: "/reportes/disponibilidad-docente",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] // ⚠️ SOLO ADMIN/DIRECTOR - ReporteDisponibilidadController
   },
   // {
   //   id: 14,
@@ -113,8 +125,9 @@ const reportes = [
     id: 15,
     titulo: "Desempeño Docente",
     descripcion: "Evaluá el trabajo docente con indicadores de asistencia y compromiso.",
-    categoria: "Docentes"
-    , ruta: "/reportes/desempeno-docente"
+    categoria: "Docentes",
+    ruta: "/reportes/desempeno-docente",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] // ⚠️ SOLO ADMIN/DIRECTOR - ReporteDesempenoDocenteController
   }
 ];
 

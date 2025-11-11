@@ -24,13 +24,28 @@ export async function listarReservas(token) {
   return data
 }
 
-// Listar reservas con filtros (según backend actual: GET con body)
+// Listar reservas con filtros
+// NOTA: El backend usa GET con @RequestBody (no es estándar REST)
+// Convertimos los filtros a query params para evitar el error de fetch
 export async function obtenerReservas(token, filtros = {}) {
   void token
-  // Mantiene método GET con body según backend actual
-  const data = await httpClient.request('/reservas/filtros', { method: 'GET', body: filtros })
-  if (data.code < 0) throw new Error(data.mensaje || 'Error al obtener reservas')
-  return data
+  
+  // Construir query params desde el objeto filtros
+  const params = new URLSearchParams();
+  
+  if (filtros.usuarioId) params.append('usuarioId', filtros.usuarioId);
+  if (filtros.cursoId) params.append('cursoId', filtros.cursoId);
+  if (filtros.espacioAulicoId) params.append('espacioAulicoId', filtros.espacioAulicoId);
+  if (filtros.estado) params.append('estado', filtros.estado);
+  if (filtros.fecha) params.append('fecha', filtros.fecha);
+  if (filtros.moduloId) params.append('moduloId', filtros.moduloId);
+  
+  const queryString = params.toString();
+  const url = queryString ? `/reservas/filtros?${queryString}` : '/reservas/filtros';
+  
+  const data = await httpClient.get(url);
+  if (data.code < 0) throw new Error(data.mensaje || 'Error al obtener reservas');
+  return data;
 }
 
 // Aprobar una reserva (roles: ADMIN, DIRECTOR, PRECEPTOR)

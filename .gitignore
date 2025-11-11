@@ -28,3 +28,7 @@ dist-ssr
 .env.*
 !.env.example
 !.env.production
+
+AUDITORIA_PERMISOS.md
+CAMBIOS_BACKEND_NECESARIOS.md
+SOLUCION_CALIFICACIONES_DOCENTE.md

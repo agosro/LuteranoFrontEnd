@@ -4,9 +4,20 @@ import { Card, Button, Row, Col } from "react-bootstrap";
 import reportes from "../Components/Reportes/reportesData";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
+import { useAuth } from "../Context/AuthContext";
 
 export default function Reportes() {
+  const { user } = useAuth();
   const categorias = ["Alumnos", "Docentes"];
+
+  // Filtrar reportes según el rol del usuario
+  const reportesFiltrados = reportes.filter(reporte => {
+    // Si el reporte no tiene roles definidos, lo mostramos (por si acaso)
+    if (!reporte.roles || reporte.roles.length === 0) return true;
+    
+    // Si el usuario tiene el rol necesario, mostramos el reporte
+    return reporte.roles.includes(user?.rol);
+  });
 
   return (
     <div className="container mt-5">
@@ -14,13 +25,17 @@ export default function Reportes() {
       <div className="mb-3"><BackButton /></div>
       <h2 className="mb-4 text-center">Reportes del Sistema</h2>
 
-      {categorias.map((categoria) => (
-        <div key={categoria} className="mb-5">
-          <h3 className="mb-3">{categoria}</h3>
-          <Row xs={1} md={2} lg={3} className="g-4">
-            {reportes
-              .filter((r) => r.categoria === categoria)
-              .map((reporte) => (
+      {categorias.map((categoria) => {
+        const reportesDeCategoria = reportesFiltrados.filter((r) => r.categoria === categoria);
+        
+        // Solo mostrar la categoría si tiene reportes disponibles para este rol
+        if (reportesDeCategoria.length === 0) return null;
+
+        return (
+          <div key={categoria} className="mb-5">
+            <h3 className="mb-3">{categoria}</h3>
+            <Row xs={1} md={2} lg={3} className="g-4">
+              {reportesDeCategoria.map((reporte) => (
                 <Col key={reporte.id}>
                   <Card className="h-100 shadow-sm">
                     <Card.Body className="d-flex flex-column">
@@ -46,9 +61,10 @@ export default function Reportes() {
                   </Card>
                 </Col>
               ))}
-          </Row>
-        </div>
-      ))}
+            </Row>
+          </div>
+        );
+      })}
     </div>
   );
 }
