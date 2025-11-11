@@ -155,7 +155,9 @@ export default function ListaCursos() {
       division: curso.division,
       nivel: curso.nivel,
       aulaId: curso.aula?.value || "",
-      materias: curso.dictados?.map(d => d.materia?.id || d.value) || []
+      materias: (curso.dictados || [])
+        .map(d => d?.materia?.id ?? d?.materiaId ?? d?.id ?? d?.value)
+        .filter(Boolean)
     });
     setModalEditarShow(true);
   };
@@ -169,10 +171,13 @@ export default function ListaCursos() {
 
   // abrir/cerrar modal Asignar Materias
   const abrirModalAsignarMaterias = (curso) => {
-    const asignados = (curso.dictados || []).map(d => ({
-      id: d.materia?.id,
-      label: d.nombre || `Materia ${d.materia?.id || ""}`,
-    }));
+    const asignados = (curso.dictados || [])
+      .map(d => {
+        const idMateria = d?.materia?.id ?? d?.materiaId ?? d?.id ?? d?.value;
+        const label = d?.nombre ?? d?.nombreMateria ?? `Materia ${idMateria ?? ""}`;
+        return { id: idMateria, label };
+      })
+      .filter(item => !!item.id);
     setCursoParaAsignar({
       id: curso.id,
       anio: curso.anio,
@@ -229,7 +234,9 @@ export default function ListaCursos() {
       // Si el formulario no provee 'materias', conservamos las actuales para evitar vaciar dictados
       const materiasIds = Array.isArray(datos.materias)
         ? datos.materias
-        : (cursoSeleccionado?.dictados || []).map(d => d.materia?.id || d.value).filter(Boolean);
+        : (cursoSeleccionado?.dictados || [])
+            .map(d => d?.materia?.id ?? d?.materiaId ?? d?.id ?? d?.value)
+            .filter(Boolean);
 
       const payload = {
         id: datos.id,

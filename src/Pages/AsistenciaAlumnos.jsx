@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../Context/AuthContext';
+import { useCicloLectivo } from '../Context/CicloLectivoContext.jsx';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { listarCursos, listarCursosPorPreceptor } from '../Services/CursoService';
@@ -17,6 +18,7 @@ import ModalEditarAsistencia from '../Components/Asistencia/ModalEditarAsistenci
 
 export default function AsistenciaAlumnos() {
 	const { user } = useAuth();
+	const { cicloLectivo } = useCicloLectivo();
 	const token = user?.token;
 
 	// Si el user tiene preceptorId, listar solo sus cursos; si es admin, todos
@@ -58,18 +60,24 @@ export default function AsistenciaAlumnos() {
 	}, [token, preceptorId]);
 
 	// Al seleccionar curso o cambiar fecha, cargar alumnos + asistencia del día
-	useEffect(() => {
-		if (!token || !cursoId || !fecha) return;
+		useEffect(() => {
+			if (!token || !cursoId || !fecha) return;
+			if (!cicloLectivo?.id) {
+				setAlumnos([]);
+				setAsistencia({});
+				setPresentes(new Set());
+				return;
+			}
 		(async () => {
 			try {
 				setCargando(true);
 				// 1) alumnos del curso (historial vigente)
-				const alumnosCurso = await listarAlumnosPorCurso(token, Number(cursoId));
+					const alumnosCurso = await listarAlumnosPorCurso(token, Number(cursoId), Number(cicloLectivo.id));
 				const alumnosOrdenados = [...alumnosCurso].sort((a, b) => (a.apellido || '').localeCompare(b.apellido || ''));
 				setAlumnos(alumnosOrdenados);
 
-				// 2) asistencia existente
-				const items = await listarAsistenciaCursoPorFecha(token, Number(cursoId), fecha);
+		// 2) asistencia existente
+			const items = await listarAsistenciaCursoPorFecha(token, Number(cursoId), fecha, Number(cicloLectivo.id));
 				// Mapear a { alumnoId: { estado, observacion } }
 				const map = {};
 				for (const it of items) {
@@ -91,8 +99,8 @@ export default function AsistenciaAlumnos() {
 			} finally {
 				setCargando(false);
 			}
-		})();
-	}, [token, cursoId, fecha]);
+			})();
+		}, [token, cursoId, fecha, cicloLectivo?.id]);
 
 	// Checkbox presente
 	const handleTogglePresente = (alumnoId) => {
@@ -188,11 +196,11 @@ export default function AsistenciaAlumnos() {
 				overridesPorAlumnoId: overrides,
 			};
 
-			const resp = await registrarAsistenciaCurso(token, payload);
+			const resp = await registrarAsistenciaCurso(token, { ...payload, cicloLectivoId: Number(cicloLectivo.id) });
 			if (resp?.code && resp.code < 0) throw new Error(resp.mensaje || 'Error al registrar asistencia');
 			toast.success('Asistencia guardada');
 			// refrescar estados actuales
-			const items = await listarAsistenciaCursoPorFecha(token, Number(cursoId), fecha);
+			const items = await listarAsistenciaCursoPorFecha(token, Number(cursoId), fecha, Number(cicloLectivo.id));
 			const map = {};
 			for (const it of items) {
 				if (it.alumnoId) map[it.alumnoId] = { estado: it.estado || '', observacion: it.observacion || '' };
