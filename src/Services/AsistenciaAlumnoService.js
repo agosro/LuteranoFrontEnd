@@ -1,11 +1,15 @@
 import { httpClient } from './httpClient'
 
 // GET: Lista la asistencia de un curso en una fecha
-export const listarAsistenciaCursoPorFecha = async (token, cursoId, fechaISO) => {
+// Opcional cicloLectivoId si el backend lo requiere para filtrar por ciclo
+export const listarAsistenciaCursoPorFecha = async (token, cursoId, fechaISO, cicloLectivoId = null) => {
   try {
     void token
     try {
-      const data = await httpClient.get(`/asistencia/alumnos/curso/${cursoId}?fecha=${encodeURIComponent(fechaISO)}`)
+      const params = [`fecha=${encodeURIComponent(fechaISO)}`]
+      if (cicloLectivoId != null) params.push(`cicloLectivoId=${cicloLectivoId}`)
+      const query = params.length ? `?${params.join('&')}` : ''
+      const data = await httpClient.get(`/asistencia/alumnos/curso/${cursoId}${query}`)
       return Array.isArray(data?.items) ? data.items : []
     } catch (e) {
       if (e.status === 403) throw new Error('No autorizado (403)')
@@ -19,6 +23,7 @@ export const listarAsistenciaCursoPorFecha = async (token, cursoId, fechaISO) =>
 
 // POST: Registra/actualiza asistencia del curso en una fecha (bulk)
 // req: { cursoId, fecha (YYYY-MM-DD), presentesIds: number[], overridesPorAlumnoId: { [alumnoId]: 'PRESENTE'|'AUSENTE'|'TARDE'|'CON_LICENCIA'|'JUSTIFICADO' } }
+// req puede incluir cicloLectivoId si se requiere en el backend
 export const registrarAsistenciaCurso = async (token, req) => {
   try {
     void token

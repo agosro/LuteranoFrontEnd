@@ -76,18 +76,23 @@ export default function ModalSeleccionSimple({
     try {
       if (!entidad) return;
 
-      // si deseleccionás algo que ya tenía
-      if (!seleccionado && entidad[campoAsignado]) {
+      const teniaAsignado = Boolean(entidad[campoAsignado]);
+      const idAnterior = entidad[campoAsignado]?.id;
+      const idNuevo = seleccionado?.value;
+
+      // Caso 1: había algo y ahora se vació -> desasignar
+      if (teniaAsignado && !idNuevo) {
         await onDesasignar(token, entidad.id);
         if (toastOnSuccess) toast.success("Desasignado correctamente");
       }
 
-      // si seleccionás algo distinto
-      if (seleccionado && String(seleccionado.value) !== String(entidad[campoAsignado]?.id)) {
-        await onAsignar(token, seleccionado.value, entidad.id);
+      // Caso 2: hay nuevo distinto al anterior -> asignar (si es igual no hago nada)
+      if (idNuevo && String(idNuevo) !== String(idAnterior)) {
+        await onAsignar(token, idNuevo, entidad.id);
         if (toastOnSuccess) toast.success("Asignado correctamente");
       }
 
+      // Si no hubo cambios efectivos, no forzamos actualización toast.
       onActualizar();
       onClose();
     } catch (error) {

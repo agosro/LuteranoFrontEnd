@@ -15,7 +15,7 @@ import { listarMaterias } from "../Services/MateriaService";
 // 🆕 imports para asignar materias
 import ModalAsignacionGenerico from "../Components/Modals/ModalAsignar";
 import { asignarMateriasACurso, quitarMateriasDeCurso, listarMateriasDeCurso } from "../Services/MateriaCursoService";
-import { FaBook, FaUserTie, FaClock } from "react-icons/fa";
+import { FaBook, FaUserTie, FaClock, FaCopy } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 // 🆕 imports para asignar preceptor
@@ -44,6 +44,9 @@ export default function ListaCursos() {
   // 🆕 estado para el modal de asignar materias
   const [modalAsignarMateriasShow, setModalAsignarMateriasShow] = useState(false);
   const [cursoParaAsignar, setCursoParaAsignar] = useState(null);
+  // 🆕 estado para copiar materias a otra división
+  const [modalCopiarMateriasShow, setModalCopiarMateriasShow] = useState(false);
+  const [cursoOrigenCopia, setCursoOrigenCopia] = useState(null);
 
   // 🆕 estado para el modal de asignar preceptor
   const [modalAsignarPreceptorShow, setModalAsignarPreceptorShow] = useState(false);
@@ -152,7 +155,9 @@ export default function ListaCursos() {
       division: curso.division,
       nivel: curso.nivel,
       aulaId: curso.aula?.value || "",
-      materias: curso.dictados?.map(d => d.materia?.id || d.value) || []
+      materias: (curso.dictados || [])
+        .map(d => d?.materia?.id ?? d?.materiaId ?? d?.id ?? d?.value)
+        .filter(Boolean)
     });
     setModalEditarShow(true);
   };
@@ -166,10 +171,13 @@ export default function ListaCursos() {
 
   // abrir/cerrar modal Asignar Materias
   const abrirModalAsignarMaterias = (curso) => {
-    const asignados = (curso.dictados || []).map(d => ({
-      id: d.materia?.id,
-      label: d.nombre || `Materia ${d.materia?.id || ""}`,
-    }));
+    const asignados = (curso.dictados || [])
+      .map(d => {
+        const idMateria = d?.materia?.id ?? d?.materiaId ?? d?.id ?? d?.value;
+        const label = d?.nombre ?? d?.nombreMateria ?? `Materia ${idMateria ?? ""}`;
+        return { id: idMateria, label };
+      })
+      .filter(item => !!item.id);
     setCursoParaAsignar({
       id: curso.id,
       anio: curso.anio,
@@ -181,6 +189,16 @@ export default function ListaCursos() {
   const cerrarModalAsignarMaterias = () => {
     setCursoParaAsignar(null);
     setModalAsignarMateriasShow(false);
+  };
+
+  // Abrir/Cerrar modal copiar materias
+  const abrirModalCopiarMaterias = (curso) => {
+    setCursoOrigenCopia(curso);
+    setModalCopiarMateriasShow(true);
+  };
+  const cerrarModalCopiarMaterias = () => {
+    setCursoOrigenCopia(null);
+    setModalCopiarMateriasShow(false);
   };
 
   const abrirModalAsignarPreceptor = (curso) => {
@@ -202,7 +220,6 @@ export default function ListaCursos() {
         nivel: datos.nivel,
         aulaId: datos.aulaId && datos.aulaId !== "" ? datos.aulaId : null
       };
-
       await crearCurso(token, payload);
       toast.success("Curso creado con éxito");
       cerrarModalCrear();
@@ -214,13 +231,20 @@ export default function ListaCursos() {
 
   const handleUpdate = async (datos) => {
     try {
+      // Si el formulario no provee 'materias', conservamos las actuales para evitar vaciar dictados
+      const materiasIds = Array.isArray(datos.materias)
+        ? datos.materias
+        : (cursoSeleccionado?.dictados || [])
+            .map(d => d?.materia?.id ?? d?.materiaId ?? d?.id ?? d?.value)
+            .filter(Boolean);
+
       const payload = {
         id: datos.id,
         anio: datos.anio, // ✅ ya viene como número
         division: datos.division,
         nivel: datos.nivel,
         aulaId: datos.aulaId && datos.aulaId !== "" ? datos.aulaId : null,
-        dictados: datos.materias?.map(id => ({ materia: { id } })) || []
+        dictados: materiasIds.map(id => ({ materia: { id } }))
       };
 
       await editarCurso(token, payload);
@@ -296,6 +320,12 @@ export default function ListaCursos() {
               title: "Asignar Materias",
             },
             {
+              icon: <FaCopy />,
+              onClick: () => abrirModalCopiarMaterias(curso),
+              title: "Copiar materias a otra división",
+              className: "btn-outline-secondary",
+            },
+            {
               icon: <FaUserTie />,
               onClick: () => abrirModalAsignarPreceptor(curso),
               title: "Asignar Preceptor",
@@ -325,7 +355,7 @@ export default function ListaCursos() {
       <ModalEditarEntidad
         show={modalEditarShow}
         onClose={cerrarModalEditar}
-        campos={camposCurso(false, aulasOptions, [], false)}
+        campos={camposCurso(false, aulasOptions, materiasOptions, true)}
         formData={formData}
         onInputChange={handleInputChange}
         onSubmit={handleUpdate}
@@ -368,6 +398,52 @@ export default function ListaCursos() {
         onDesasignar={(token, materiaIds, cursoId) =>
           quitarMateriasDeCurso(token, cursoId, materiaIds)
         }
+        token={token}
+        onActualizar={recargarCursos}
+      />
+
+      <ModalSeleccionSimple
+        // Modal: Copiar materias desde un curso origen hacia otro curso del mismo año
+        show={modalCopiarMateriasShow}
+        onClose={cerrarModalCopiarMaterias}
+        titulo={
+          cursoOrigenCopia
+            ? `Copiar materias de ${cursoOrigenCopia.anio} ${cursoOrigenCopia.division} a...`
+            : "Copiar materias"
+        }
+        entidad={cursoOrigenCopia}
+        campoAsignado="cursoDestino"
+        hint="Elegí la otra división del mismo año a la que querés copiar las materias. Si ya tiene algunas materias, solo se agregarán las que falten."
+        obtenerOpciones={async () => {
+          if (!cursoOrigenCopia) return [];
+          // usar cursos en memoria; filtrar mismo año y distinto id
+          const elegibles = (cursos || [])
+            .filter(c => Number(c.anio) === Number(cursoOrigenCopia.anio) && Number(c.id) !== Number(cursoOrigenCopia.id))
+            .map(c => ({ value: c.id, label: `${c.anio} ${c.division}` }));
+          return elegibles;
+        }}
+        onAsignar={async (token, cursoDestinoId, cursoOrigenId) => {
+          // Copiar materias: obtener materias de origen y destino, calcular diferencia y asignar
+          const [origen, destino] = await Promise.all([
+            listarMateriasDeCurso(token, cursoOrigenId),
+            listarMateriasDeCurso(token, cursoDestinoId),
+          ]);
+          const idsOrigen = new Set((origen || []).map(m => m.materiaId || m.id));
+          const idsDestino = new Set((destino || []).map(m => m.materiaId || m.id));
+          const aAgregar = Array.from(idsOrigen).filter(id => !idsDestino.has(id));
+
+          if (!aAgregar.length) {
+            toast.info("El curso destino ya tiene todas esas materias.");
+            return;
+          }
+          await asignarMateriasACurso(token, cursoDestinoId, aAgregar);
+          toast.success(`Se copiaron ${aAgregar.length} materia(s) al curso destino`);
+          await recargarCursos();
+        }}
+        onDesasignar={async () => {
+          // No aplica "desasignar" en el flujo de copiar
+          return;
+        }}
         token={token}
         onActualizar={recargarCursos}
       />
