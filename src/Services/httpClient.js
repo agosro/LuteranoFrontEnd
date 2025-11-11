@@ -21,7 +21,7 @@ const baseApiUrl = typeof import.meta !== 'undefined' && import.meta.env && impo
       .replace(/\/api$/i, '')    // si termina exactamente en /api lo quitamos
   : ''
 
-async function request(path, { method = 'GET', body = null, headers = {}, skipAuth = false, signal } = {}) {
+async function request(path, { method = 'GET', body = null, headers = {}, skipAuth = false, signal, timeoutMs = 30000 } = {}) {
   // Normalización de la URL:
   // Siempre usamos la variable de entorno VITE_API_URL (dev y prod) para construir la URL base.
   // IMPORTANTE: Respetamos el path tal cual lo envían los Services (algunos empiezan con /api y otros no),
@@ -49,21 +49,51 @@ async function request(path, { method = 'GET', body = null, headers = {}, skipAu
   const isString = typeof body === 'string'
   const shouldJson = body != null && !isForm && !isString
 
+  // Preparar AbortController para timeout si no se pasó uno externo
+  const controller = !signal ? (typeof AbortController !== 'undefined' ? new AbortController() : null) : null
+  const abortSignal = signal || controller?.signal
+
   const opts = {
     method,
     headers: {
       'Content-Type': shouldJson ? 'application/json' : undefined,
+      // Evitar pantalla de advertencia de ngrok
+      'ngrok-skip-browser-warning': 'true',
       ...authHeaders,
       ...headers,
     },
-    signal,
+    signal: abortSignal,
   }
 
   if (body != null) {
     opts.body = shouldJson ? JSON.stringify(body) : body
   }
 
-  const res = await fetch(url, opts)
+  // Iniciar timeout si aplica
+  let timeoutId
+  if (controller && timeoutMs && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+    timeoutId = setTimeout(() => {
+      try {
+        controller.abort()
+      } catch {
+        // Ignorar fallo de abort
+      }
+    }, timeoutMs)
+  }
+
+  let res
+  try {
+    res = await fetch(url, opts)
+  } catch (err) {
+    if (err && (err.name === 'AbortError' || err.code === 'ABORT_ERR')) {
+      const e = new Error('Tiempo de espera agotado al conectar con el servidor')
+      e.status = 408
+      throw e
+    }
+    throw err
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
 
   // Manejo de 401: limpiar estado local y redirigir al login
   if (res.status === 401) {
@@ -86,11 +116,22 @@ async function request(path, { method = 'GET', body = null, headers = {}, skipAu
   if (res.status === 204) return null
 
   const contentType = res.headers.get('content-type') || ''
-  const isJson = contentType.includes('application/json')
+  const isJson = contentType.toLowerCase().includes('application/json')
 
   let data
   try {
-    data = isJson ? await res.json() : await res.text()
+    if (isJson) {
+      data = await res.json()
+    } else {
+      const txt = await res.text()
+      // Si parece JSON aunque el header no lo declare, intentar parsear
+      const looksJson = txt && (txt.trim().startsWith('{') || txt.trim().startsWith('['))
+      if (looksJson) {
+        try { data = JSON.parse(txt) } catch { data = txt }
+      } else {
+        data = txt
+      }
+    }
   } catch {
     data = null
   }
