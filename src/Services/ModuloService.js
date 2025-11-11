@@ -4,7 +4,7 @@ import { httpClient } from './httpClient'
 export const getModulosConEstadoPorDia = async (token, cursoId, dia) => {
   try {
     void token
-    const data = await httpClient.get(`/api/modulos/curso/${cursoId}/estado?dia=${dia}`)
+    const data = await httpClient.get(`/modulos/curso/${cursoId}/estado?dia=${dia}`)
     return data
   } catch (error) {
     console.error("Error en getModulosConEstadoPorDia:", error);
@@ -16,7 +16,7 @@ export const getModulosConEstadoPorDia = async (token, cursoId, dia) => {
 export const getModulosConEstadoSemana = async (token, cursoId) => {
   try {
     void token
-    const data = await httpClient.get(`/api/modulos/curso/${cursoId}/estado/semana`)
+    const data = await httpClient.get(`/modulos/curso/${cursoId}/estado/semana`)
     return data
   } catch (error) {
     console.error("Error en getModulosConEstadoSemana:", error);
@@ -28,7 +28,7 @@ export const getModulosConEstadoSemana = async (token, cursoId) => {
 export const getModulosLibresPorDia = async (token, cursoId, dia) => {
   try {
     void token
-    const data = await httpClient.get(`/api/modulos/curso/${cursoId}/libres?dia=${dia}`)
+    const data = await httpClient.get(`/modulos/curso/${cursoId}/libres?dia=${dia}`)
     return data
   } catch (error) {
     console.error("Error en getModulosLibresPorDia:", error);
@@ -40,7 +40,7 @@ export const getModulosLibresPorDia = async (token, cursoId, dia) => {
 export const getModulosLibresSemana = async (token, cursoId) => {
   try {
     void token
-    const data = await httpClient.get(`/api/modulos/curso/${cursoId}/libres/semana`)
+    const data = await httpClient.get(`/modulos/curso/${cursoId}/libres/semana`)
     return data
   } catch (error) {
     console.error("Error en getModulosLibresSemana:", error);
@@ -53,7 +53,7 @@ export const getModulosReservaEstado = async (token, espacioAulicoId, fecha) => 
   try {
     void token
     const params = new URLSearchParams({ espacioAulicoId, fecha });
-    const data = await httpClient.get(`/api/modulos/reservas/estado?${params.toString()}`)
+    const data = await httpClient.get(`/modulos/reservas/estado?${params.toString()}`)
     return data
   } catch (error) {
     console.error("Error en getModulosReservaEstado:", error);

@@ -17,7 +17,7 @@ const normalizarAlumnoResponse = (data) => {
 export const asignarTutorAAlumno = async (token, tutorId, alumnoId) => {
   try {
     void token;
-    const data = await httpClient.post(`/api/tutorAlumno/asignarTutor/${tutorId}/${alumnoId}`);
+    const data = await httpClient.post(`/tutorAlumno/asignarTutor/${tutorId}/${alumnoId}`);
     return normalizarAlumnoResponse(data);
   } catch (error) {
     console.error('Error al asignar tutor:', error);
@@ -29,7 +29,7 @@ export const asignarTutorAAlumno = async (token, tutorId, alumnoId) => {
 export const desasignarTutorDeAlumno = async (token, tutorId, alumnoId) => {
   try {
     void token;
-    const data = await httpClient.post(`/api/tutorAlumno/desasignarTutor/${tutorId}/${alumnoId}`);
+    const data = await httpClient.post(`/tutorAlumno/desasignarTutor/${tutorId}/${alumnoId}`);
     return normalizarAlumnoResponse(data);
   } catch (error) {
     console.error('Error al desasignar tutor:', error);
@@ -41,7 +41,7 @@ export const desasignarTutorDeAlumno = async (token, tutorId, alumnoId) => {
 export const listarAlumnosACargo = async (token, tutorId) => {
   try {
     void token;
-    const data = await httpClient.get(`/api/tutorAlumno/${tutorId}/alumnos`);
+    const data = await httpClient.get(`/tutorAlumno/${tutorId}/alumnos`);
     return data?.alumnoDtos ?? [];
   } catch (error) {
     console.error('Error al listar alumnos a cargo:', error);
@@ -53,7 +53,7 @@ export const listarAlumnosACargo = async (token, tutorId) => {
 export const asignarMultiplesTutores = async (token, alumnoId, tutorIds) => {
   try {
     void token;
-    const data = await httpClient.post('/api/tutorAlumno/asignar-multiples-tutores', { alumnoId, tutorIds });
+    const data = await httpClient.post('/tutorAlumno/asignar-multiples-tutores', { alumnoId, tutorIds });
     return normalizarAlumnoResponse(data);
   } catch (error) {
     console.error('Error al asignar múltiples tutores:', error);
@@ -65,7 +65,7 @@ export const asignarMultiplesTutores = async (token, alumnoId, tutorIds) => {
 export const desasignarMultiplesTutores = async (token, alumnoId, tutorIds) => {
   try {
     void token;
-    const data = await httpClient.post('/api/tutorAlumno/desasignar-multiples-tutores', { alumnoId, tutorIds });
+    const data = await httpClient.post('/tutorAlumno/desasignar-multiples-tutores', { alumnoId, tutorIds });
     return normalizarAlumnoResponse(data);
   } catch (error) {
     console.error('Error al desasignar múltiples tutores:', error);

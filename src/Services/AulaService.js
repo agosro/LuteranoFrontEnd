@@ -4,7 +4,7 @@ import { httpClient } from './httpClient'
 export const listarAulas = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/aula/list')
+    const data = await httpClient.get('/aula/list')
     return Array.isArray(data.aulaDtos) ? data.aulaDtos : []
   } catch (error) {
     console.error('Error al listar aulas:', error);
@@ -16,7 +16,7 @@ export const listarAulas = async (token) => {
 export const listarAulasLibres = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/aula/list/libres')
+    const data = await httpClient.get('/aula/list/libres')
     return Array.isArray(data.aulaDtos) ? data.aulaDtos : []
   } catch (error) {
     console.error('Error al listar aulas libres:', error);
@@ -28,7 +28,7 @@ export const listarAulasLibres = async (token) => {
 export const crearAula = async (token, aula) => {
   try {
     void token
-    const data = await httpClient.post('/api/aula/create', aula)
+    const data = await httpClient.post('/aula/create', aula)
     return data
   } catch (error) {
     console.error('Error al crear aula:', error);
@@ -40,7 +40,7 @@ export const crearAula = async (token, aula) => {
 export const editarAula = async (token, aula) => {
   try {
     void token
-    const data = await httpClient.put('/api/aula/update', aula)
+    const data = await httpClient.put('/aula/update', aula)
     return data
   } catch (error) {
     console.error('Error al editar aula:', error);
@@ -52,7 +52,7 @@ export const editarAula = async (token, aula) => {
 export const eliminarAula = async (token, id) => {
   try {
     void token
-    const data = await httpClient.delete(`/api/aula/delete/${id}`)
+    const data = await httpClient.delete(`/aula/delete/${id}`)
     return data
   } catch (error) {
     console.error('Error al eliminar aula:', error);
@@ -64,7 +64,7 @@ export const eliminarAula = async (token, id) => {
 export const obtenerAulaPorId = async (token, id) => {
   try {
     void token
-    const data = await httpClient.get(`/api/aula/${id}`)
+    const data = await httpClient.get(`/aula/${id}`)
     return data
   } catch (error) {
     console.error('Error al obtener aula por ID:', error);

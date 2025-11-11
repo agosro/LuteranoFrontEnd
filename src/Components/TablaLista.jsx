@@ -11,7 +11,7 @@ import './tabla.css';
 export default function TablaGenerica({
   titulo,
   columnas,
-  datos,
+  datos = [],
   onView,
   onEdit,
   onDelete,
@@ -27,9 +27,12 @@ export default function TablaGenerica({
   const [paginaActual, setPaginaActual] = useState(1);
   const [itemsPorPagina, setItemsPorPagina] = useState(10);
 
+  // Normalizar datos para evitar errores si llega algo distinto a array
+  const safeDatos = useMemo(() => (Array.isArray(datos) ? datos : []), [datos])
+
   // Filtrar datos (solo filtros por columna)
   const datosFiltrados = useMemo(() => {
-  return datos.filter((item) => {
+  return safeDatos.filter((item) => {
     // filtros por columna (AND)
     for (const [k, fv] of Object.entries(filtrosColumnas)) {
       if (!fv) continue;
@@ -52,7 +55,7 @@ export default function TablaGenerica({
 
     return true;
   });
-}, [datos, filtrosColumnas]);
+}, [safeDatos, filtrosColumnas]);
 
   // Paginación
   const totalPaginas = Math.ceil(datosFiltrados.length / itemsPorPagina);

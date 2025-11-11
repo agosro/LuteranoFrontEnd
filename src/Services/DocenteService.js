@@ -4,7 +4,7 @@ import { httpClient } from './httpClient'
 export const listarDocentes = async (token) => {
   try {
     void token
-    const data = await httpClient.get('/api/docente/list')
+    const data = await httpClient.get('/docente/list')
     return Array.isArray(data.docenteDtos) ? data.docenteDtos : []
   } catch (error) {
     console.error('Error al listar docentes:', error);
@@ -16,7 +16,7 @@ export const listarDocentes = async (token) => {
 export const crearDocente = async (token, docente) => {
   try {
     void token
-    const data = await httpClient.post('/api/docente/create', docente)
+    const data = await httpClient.post('/docente/create', docente)
     return data
   } catch (error) {
     console.error('Error al crear docente:', error);
@@ -28,7 +28,7 @@ export const crearDocente = async (token, docente) => {
 export const editarDocente = async (token, docente) => {
   try {
     void token
-    const data = await httpClient.put('/api/docente/update', docente)
+    const data = await httpClient.put('/docente/update', docente)
     return data
   } catch (error) {
     console.error('Error al editar docente:', error);
@@ -40,7 +40,7 @@ export const editarDocente = async (token, docente) => {
 export const eliminarDocente = async (token, id) => {
   try {
     void token
-    const data = await httpClient.delete(`/api/docente/delete/${id}`)
+    const data = await httpClient.delete(`/docente/delete/${id}`)
     return data
   } catch (error) {
     console.error('Error al eliminar docente:', error);
@@ -50,7 +50,7 @@ export const eliminarDocente = async (token, id) => {
 
 export const obtenerDocentePorUserId = async (token, userId) => {
   try {
-    const data = await httpClient.get(`/api/docente/usuario/${userId}`, {
+    const data = await httpClient.get(`/docente/usuario/${userId}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     })
     return data.docente || null

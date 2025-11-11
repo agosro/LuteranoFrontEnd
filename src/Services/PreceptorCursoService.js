@@ -11,13 +11,13 @@ const parseCursoResponse = (data, defaultErrorMsg) => {
 // Asignar preceptor a curso
 export const asignarPreceptorACurso = async (token, cursoId, preceptorId) => {
   void token
-  const data = await httpClient.post(`/api/preceptorCurso/${cursoId}/preceptor/${preceptorId}`)
+  const data = await httpClient.post(`/preceptorCurso/${cursoId}/preceptor/${preceptorId}`)
   return parseCursoResponse(data, 'Error al asignar preceptor al curso')
 };
 
 // Desasignar preceptor de curso
 export const desasignarPreceptorDeCurso = async (token, cursoId) => {
   void token
-  const data = await httpClient.delete(`/api/preceptorCurso/${cursoId}/preceptor`)
+  const data = await httpClient.delete(`/preceptorCurso/${cursoId}/preceptor`)
   return parseCursoResponse(data, 'Error al desasignar preceptor del curso')
 };

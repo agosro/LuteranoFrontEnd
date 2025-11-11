@@ -14,7 +14,7 @@ export const listarTutores = async (token, { force = false } = {}) => {
     if (!force && _cacheTutores && (now - _cacheTimestamp) < CACHE_TTL_MS) {
       return _cacheTutores;
     }
-    const data = await httpClient.get('/api/tutor/list');
+    const data = await httpClient.get('/tutor/list');
     _cacheTutores = data.tutores || [];
     _cacheTimestamp = now;
     return _cacheTutores;
@@ -46,7 +46,7 @@ export const buscarTutores = async (query, token) => {
 export const crearTutor = async (tutor, token) => {
   try {
     void token
-    return await httpClient.post('/api/tutor/create', tutor)
+    return await httpClient.post('/tutor/create', tutor)
   } catch (error) {
     console.error("Error al crear tutor:", error);
     throw error;
@@ -57,7 +57,7 @@ export const crearTutor = async (tutor, token) => {
 export const editarTutor = async (tutor, token) => {
   try {
     void token
-    return await httpClient.put('/api/tutor/update', tutor)
+    return await httpClient.put('/tutor/update', tutor)
   } catch (error) {
     console.error("Error al actualizar tutor:", error);
     throw error;
@@ -68,7 +68,7 @@ export const editarTutor = async (tutor, token) => {
 export const eliminarTutor = async (id, token) => {
   try {
     void token
-    return await httpClient.delete(`/api/tutor/delete/${id}`)
+    return await httpClient.delete(`/tutor/delete/${id}`)
   } catch (error) {
     console.error("Error al eliminar tutor:", error);
     throw error;
