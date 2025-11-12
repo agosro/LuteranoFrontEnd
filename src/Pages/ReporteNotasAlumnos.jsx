@@ -3,7 +3,7 @@ import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge } from "reac
 import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import { useAuth } from "../Context/AuthContext";
 import { useLocation } from "react-router-dom";
-import { listarAlumnosConFiltros } from "../Services/AlumnoService";
+import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
 // import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { listarCalifPorAnio } from "../Services/CalificacionesService";
@@ -33,6 +33,9 @@ export default function ReporteNotasAlumnos() {
   const [anio, setAnio] = useState(anioFromUrl ? Number(anioFromUrl) : new Date().getFullYear());
   const [alumnoId, setAlumnoId] = useState(preselectedAlumnoId || "");
   const [alumnoOption, setAlumnoOption] = useState(null);
+  const [alumnos, setAlumnos] = useState([]);
+  const [incluirEgresados, setIncluirEgresados] = useState(false);
+  const [anioEgreso, setAnioEgreso] = useState(new Date().getFullYear());
   const [cursos, setCursos] = useState([]);
   const [cursoAnioSel, setCursoAnioSel] = useState("");
   const [divisionSel, setDivisionSel] = useState("");
@@ -76,6 +79,47 @@ export default function ReporteNotasAlumnos() {
     if (token) loadCursos();
     return () => { active = false; };
   }, [token, user]);
+
+  // Generar años posibles para egresados
+  const aniosEgresoDisponibles = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = currentYear + 1; i >= currentYear - 10; i--) {
+      years.push(i);
+    }
+    return years;
+  }, []);
+
+  // Cargar alumnos según filtro de egresados
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        let lista = [];
+        if (incluirEgresados) {
+          const listaEgresados = await listarAlumnosEgresados(token);
+          lista = (listaEgresados || []).filter(alumno => {
+            if (!alumno.historialCursos || alumno.historialCursos.length === 0) return false;
+            const historiales = [...alumno.historialCursos]
+              .filter(h => h.fechaHasta != null)
+              .sort((a, b) => new Date(b.fechaHasta) - new Date(a.fechaHasta));
+            if (historiales.length === 0) return false;
+            const ultimoHistorial = historiales[0];
+            const yearEgreso = new Date(ultimoHistorial.fechaHasta).getFullYear();
+            return yearEgreso === anioEgreso;
+          });
+        } else {
+          const listaActivos = await listarAlumnosConFiltros(token, {});
+          lista = listaActivos || [];
+        }
+        if (active) setAlumnos(lista);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (token) load();
+    return () => { active = false; };
+  }, [token, incluirEgresados, anioEgreso]);
 
   // Derivar opciones de año y división a partir de cursos
   const aniosCursoOptions = useMemo(() => {
@@ -300,43 +344,66 @@ export default function ReporteNotasAlumnos() {
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
-      <h2 className="mb-3">Notas de un Alumno</h2>
+      <h2 className="mb-2">Notas de un Alumno</h2>
+      <p className="text-muted mb-3">
+        Consultá el detalle completo de calificaciones por materia, incluyendo las notas de cada etapa, promedios y estado de aprobación.
+      </p>
 
       <Card className="mb-4">
         <Card.Body>
           <Form onSubmit={onSubmit}>
             <Row className="g-3">
-              <Col md={3}>
-                <Form.Label>Curso (Año, opcional)</Form.Label>
-                <Form.Select value={cursoAnioSel} onChange={(e)=>setCursoAnioSel(e.target.value)}>
-                  <option value="">Todos</option>
-                  {aniosCursoOptions.map(an => (
-                    <option key={an} value={an}>{an}</option>
-                  ))}
-                </Form.Select>
-              </Col>
-              <Col md={3}>
-                <Form.Label>División (opcional)</Form.Label>
-                <Form.Select value={divisionSel} onChange={(e)=>setDivisionSel(e.target.value)} disabled={!cursoAnioSel}>
-                  <option value="">Todas</option>
-                  {divisionesOptions.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </Form.Select>
-              </Col>
-              <Col md={7}>
-                <Form.Label>Alumno</Form.Label>
-                <AsyncAlumnoSelect
-                  key={alumnoSelectKey}
-                  token={token}
-                  value={alumnoOption}
-                  onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
-                  cursos={cursos}
-                  cursoId={cursoId}
-                  cursoAnioSel={cursoAnioSel}
-                  showDniSearch={true}
+              <Col md={2}>
+                <Form.Check 
+                  type="checkbox"
+                  label="Buscar egresados"
+                  checked={incluirEgresados}
+                  onChange={(e) => { 
+                    setIncluirEgresados(e.target.checked);
+                    if (!e.target.checked) {
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }
+                  }}
+                  className="mb-2"
                 />
+                {incluirEgresados && (
+                  <>
+                    <Form.Label className="small">Año de egreso</Form.Label>
+                    <Form.Select 
+                      size="sm"
+                      value={anioEgreso} 
+                      onChange={(e)=>setAnioEgreso(Number(e.target.value))}
+                    >
+                      {aniosEgresoDisponibles.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </Form.Select>
+                  </>
+                )}
               </Col>
+              {!incluirEgresados && (
+                <>
+                  <Col md={2}>
+                    <Form.Label>Curso (Año, opcional)</Form.Label>
+                    <Form.Select value={cursoAnioSel} onChange={(e)=>setCursoAnioSel(e.target.value)}>
+                      <option value="">Todos</option>
+                      {aniosCursoOptions.map(an => (
+                        <option key={an} value={an}>{an}</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label>División (opcional)</Form.Label>
+                    <Form.Select value={divisionSel} onChange={(e)=>setDivisionSel(e.target.value)} disabled={!cursoAnioSel}>
+                      <option value="">Todas</option>
+                      {divisionesOptions.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                </>
+              )}
               <Col md={2}>
                 <Form.Label>Año</Form.Label>
                 <Form.Select value={anio} onChange={(e) => setAnio(e.target.value)}>
@@ -347,8 +414,19 @@ export default function ReporteNotasAlumnos() {
                   ))}
                 </Form.Select>
               </Col>
+              <Col md={incluirEgresados ? 6 : 2}>
+                <Form.Label>Alumno</Form.Label>
+                <AsyncAlumnoSelect
+                  key={alumnoSelectKey}
+                  token={token}
+                  value={alumnoOption}
+                  onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
+                  cursoId={incluirEgresados ? "" : cursoId}
+                  alumnosExternos={incluirEgresados ? alumnos : null}
+                />
+              </Col>
               <Col md={2} className="d-flex align-items-end">
-                <Button type="submit" variant="primary" disabled={loading || !alumnoId}>
+                <Button type="submit" variant="primary" disabled={loading || !alumnoId} className="w-100">
                   {loading ? (
                     <>
                       <Spinner size="sm" animation="border" className="me-2" /> Generando...
