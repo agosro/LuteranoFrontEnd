@@ -85,7 +85,6 @@ export const menuConfig = [
     roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_AUXILIAR"],
     subItems: [
       { label: "Ciclo lectivo", path: "/configuracion/ciclo-lectivo", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
-      { label: "Parámetros", path: "/configuracion", roles: ["ROLE_ADMIN"] },
       { label: "Importar Alumnos", path: "/configuracion/importar-alumnos", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Importar Calificaciones", path: "/configuracion/importar-calificaciones", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       // Habilitar para ROLE_AUXILIAR
