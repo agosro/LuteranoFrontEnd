@@ -6,7 +6,7 @@ import BackButton from "../Components/Botones/BackButton";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
-import { listarAlumnosConFiltros } from "../Services/AlumnoService";
+import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
 // import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { obtenerInformeAnualAlumno } from "../Services/ReporteAnualAlumnoService";
 
@@ -24,6 +24,11 @@ export default function ReporteAnualAlumno() {
   const [cursoId, setCursoId] = useState("");
   const [alumnoId, setAlumnoId] = useState(preselectedAlumnoId || "");
   const [alumnoOption, setAlumnoOption] = useState(null);
+
+  // Egresados
+  const [alumnos, setAlumnos] = useState([]);
+  const [incluirEgresados, setIncluirEgresados] = useState(false);
+  const [anioEgreso, setAnioEgreso] = useState(new Date().getFullYear());
 
   // Estado
   const [loading, setLoading] = useState(false);
@@ -104,6 +109,42 @@ export default function ReporteAnualAlumno() {
     loadPreselected();
     return () => { active = false; };
   }, [preselectedAlumnoId, token]);
+
+  // Años de egreso disponibles
+  const aniosEgresoDisponibles = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let y = currentYear + 1; y >= currentYear - 10; y--) {
+      years.push(y);
+    }
+    return years;
+  }, []);
+
+  // Cargar alumnos egresados filtrados por año
+  useEffect(() => {
+    if (!incluirEgresados || !token) {
+      setAlumnos([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const lista = await listarAlumnosEgresados(token);
+        if (!active) return;
+        // Filtrar por año de egreso usando HistorialCurso fechaHasta
+        const filtrados = (lista || []).filter(alumno => {
+          const hist = (alumno.historialCursos || []).find(h => h.fechaHasta);
+          if (!hist || !hist.fechaHasta) return false;
+          const fechaHastaYear = new Date(hist.fechaHasta).getFullYear();
+          return fechaHastaYear === anioEgreso;
+        });
+        setAlumnos(filtrados);
+      } catch {
+        setAlumnos([]);
+      }
+    })();
+    return () => { active = false; };
+  }, [incluirEgresados, anioEgreso, token]);
 
   // Forzar remontar el selector cuando cambian año/división/cursoId
   const alumnoSelectKey = React.useMemo(
@@ -255,37 +296,57 @@ export default function ReporteAnualAlumno() {
         <Card.Body>
           <Form onSubmit={onSubmit}>
             <Row className="g-3">
-              <Col md={3}>
-                <Form.Label>Curso (Año, opcional)</Form.Label>
-                <Form.Select value={cursoAnioSel} onChange={(e)=>setCursoAnioSel(e.target.value)}>
-                  <option value="">Todos</option>
-                  {aniosCursoOptions.map(an => (
-                    <option key={an} value={an}>{an}</option>
-                  ))}
-                </Form.Select>
-              </Col>
-              <Col md={3}>
-                <Form.Label>División (opcional)</Form.Label>
-                <Form.Select value={divisionSel} onChange={(e)=>setDivisionSel(e.target.value)} disabled={!cursoAnioSel}>
-                  <option value="">Todas</option>
-                  {divisionesOptions.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </Form.Select>
-              </Col>
-              <Col md={7}>
-                <Form.Label>Alumno</Form.Label>
-                <AsyncAlumnoSelect
-                  key={alumnoSelectKey}
-                  token={token}
-                  value={alumnoOption}
-                  onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
-                  cursos={cursos}
-                  cursoId={cursoId}
-                  cursoAnioSel={cursoAnioSel}
-                  showDniSearch={true}
+              <Col md={2}>
+                <Form.Check 
+                  type="checkbox"
+                  label="Buscar egresados"
+                  checked={incluirEgresados}
+                  onChange={(e) => { 
+                    setIncluirEgresados(e.target.checked);
+                    if (!e.target.checked) {
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }
+                  }}
+                  className="mb-2"
                 />
+                {incluirEgresados && (
+                  <>
+                    <Form.Label className="small">Año de egreso</Form.Label>
+                    <Form.Select 
+                      size="sm"
+                      value={anioEgreso} 
+                      onChange={(e)=>setAnioEgreso(Number(e.target.value))}
+                    >
+                      {aniosEgresoDisponibles.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </Form.Select>
+                  </>
+                )}
               </Col>
+              {!incluirEgresados && (
+                <>
+                  <Col md={2}>
+                    <Form.Label>Curso (Año, opcional)</Form.Label>
+                    <Form.Select value={cursoAnioSel} onChange={(e)=>setCursoAnioSel(e.target.value)}>
+                      <option value="">Todos</option>
+                      {aniosCursoOptions.map(an => (
+                        <option key={an} value={an}>{an}</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label>División (opcional)</Form.Label>
+                    <Form.Select value={divisionSel} onChange={(e)=>setDivisionSel(e.target.value)} disabled={!cursoAnioSel}>
+                      <option value="">Todas</option>
+                      {divisionesOptions.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                </>
+              )}
               <Col md={2}>
                 <Form.Label>Año</Form.Label>
                 <Form.Select value={anio} onChange={(e) => setAnio(e.target.value)}>
@@ -294,8 +355,19 @@ export default function ReporteAnualAlumno() {
                   ))}
                 </Form.Select>
               </Col>
+              <Col md={incluirEgresados ? 6 : 2}>
+                <Form.Label>Alumno</Form.Label>
+                <AsyncAlumnoSelect
+                  key={alumnoSelectKey}
+                  token={token}
+                  value={alumnoOption}
+                  onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
+                  cursoId={incluirEgresados ? "" : cursoId}
+                  alumnosExternos={incluirEgresados ? alumnos : null}
+                />
+              </Col>
               <Col md={2} className="d-flex align-items-end">
-                <Button type="submit" variant="primary" disabled={loading || !alumnoId}>
+                <Button type="submit" variant="primary" disabled={loading || !alumnoId} className="w-100">
                   {loading ? (<><Spinner size="sm" animation="border" className="me-2" /> Generando...</>) : "Generar reporte"}
                 </Button>
               </Col>

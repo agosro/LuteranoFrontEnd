@@ -5,7 +5,7 @@ import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
 import { useLocation } from "react-router-dom";
-import { listarAlumnosConFiltros } from "../Services/AlumnoService";
+import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
 import { obtenerHistorialActualAlumno } from "../Services/HistorialCursoService";
 import { isoToDisplay } from "../utils/fechas";
 import { getTituloCurso } from "../utils/cursos";
@@ -23,6 +23,8 @@ export default function ReporteLegajoAlumno() {
   const [alumnoId, setAlumnoId] = useState(preselectedAlumnoId || "");
   const [alumnoOption, setAlumnoOption] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
+  const [incluirEgresados, setIncluirEgresados] = useState(false);
+  const [anioEgreso, setAnioEgreso] = useState(new Date().getFullYear());
   // DNI search integrado en AsyncAlumnoSelect
 
   // Filtro opcional por curso/división
@@ -35,20 +37,56 @@ export default function ReporteLegajoAlumno() {
   const [datos, setDatos] = useState(null); // legajo compilado
   const printRef = useRef(null);
 
+  // Generar años posibles para egresados (últimos 10 años + próximo)
+  const aniosEgresoDisponibles = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = currentYear + 1; i >= currentYear - 10; i--) {
+      years.push(i);
+    }
+    return years;
+  }, []);
+
   // Cargar alumnos para selector
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const lista = await listarAlumnosConFiltros(token, {});
+        let lista = [];
+        
+        if (incluirEgresados) {
+          // Si incluir egresados está marcado, solo mostrar egresados del año seleccionado
+          const listaEgresados = await listarAlumnosEgresados(token);
+          // Filtrar por año de egreso basado en el historial curso más reciente
+          lista = (listaEgresados || []).filter(alumno => {
+            // Buscar el historial más reciente con fechaHasta
+            if (!alumno.historialCursos || alumno.historialCursos.length === 0) return false;
+            
+            // Ordenar por fechaHasta descendente y tomar el más reciente
+            const historiales = [...alumno.historialCursos]
+              .filter(h => h.fechaHasta != null)
+              .sort((a, b) => new Date(b.fechaHasta) - new Date(a.fechaHasta));
+            
+            if (historiales.length === 0) return false;
+            
+            const ultimoHistorial = historiales[0];
+            const yearEgreso = new Date(ultimoHistorial.fechaHasta).getFullYear();
+            return yearEgreso === anioEgreso;
+          });
+        } else {
+          // Cargar alumnos activos
+          const listaActivos = await listarAlumnosConFiltros(token, {});
+          lista = listaActivos || [];
+        }
+        
         if (active) setAlumnos(lista);
       } catch (e) {
         console.error(e);
-  } finally { /* noop */ }
+      } finally { /* noop */ }
     }
     if (token) load();
     return () => { active = false; };
-  }, [token]);
+  }, [token, incluirEgresados, anioEgreso]);
 
   // Cargar cursos para el filtro opcional
   useEffect(() => {
@@ -150,6 +188,9 @@ export default function ReporteLegajoAlumno() {
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
       <h2 className="mb-2">Legajo de Alumno</h2>
+      <p className="text-muted mb-3">
+        Consultá el legajo completo de un alumno con sus datos personales, de contacto e información académica.
+      </p>
       <div className="mb-3">
         {cicloLectivo?.id ? (
           <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
@@ -161,29 +202,73 @@ export default function ReporteLegajoAlumno() {
       <Card className="mb-4">
         <Card.Body>
           <Form onSubmit={onGenerar}>
-            <Row className="g-3">
-              <Col md={4}>
-                <Form.Label>Curso (opcional)</Form.Label>
-                <Form.Select value={cursoId} onChange={(e)=>setCursoId(e.target.value)} disabled={loadingCursos}>
-                  <option value="">Todos</option>
-                  {cursos.map(c => (
-                    <option key={c.id} value={c.id}>{getTituloCurso(c) || c.nombre || `${c.anio||''} ${c.division||''}`}</option>
-                  ))}
-                </Form.Select>
+            <Row className="g-3 align-items-end">
+              <Col md={2}>
+                <Form.Check 
+                  type="checkbox"
+                  label="Buscar egresados"
+                  checked={incluirEgresados}
+                  onChange={(e) => { 
+                    setIncluirEgresados(e.target.checked);
+                    if (!e.target.checked) {
+                      // Limpiar selección al desmarcar
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }
+                  }}
+                  className="mb-2"
+                />
+                {incluirEgresados && (
+                  <>
+                    <Form.Label className="small">Año de egreso</Form.Label>
+                    <Form.Select 
+                      size="sm"
+                      value={anioEgreso} 
+                      onChange={(e)=>setAnioEgreso(Number(e.target.value))}
+                    >
+                      {aniosEgresoDisponibles.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </Form.Select>
+                  </>
+                )}
               </Col>
-              <Col md={8}>
+              {!incluirEgresados && (
+                <Col md={3}>
+                  <Form.Label>Curso (opcional)</Form.Label>
+                  <Form.Select 
+                    value={cursoId} 
+                    onChange={(e)=>setCursoId(e.target.value)} 
+                    disabled={loadingCursos}
+                    style={{ height: '38px', padding: '0.375rem 2.25rem 0.375rem 0.75rem' }}
+                  >
+                    <option value="">Todos</option>
+                    {cursos.map(c => (
+                      <option key={c.id} value={c.id}>{getTituloCurso(c) || c.nombre || `${c.anio||''} ${c.division||''}`}</option>
+                    ))}
+                  </Form.Select>
+                </Col>
+              )}
+              <Col md={incluirEgresados ? 8 : 5}>
                 <Form.Label>Alumno</Form.Label>
                 <AsyncAlumnoSelect
                   token={token}
                   value={alumnoOption}
                   onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
-                  cursos={cursos}
-                  cursoId={cursoId}
-                  showDniSearch={true}
+                  cursoId={incluirEgresados ? "" : cursoId}
+                  alumnosExternos={incluirEgresados ? alumnos : null}
                 />
               </Col>
-              <Col md={12} className="d-flex align-items-end justify-content-end">
-                <Button type="submit" variant="primary" disabled={loading}>{loading ? <><Spinner size="sm" animation="border" className="me-2"/>Generando...</> : "Generar"}</Button>
+              <Col md={2}>
+                <Button 
+                  type="submit" 
+                  variant="primary" 
+                  disabled={loading} 
+                  className="w-100"
+                  style={{ height: '38px', padding: '0.375rem 0.75rem' }}
+                >
+                  {loading ? <><Spinner size="sm" animation="border" className="me-2"/>Generando...</> : "Generar"}
+                </Button>
               </Col>
             </Row>
           </Form>
@@ -217,9 +302,7 @@ export default function ReporteLegajoAlumno() {
                     <div className="small">N° Doc.: <strong>{datos.alumno?.dni || '-'}</strong></div>
                     <div className="small">Género: <strong>{datos.alumno?.genero || '-'}</strong></div>
                     <div className="small">Fecha Nac.: <strong>{datos.alumno?.fechaNacimiento ? isoToDisplay(datos.alumno.fechaNacimiento) : '-'}</strong></div>
-                    <div className="small">Nacionalidad: <strong>{datos.alumno?.nacionalidad || '-'}</strong></div>
                     <div className="small">Domicilio: <strong>{datos.alumno?.direccion || '-'}</strong></div>
-                    <div className="small">Localidad: <strong>{datos.alumno?.localidad || '-'}</strong></div>
                     <div className="small">Ingreso: <strong>{datos.alumno?.fechaIngreso ? isoToDisplay(datos.alumno.fechaIngreso) : '-'}</strong></div>
                   </div>
                 </Col>
@@ -240,7 +323,7 @@ export default function ReporteLegajoAlumno() {
                 </Col>
               </Row>
 
-              <Row className="mb-3">
+              <Row>
                 <Col md={12}>
                   <div className="box">
                     <h6>Curso vigente</h6>
@@ -249,20 +332,10 @@ export default function ReporteLegajoAlumno() {
                         <div>Curso: <strong>{getTituloCurso(datos.vigente?.curso) || '-'}</strong></div>
                         <div>Ciclo Lectivo: <strong>{datos.vigente?.cicloLectivo?.nombre || '-'}</strong></div>
                         <div>Desde: <strong>{datos.vigente?.fechaDesde ? isoToDisplay(datos.vigente.fechaDesde) : '-'}</strong> {datos.vigente?.fechaHasta ? <>• Hasta: <strong>{isoToDisplay(datos.vigente.fechaHasta)}</strong></> : null}</div>
-                        <div>Estado: <strong>{datos.vigente?.estado || '-'}</strong></div>
                       </div>
                     ) : (
                       <div className="text-muted small">Sin curso vigente</div>
                     )}
-                  </div>
-                </Col>
-              </Row>
-
-              <Row>
-                <Col md={12}>
-                  <div className="box">
-                    <h6>Documentos adjuntos</h6>
-                    <div className="text-muted small">Aún no implementado. Cuando exista el endpoint de documentos, se listarán aquí (CVAC, CDOM, CANP, CUS, DNI-F, DNI-D, PNAC, FPACE, etc.) con botones para "Ver archivo".</div>
                   </div>
                 </Col>
               </Row>
