@@ -1,37 +1,42 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Container, Card, Row, Col, Form, Button, Spinner, Table, Badge, Alert, Accordion } from 'react-bootstrap';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
+import AsyncDocenteSelect from '../Components/Controls/AsyncDocenteSelect';
+import { listarCursos } from '../Services/CursoService';
 import { listarMaterias } from '../Services/MateriaService';
-import { listarDocentes } from '../Services/DocenteService';
-import { reporteCompleto, reportePorMateria, reportePorDocente } from '../Services/ReporteDesempenoDocenteService';
+import { reporteCompleto, reportePorDocente, reportePorCurso, reportePorMateria } from '../Services/ReporteDesempenoDocenteService';
 import { toast } from 'react-toastify';
 // Exportación a PDF: este reporte usará ventana de impresión, igual que otros reportes del sistema
 
 export default function ReporteDesempenoDocente() {
   const { user } = useAuth();
   const token = user?.token;
+  const navigate = useNavigate();
 
   const [anio, setAnio] = useState(new Date().getFullYear());
+  const [cursos, setCursos] = useState([]);
   const [materias, setMaterias] = useState([]);
-  const [docentes, setDocentes] = useState([]);
+  const [cursoId, setCursoId] = useState('');
   const [materiaId, setMateriaId] = useState('');
+  const [docenteOpt, setDocenteOpt] = useState(null);
   const [docenteId, setDocenteId] = useState('');
-  const [filtroDocente, setFiltroDocente] = useState('');
   const [cargando, setCargando] = useState(false);
   const [data, setData] = useState(null);
   const printRef = useRef(null);
 
   useEffect(() => {
+    if (!token) return;
     (async () => {
       try {
-        const [m, d] = await Promise.all([
-          listarMaterias(token).catch(() => []),
-          listarDocentes(token).catch(() => []),
+        const [cursosList, materiasList] = await Promise.all([
+          listarCursos(token).catch(() => []),
+          listarMaterias(token).catch(() => [])
         ]);
-        setMaterias(Array.isArray(m) ? m : []);
-        setDocentes(Array.isArray(d) ? d : []);
+        setCursos(Array.isArray(cursosList) ? cursosList : []);
+        setMaterias(Array.isArray(materiasList) ? materiasList : []);
       } catch {
         // silencioso
       }
@@ -43,8 +48,8 @@ export default function ReporteDesempenoDocente() {
       toast.error('Año inválido');
       return;
     }
-    if (materiaId && docenteId) {
-      toast.info('Elegí materia o docente, no ambos. Por ahora se genera por uno a la vez.');
+    if (cursoId) {
+      toast.error('El reporte por curso aún no está implementado en el backend. Pedí que agreguen el endpoint: GET /reportes/desempeno-docente/{anio}/curso/{cursoId}');
       return;
     }
     setCargando(true);
@@ -68,21 +73,10 @@ export default function ReporteDesempenoDocente() {
   const materiasOpts = useMemo(() => {
     const arr = Array.isArray(materias) ? materias : [];
     return arr.map((m) => ({
-      value: m.id ?? m.materiaId ?? m.codigo ?? '',
-      label: m.nombre ?? m.nombreMateria ?? m.descripcion ?? `Materia ${m.id ?? m.materiaId ?? ''}`,
+      value: m.id ?? m.materiaId ?? '',
+      label: m.nombre ?? m.nombreMateria ?? `Materia ${m.id ?? ''}`,
     })).filter(o => o.value !== '');
   }, [materias]);
-
-  const docentesFiltrados = useMemo(() => {
-    const term = (filtroDocente || '').toString().trim().toLowerCase();
-    const base = Array.isArray(docentes) ? docentes : [];
-    if (!term) return base;
-    return base.filter((d) => {
-      const nombre = `${d.apellido || ''} ${d.nombre || ''}`.toLowerCase();
-      const dni = (d.dni || d.documento || '').toString().toLowerCase();
-      return nombre.includes(term) || (dni && dni.includes(term));
-    });
-  }, [docentes, filtroDocente]);
 
   const resultadosMateria = useMemo(() => {
     return Array.isArray(data?.resultadosPorMateria) ? data.resultadosPorMateria : [];
@@ -149,12 +143,14 @@ export default function ReporteDesempenoDocente() {
       thead th { background: #f0f0f0; }
     `;
     const findMateriaLabel = () => (materiasOpts.find(o => String(o.value)===String(materiaId))?.label || 'Todas');
-    const findDocenteLabel = () => {
-      const d = (docentes || []).find(x => String(x.id)===String(docenteId));
-      return d ? `${d.apellido || ''}, ${d.nombre || ''}${d.dni ? ' ('+d.dni+')' : ''}` : 'Todos';
+    const findDocenteLabel = () => docenteOpt?.label || 'Todos';
+    const findCursoLabel = () => {
+      const c = cursos.find(x => String(x.id) === String(cursoId));
+      return c ? `${c.anio || ''}° ${c.division || ''}` : 'Todos';
     };
     const filtros = [
       `Año: ${anio}`,
+      `Curso: ${cursoId ? findCursoLabel() : 'Todos'}`,
       `Materia: ${materiaId ? findMateriaLabel() : 'Todas'}`,
       `Docente: ${docenteId ? findDocenteLabel() : 'Todos'}`,
     ].join(' · ');
@@ -177,7 +173,17 @@ export default function ReporteDesempenoDocente() {
 
       <Card className="shadow-sm">
         <Card.Body>
-          <h3 className="mb-4">Reporte de desempeño docente</h3>
+          <h3 className="mb-3">Reporte de desempeño docente</h3>
+          
+          <p className="text-muted small mb-3">
+            Este reporte analiza el rendimiento académico de los docentes según los resultados de sus alumnos. 
+            Incluye porcentajes de aprobación, promedios generales y estado de desempeño por materia y curso.
+          </p>
+
+          <Alert variant="warning" className="mb-3">
+            <strong>⚠️ Recomendación:</strong> Si generás el reporte completo de todo el año puede demorar debido a la cantidad de datos. 
+            Se recomienda filtrar por <strong>Curso</strong> o <strong>Materia</strong> para obtener resultados más rápidos y específicos.
+          </Alert>
 
           {/* Filtros */}
           <Row className="g-3 align-items-end">
@@ -187,7 +193,20 @@ export default function ReporteDesempenoDocente() {
                 <Form.Control type="number" value={anio} onChange={(e)=>setAnio(Number(e.target.value))} />
               </Form.Group>
             </Col>
-            <Col md={4} sm={6} xs={12}>
+            <Col md={2} sm={6} xs={12}>
+              <Form.Group>
+                <Form.Label>Curso (opcional)</Form.Label>
+                <Form.Select value={cursoId} onChange={(e)=>setCursoId(e.target.value)}>
+                  <option value="">-- Todos --</option>
+                  {cursos.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {`${c.anio || ''}° ${c.division || ''}`.trim()}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={3} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Materia (opcional)</Form.Label>
                 <Form.Select value={materiaId} onChange={(e)=>setMateriaId(e.target.value)}>
@@ -198,16 +217,15 @@ export default function ReporteDesempenoDocente() {
                 </Form.Select>
               </Form.Group>
             </Col>
-            <Col md={4} sm={6} xs={12}>
+            <Col md={3} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Docente (opcional)</Form.Label>
-                <Form.Control className="mb-2" placeholder="Buscar por nombre o DNI" value={filtroDocente} onChange={(e)=> setFiltroDocente(e.target.value)} />
-                <Form.Select value={docenteId} onChange={(e)=>setDocenteId(e.target.value)}>
-                  <option value="">-- Todos --</option>
-                  {docentesFiltrados.map(d => (
-                    <option key={d.id} value={d.id}>{`${d.apellido || ''}, ${d.nombre || ''}${d.dni ? ` (${d.dni})` : ''}`}</option>
-                  ))}
-                </Form.Select>
+                <AsyncDocenteSelect
+                  token={token}
+                  value={docenteOpt}
+                  onChange={(opt) => { setDocenteOpt(opt); setDocenteId(opt?.value || ''); }}
+                  placeholder="Seleccioná un docente"
+                />
               </Form.Group>
             </Col>
           </Row>
@@ -282,6 +300,7 @@ export default function ReporteDesempenoDocente() {
                                 <th>% Aprob.</th>
                                 <th>Promedio</th>
                                 <th>Estado</th>
+                                <th className="d-print-none">Acciones</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -301,13 +320,27 @@ export default function ReporteDesempenoDocente() {
                                       </Badge>
                                     ) : '-' }
                                   </td>
+                                  <td className="d-print-none">
+                                    <Button
+                                      variant="outline-primary"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (d.cursoId && d.materiaId) {
+                                          window.open(`/reportes/notas-por-curso?cursoId=${d.cursoId}&materiaId=${d.materiaId}`, '_blank');
+                                        }
+                                      }}
+                                      disabled={!d.cursoId || !d.materiaId}
+                                    >
+                                      Ver notas
+                                    </Button>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
                           </Table>
 
                           <div className="small text-muted">
-                            Total docentes: {m.totalDocentes ?? '-'} — Total alumnos: {m.totalAlumnos ?? '-'} — Rango aprobación: {typeof m.rangoAprobacion === 'number' ? `${m.rangoAprobacion.toFixed(2)}%` : '-'}
+                            Total docentes: {m.totalDocentes ?? '-'} — Total alumnos: {m.totalAlumnos ?? '-'}
                           </div>
                         </Accordion.Body>
                       </Accordion.Item>
@@ -331,6 +364,7 @@ export default function ReporteDesempenoDocente() {
                         <th>% Aprob.</th>
                         <th>Promedio</th>
                         <th>Estado</th>
+                        <th className="d-print-none">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -350,6 +384,20 @@ export default function ReporteDesempenoDocente() {
                                 {d.estadoAnalisis}
                               </Badge>
                             ) : '-' }
+                          </td>
+                          <td className="d-print-none">
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              onClick={() => {
+                                if (d.cursoId && d.materiaId) {
+                                  window.open(`/reportes/notas-por-curso?cursoId=${d.cursoId}&materiaId=${d.materiaId}`, '_blank');
+                                }
+                              }}
+                              disabled={!d.cursoId || !d.materiaId}
+                            >
+                              Ver notas
+                            </Button>
                           </td>
                         </tr>
                       ))}

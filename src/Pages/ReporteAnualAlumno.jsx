@@ -9,6 +9,7 @@ import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "
 import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
 // import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { obtenerInformeAnualAlumno } from "../Services/ReporteAnualAlumnoService";
+import { listarMaterias } from "../Services/MateriaService";
 
 export default function ReporteAnualAlumno() {
   const { user } = useAuth();
@@ -34,6 +35,7 @@ export default function ReporteAnualAlumno() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+  const [todasLasMaterias, setTodasLasMaterias] = useState([]);
   const printRef = useRef(null);
 
   // Cargar cursos según rol
@@ -55,6 +57,19 @@ export default function ReporteAnualAlumno() {
       }
     })();
   }, [token, user]);
+
+  // Cargar todas las materias para poder mostrar nombres de previas
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const lista = await listarMaterias(token);
+        setTodasLasMaterias(lista || []);
+      } catch {
+        // noop
+      }
+    })();
+  }, [token]);
 
   // Derivar opciones de año/ división
   const aniosCursoOptions = useMemo(() => {
@@ -184,14 +199,15 @@ export default function ReporteAnualAlumno() {
   const dto = data?.data; // ReporteAnualAlumnoDto
   const materias = useMemo(() => dto?.materias || [], [dto]);
 
-  // Derivados para badges
-  const cantPrevias = useMemo(() => {
-    if (!Array.isArray(dto?.materiasPreviasIds)) {
-      // alternativamente detectar previas por estado
-      return materias.filter(m => (m?.estado || '').toLowerCase() === 'desaprobado' || (m?.estadoFinal || '').toLowerCase() === 'desaprobado').length;
-    }
-    return dto.materiasPreviasIds.length;
-  }, [dto, materias]);
+  // Previas de años anteriores (basado en materiasPreviasIds del backend)
+  const materiasPrevia = useMemo(() => {
+    if (!Array.isArray(dto?.materiasPreviasIds) || dto.materiasPreviasIds.length === 0) return [];
+    return dto.materiasPreviasIds
+      .map(id => todasLasMaterias.find(m => m.id === id))
+      .filter(Boolean);
+  }, [dto, todasLasMaterias]);
+
+  const cantPrevias = materiasPrevia.length;
 
   const exportCSV = () => {
     // Construir un CSV más completo: metadatos + tabla de materias + resumen de inasistencias y previas
@@ -220,7 +236,7 @@ export default function ReporteAnualAlumno() {
       "Materia",
       "E1 N1","E1 N2","E1 N3","E1 N4","E1 Prom",
       "E2 N1","E2 N2","E2 N3","E2 N4","E2 Prom",
-      "PG","Estado","Nota Final","Estado Final","Estado Materia"
+      "PG","Estado","CO","EX","Nota Final","Estado Final","Estado Materia"
     ];
     lines.push(header);
     if (Array.isArray(materias)) {
@@ -231,17 +247,15 @@ export default function ReporteAnualAlumno() {
           r.materiaNombre || "",
           e1arr[0] ?? "", e1arr[1] ?? "", e1arr[2] ?? "", e1arr[3] ?? "", (r.e1 ?? ""),
           e2arr[0] ?? "", e2arr[1] ?? "", e2arr[2] ?? "", e2arr[3] ?? "", (r.e2 ?? ""),
-          (r.pg ?? ""), (r.estado ?? ""), (r.notaFinal ?? ""), (r.estadoFinal ?? ""), (r.estadoMateria ?? "")
+          (r.pg ?? ""), (r.estado ?? ""), (r.co ?? ""), (r.ex ?? ""), (r.notaFinal ?? ""), (r.estadoFinal ?? ""), (r.estadoMateria ?? "")
         ]);
       });
     }
     // Previas detalle
     lines.push([]);
-    lines.push(["Previas"]);
+    lines.push(["Previas (de años anteriores)"]);
     if (cantPrevias > 0) {
-      materias
-        .filter(m => (m?.estado || '').toLowerCase() === 'desaprobado' || (m?.estadoFinal || '').toLowerCase() === 'desaprobado')
-        .forEach(m => lines.push([m.materiaNombre]));
+      materiasPrevia.forEach(m => lines.push([m.nombre || m.materiaNombre || ""]));
     } else {
       lines.push(["-"]);
     }
@@ -290,41 +304,15 @@ export default function ReporteAnualAlumno() {
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
-      <h2 className="mb-3">Informe Anual de Alumno</h2>
+      <h2 className="mb-2">Informe Anual de Alumno</h2>
+      <p className="text-muted mb-3">
+        Este informe muestra el rendimiento escolar completo del alumno durante el año seleccionado, incluyendo calificaciones por materia, promedios por etapa, inasistencias y materias previas.
+      </p>
 
       <Card className="mb-4">
         <Card.Body>
           <Form onSubmit={onSubmit}>
             <Row className="g-3">
-              <Col md={2}>
-                <Form.Check 
-                  type="checkbox"
-                  label="Buscar egresados"
-                  checked={incluirEgresados}
-                  onChange={(e) => { 
-                    setIncluirEgresados(e.target.checked);
-                    if (!e.target.checked) {
-                      setAlumnoOption(null);
-                      setAlumnoId("");
-                    }
-                  }}
-                  className="mb-2"
-                />
-                {incluirEgresados && (
-                  <>
-                    <Form.Label className="small">Año de egreso</Form.Label>
-                    <Form.Select 
-                      size="sm"
-                      value={anioEgreso} 
-                      onChange={(e)=>setAnioEgreso(Number(e.target.value))}
-                    >
-                      {aniosEgresoDisponibles.map(y => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </Form.Select>
-                  </>
-                )}
-              </Col>
               {!incluirEgresados && (
                 <>
                   <Col md={2}>
@@ -355,7 +343,7 @@ export default function ReporteAnualAlumno() {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={incluirEgresados ? 6 : 2}>
+              <Col md={incluirEgresados ? 8 : 4}>
                 <Form.Label>Alumno</Form.Label>
                 <AsyncAlumnoSelect
                   key={alumnoSelectKey}
@@ -370,6 +358,39 @@ export default function ReporteAnualAlumno() {
                 <Button type="submit" variant="primary" disabled={loading || !alumnoId} className="w-100">
                   {loading ? (<><Spinner size="sm" animation="border" className="me-2" /> Generando...</>) : "Generar reporte"}
                 </Button>
+              </Col>
+            </Row>
+            <Row className="g-3 mt-2">
+              <Col md={12}>
+                <Form.Check 
+                  type="checkbox"
+                  label="Buscar egresados"
+                  checked={incluirEgresados}
+                  onChange={(e) => { 
+                    setIncluirEgresados(e.target.checked);
+                    if (!e.target.checked) {
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }
+                  }}
+                  className="d-inline-block me-3"
+                />
+                {incluirEgresados && (
+                  <>
+                    <Form.Label className="small d-inline-block me-2 mb-0">Año de egreso:</Form.Label>
+                    <Form.Select 
+                      size="sm"
+                      value={anioEgreso} 
+                      onChange={(e)=>setAnioEgreso(Number(e.target.value))}
+                      className="d-inline-block"
+                      style={{ width: 'auto' }}
+                    >
+                      {aniosEgresoDisponibles.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </Form.Select>
+                  </>
+                )}
               </Col>
             </Row>
           </Form>
@@ -448,6 +469,22 @@ export default function ReporteAnualAlumno() {
                 </div>
               </div>
 
+              {/* Explicación de columnas - No se imprime */}
+              <Alert variant="info" className="d-print-none small mb-3">
+                <strong>Referencia de columnas:</strong>
+                <ul className="mb-0 mt-2" style={{ columnCount: 2, columnGap: '2rem' }}>
+                  <li><strong>N1-N4:</strong> Notas individuales de cada etapa</li>
+                  <li><strong>E1/E2:</strong> Promedio de la Etapa 1 y 2</li>
+                  <li><strong>PG:</strong> Promedio General del año</li>
+                  <li><strong>Estado:</strong> Aprobado/Desaprobado según PG</li>
+                  <li><strong>CO:</strong> Nota de Coloquio (si aplica)</li>
+                  <li><strong>EX:</strong> Nota de Examen Final (si aplica)</li>
+                  <li><strong>Nota Final:</strong> Calificación final definitiva</li>
+                  <li><strong>Estado Final:</strong> Resultado del examen final</li>
+                  <li><strong>Estado Materia:</strong> Situación definitiva (promocionada, regular, previa, etc.)</li>
+                </ul>
+              </Alert>
+
               <div>
                 {Array.isArray(materias) && materias.length > 0 ? (
                   <Table striped bordered hover responsive size="sm">
@@ -456,8 +493,10 @@ export default function ReporteAnualAlumno() {
                         <th>Materia</th>
                         <th colSpan={5} className="text-center">1° Etapa · Calificaciones</th>
                         <th colSpan={5} className="text-center">2° Etapa · Calificaciones</th>
-                        <th>Prom PG</th>
+                        <th>PG</th>
                         <th>Estado</th>
+                        <th>CO</th>
+                        <th>EX</th>
                         <th>Nota Final</th>
                         <th>Estado Final</th>
                         <th>Estado Materia</th>
@@ -466,6 +505,8 @@ export default function ReporteAnualAlumno() {
                         <th></th>
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E1</th>
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
+                        <th></th>
+                        <th></th>
                         <th></th>
                         <th></th>
                         <th></th>
@@ -484,6 +525,8 @@ export default function ReporteAnualAlumno() {
                             <td>{e2[0] ?? '-'}</td><td>{e2[1] ?? '-'}</td><td>{e2[2] ?? '-'}</td><td>{e2[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e2 ?? '-'}</Badge></td>
                             <td><Badge bg={(r.pg ?? 0) >= 6 ? 'success' : 'danger'}>{r.pg ?? '-'}</Badge></td>
                             <td>{r.estado ?? '-'}</td>
+                            <td>{r.co ?? '-'}</td>
+                            <td>{r.ex ?? '-'}</td>
                             <td>{r.notaFinal ?? '-'}</td>
                             <td>{r.estadoFinal ?? '-'}</td>
                             <td>{r.estadoMateria ?? '-'}</td>
@@ -515,12 +558,12 @@ export default function ReporteAnualAlumno() {
           </div>
 
           <div className="card mt-2">
-            <div className="card-header"><strong>Previas</strong></div>
+            <div className="card-header"><strong>Previas (de años anteriores)</strong></div>
             <div className="card-body p-2 small">
               {cantPrevias > 0 ? (
                 <ul className="mb-0">
-                  {materias.filter(m => (m?.estado || '').toLowerCase() === 'desaprobado' || (m?.estadoFinal || '').toLowerCase() === 'desaprobado').map((m,i) => (
-                    <li key={i}>{m.materiaNombre}</li>
+                  {materiasPrevia.map((m,i) => (
+                    <li key={i}>{m.nombre || m.materiaNombre || ""}</li>
                   ))}
                 </ul>
               ) : (

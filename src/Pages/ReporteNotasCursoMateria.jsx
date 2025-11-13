@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, Row, Col, Form, Button, Table, Spinner, Alert, Badge } from "react-bootstrap";
 import { useAuth } from "../Context/AuthContext";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
@@ -17,11 +18,12 @@ export default function ReporteNotasCursoMateria() {
   const { user } = useAuth();
   const token = user?.token;
   const { cicloLectivo } = useCicloLectivo();
+  const [searchParams] = useSearchParams();
 
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [periodo, setPeriodo] = useState("Todos"); // E1, E2, Todos
   const [cursoId, setCursoId] = useState("");
-  const [materiaId, setMateriaId] = useState("");
+  const [materiasSeleccionadas, setMateriasSeleccionadas] = useState([]); // array de IDs
   const [vista, setVista] = useState("materia"); // materia | alumno | plana
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState("Todos"); // Todos | Aprobado | Desaprobado
@@ -62,7 +64,7 @@ export default function ReporteNotasCursoMateria() {
     async function loadMaterias() {
       try {
         setMaterias([]);
-        setMateriaId("");
+        setMateriasSeleccionadas([]);
         if (!cursoId) return;
         const lista = await listarMateriasDeCurso(token, cursoId);
         if (active) setMaterias(lista);
@@ -73,6 +75,37 @@ export default function ReporteNotasCursoMateria() {
     if (token) loadMaterias();
     return () => { active = false; };
   }, [token, cursoId]);
+
+  // Auto-cargar desde URL params
+  useEffect(() => {
+    const paramCursoId = searchParams.get('cursoId');
+    const paramMateriaId = searchParams.get('materiaId');
+    if (paramCursoId) {
+      setCursoId(paramCursoId);
+      if (paramMateriaId) {
+        // Esperar a que las materias se carguen y luego seleccionar
+        const checkAndLoad = async () => {
+          // Pequeño delay para que se carguen las materias primero
+          await new Promise(resolve => setTimeout(resolve, 500));
+          setMateriasSeleccionadas([paramMateriaId]);
+          // Auto-generar el reporte
+          if (token && paramCursoId) {
+            try {
+              setLoading(true);
+              const res = await resumenNotasCursoPorAnio(token, paramCursoId, anio);
+              setData(res);
+              if (res?.code && res.code < 0) setError(res.mensaje || "Error en el reporte");
+            } catch (err) {
+              setError(err.message || "Error al generar reporte");
+            } finally {
+              setLoading(false);
+            }
+          }
+        };
+        checkAndLoad();
+      }
+    }
+  }, [searchParams, token, anio]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -95,10 +128,10 @@ export default function ReporteNotasCursoMateria() {
   const collator = useMemo(() => new Intl.Collator("es-AR", { sensitivity: "base" }), []);
   const alumnos = useMemo(() => {
     let list = data?.alumnos || [];
-    if (materiaId) {
+    if (materiasSeleccionadas.length > 0) {
       list = list.map(a => ({
         ...a,
-        materias: (a.materias || []).filter(m => String(m.materiaId) === String(materiaId))
+        materias: (a.materias || []).filter(m => materiasSeleccionadas.includes(String(m.materiaId)))
       }));
     }
     // Orden por apellido, nombre
@@ -107,7 +140,7 @@ export default function ReporteNotasCursoMateria() {
       if (ap !== 0) return ap;
       return collator.compare(a.nombre || "", b.nombre || "");
     });
-  }, [data, materiaId, collator]);
+  }, [data, materiasSeleccionadas, collator]);
 
   const materiasCurso = materias.map(m => ({ id: m.materiaId ?? m.id, nombre: m.nombreMateria ?? m.nombre }));
 
@@ -119,10 +152,14 @@ export default function ReporteNotasCursoMateria() {
   }, [data, cursos, cursoId]);
 
   const materiaLabel = useMemo(() => {
-    if (!materiaId) return 'Todas';
-    const m = materiasCurso.find(x => String(x.id) === String(materiaId));
-    return m?.nombre || String(materiaId);
-  }, [materiasCurso, materiaId]);
+    if (materiasSeleccionadas.length === 0) return 'Ninguna';
+    if (materiasSeleccionadas.length === materiasCurso.length) return 'Todas';
+    if (materiasSeleccionadas.length === 1) {
+      const m = materiasCurso.find(x => String(x.id) === String(materiasSeleccionadas[0]));
+      return m?.nombre || String(materiasSeleccionadas[0]);
+    }
+    return `${materiasSeleccionadas.length} materias`;
+  }, [materiasCurso, materiasSeleccionadas]);
 
   // Filas planas alumno-materia y filtros
   const filas = useMemo(() => {
@@ -145,7 +182,7 @@ export default function ReporteNotasCursoMateria() {
   useEffect(() => {
     if (!token) return;
     // Solo hacemos NF cuando hay una única materia seleccionada
-    if (!materiaId) { setNfMap({}); return; }
+    if (materiasSeleccionadas.length !== 1) { setNfMap({}); return; }
     // Construimos la lista de alumnoIds visibles en este momento
     const alumnoIds = alumnos.map(a => a.id).filter(Boolean);
     if (alumnoIds.length === 0) { setNfMap({}); return; }
@@ -159,7 +196,7 @@ export default function ReporteNotasCursoMateria() {
           const i = idx++;
           const aid = alumnoIds[i];
           try {
-            const resp = await obtenerNotaFinalSimple(token, aid, Number(materiaId), Number(anio));
+            const resp = await obtenerNotaFinalSimple(token, aid, Number(materiasSeleccionadas[0]), Number(anio));
             results[aid] = typeof resp?.notaFinal === 'number' ? resp.notaFinal : (resp?.notaFinal ?? null);
           } catch {
             results[aid] = null;
@@ -173,9 +210,9 @@ export default function ReporteNotasCursoMateria() {
     };
     run();
     return () => { cancelled = true; };
-  }, [token, alumnos, materiaId, anio]);
+  }, [token, alumnos, materiasSeleccionadas, anio]);
 
-  const normalizar = (s) => (s || "").toString().toLowerCase();
+  const normalizar = (s) => (s || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const filasFiltradas = useMemo(() => {
     let list = filas;
@@ -211,7 +248,7 @@ export default function ReporteNotasCursoMateria() {
 
   const e1Cols = periodo !== 'E2' ? 5 : 0;
   const e2Cols = periodo !== 'E1' ? 5 : 0;
-  const showNF = Boolean(materiaId); // mostramos NF solo cuando hay materia específica
+  const showNF = materiasSeleccionadas.length === 1; // mostramos NF solo cuando hay materia específica
   const totalCols = 4 + e1Cols + e2Cols + 5 + (showNF ? 1 : 0); // +NF opcional
 
   const printOnlyTable = () => {
@@ -222,7 +259,8 @@ export default function ReporteNotasCursoMateria() {
       body { font-family: Arial, sans-serif; padding: 16px; }
       h3 { margin: 0 0 12px 0; }
       .sub { margin: 0 0 12px 0; color: #555; font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; }
+      .fw-bold { margin-top: 24px; margin-bottom: 8px; font-weight: 600; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
       th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
       thead tr:first-child th { background: #f0f0f0; }
     `;
@@ -245,7 +283,7 @@ export default function ReporteNotasCursoMateria() {
       "E1 N1","E1 N2","E1 N3","E1 N4","E1",
       "E2 N1","E2 N2","E2 N3","E2 N4","E2",
       "PG",
-      ...(materiaId ? ["NF"] : []),
+      ...(materiasSeleccionadas.length === 1 ? ["NF"] : []),
       "Estado"
     ]; 
     const rows = [];
@@ -262,7 +300,7 @@ export default function ReporteNotasCursoMateria() {
         m.e2??"",
         m.pg??"",
       ];
-      if (materiaId) base.push(nfMap[a.id] ?? "");
+      if (materiasSeleccionadas.length === 1) base.push(nfMap[a.id] ?? "");
       base.push(m.estado??"");
       rows.push(base);
     }
@@ -282,7 +320,10 @@ export default function ReporteNotasCursoMateria() {
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
-      <h2 className="mb-3">Notas por Curso y Materia</h2>
+      <h2 className="mb-2">Notas por Curso y Materia</h2>
+      <p className="text-muted mb-3">
+        Este reporte muestra las calificaciones detalladas por etapa (E1 y E2), promedio general (PG) y estado de los alumnos para las materias seleccionadas del curso elegido.
+      </p>
       <div className="mb-3">
         {cicloLectivo?.id ? (
           <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
@@ -299,18 +340,63 @@ export default function ReporteNotasCursoMateria() {
                 <Form.Select value={cursoId} onChange={(e)=>setCursoId(e.target.value)}>
                   <option value="">Seleccioná un curso</option>
                   {cursos.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre || `${c.anio || ''} ${c.division || ''} ${c.nivel || ''}`}</option>
+                    <option key={c.id} value={c.id}>{`${c.anio || ''} ${c.division || ''}`.trim()}</option>
                   ))}
                 </Form.Select>
               </Col>
               <Col md={4}>
-                <Form.Label>Materia (opcional)</Form.Label>
-                <Form.Select value={materiaId} onChange={(e)=>setMateriaId(e.target.value)} disabled={!cursoId}>
-                  <option value="">Todas</option>
-                  {materiasCurso.map(m => (
-                    <option key={m.id} value={m.id}>{m.nombre}</option>
+                <Form.Label className="d-flex justify-content-between align-items-center">
+                  <span>Materias</span>
+                  <div className="d-flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline-secondary" 
+                      onClick={() => setMateriasSeleccionadas(materiasCurso.map(m => String(m.id)))}
+                      disabled={!cursoId || materiasCurso.length === 0}
+                    >
+                      Todas
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline-secondary" 
+                      onClick={() => setMateriasSeleccionadas([])}
+                      disabled={!cursoId || materiasSeleccionadas.length === 0}
+                    >
+                      Ninguna
+                    </Button>
+                  </div>
+                </Form.Label>
+                <div 
+                  className="border rounded p-2" 
+                  style={{ maxHeight: '120px', overflowY: 'auto', backgroundColor: cursoId ? '#fff' : '#e9ecef' }}
+                >
+                  {!cursoId && (
+                    <div className="text-muted small">Seleccioná un curso primero</div>
+                  )}
+                  {cursoId && materiasCurso.length === 0 && (
+                    <div className="text-muted small">No hay materias disponibles</div>
+                  )}
+                  {cursoId && materiasCurso.map(m => (
+                    <Form.Check
+                      key={m.id}
+                      type="checkbox"
+                      id={`materia-${m.id}`}
+                      label={m.nombre}
+                      checked={materiasSeleccionadas.includes(String(m.id))}
+                      onChange={(e) => {
+                        const id = String(m.id);
+                        if (e.target.checked) {
+                          setMateriasSeleccionadas([...materiasSeleccionadas, id]);
+                        } else {
+                          setMateriasSeleccionadas(materiasSeleccionadas.filter(x => x !== id));
+                        }
+                      }}
+                    />
                   ))}
-                </Form.Select>
+                </div>
+                <Form.Text className="text-muted">
+                  {materiasSeleccionadas.length > 0 ? `${materiasSeleccionadas.length} seleccionada(s)` : 'Seleccioná al menos una materia'}
+                </Form.Text>
               </Col>
               <Col md={2}>
                 <Form.Label>Año</Form.Label>

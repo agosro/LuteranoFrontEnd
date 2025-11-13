@@ -353,35 +353,6 @@ export default function ReporteNotasAlumnos() {
         <Card.Body>
           <Form onSubmit={onSubmit}>
             <Row className="g-3">
-              <Col md={2}>
-                <Form.Check 
-                  type="checkbox"
-                  label="Buscar egresados"
-                  checked={incluirEgresados}
-                  onChange={(e) => { 
-                    setIncluirEgresados(e.target.checked);
-                    if (!e.target.checked) {
-                      setAlumnoOption(null);
-                      setAlumnoId("");
-                    }
-                  }}
-                  className="mb-2"
-                />
-                {incluirEgresados && (
-                  <>
-                    <Form.Label className="small">Año de egreso</Form.Label>
-                    <Form.Select 
-                      size="sm"
-                      value={anioEgreso} 
-                      onChange={(e)=>setAnioEgreso(Number(e.target.value))}
-                    >
-                      {aniosEgresoDisponibles.map(y => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </Form.Select>
-                  </>
-                )}
-              </Col>
               {!incluirEgresados && (
                 <>
                   <Col md={2}>
@@ -414,7 +385,7 @@ export default function ReporteNotasAlumnos() {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={incluirEgresados ? 6 : 2}>
+              <Col md={incluirEgresados ? 6 : 4}>
                 <Form.Label>Alumno</Form.Label>
                 <AsyncAlumnoSelect
                   key={alumnoSelectKey}
@@ -435,6 +406,39 @@ export default function ReporteNotasAlumnos() {
                     "Generar reporte"
                   )}
                 </Button>
+              </Col>
+            </Row>
+            <Row className="g-3 mt-2">
+              <Col md={12}>
+                <Form.Check 
+                  type="checkbox"
+                  label="Buscar egresados"
+                  checked={incluirEgresados}
+                  onChange={(e) => { 
+                    setIncluirEgresados(e.target.checked);
+                    if (!e.target.checked) {
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }
+                  }}
+                  className="d-inline-block me-3"
+                />
+                {incluirEgresados && (
+                  <>
+                    <Form.Label className="small d-inline-block me-2 mb-0">Año de egreso:</Form.Label>
+                    <Form.Select 
+                      size="sm"
+                      value={anioEgreso} 
+                      onChange={(e)=>setAnioEgreso(Number(e.target.value))}
+                      className="d-inline-block"
+                      style={{ width: 'auto' }}
+                    >
+                      {aniosEgresoDisponibles.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </Form.Select>
+                  </>
+                )}
               </Col>
             </Row>
           </Form>

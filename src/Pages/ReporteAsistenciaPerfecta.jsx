@@ -5,10 +5,12 @@ import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
 import { obtenerAsistenciaPerfecta } from "../Services/ReporteAsistenciaPerfectaService";
 import { listarCursos } from "../Services/CursoService";
+import { useNavigate } from "react-router-dom";
 
 export default function ReporteAsistenciaPerfecta() {
   const { user } = useAuth();
   const token = user?.token;
+  const navigate = useNavigate();
 
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [modo, setModo] = useState('todos'); // 'todos' | 'curso' | 'top'
@@ -168,6 +170,11 @@ export default function ReporteAsistenciaPerfecta() {
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
       <h2 className="mb-3">Alumnos con Asistencia Perfecta</h2>
+      
+      <p className="text-muted small mb-3">
+        Este reporte lista los alumnos que no registran inasistencias ni tardanzas durante el año seleccionado. 
+        Podés ver el listado completo, filtrar por curso específico o consultar el ranking de cursos con más alumnos de asistencia perfecta.
+      </p>
 
       <Card className="mb-4">
         <Card.Body>
@@ -289,18 +296,32 @@ export default function ReporteAsistenciaPerfecta() {
                         <th>DNI</th>
                         <th>Curso</th>
                         <th>Nivel</th>
+                        <th className="d-print-none">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(modo === 'curso' ? alumnosCurso : alumnosTodos).length === 0 && (
-                        <tr><td colSpan={4} className="text-center text-muted">Sin datos</td></tr>
+                        <tr><td colSpan={5} className="text-center text-muted">Sin datos</td></tr>
                       )}
                       {(modo === 'curso' ? alumnosCurso : alumnosTodos).map((a, i) => (
                         <tr key={a?.id ?? i}>
-                          <td>{a?.nombre}</td>
+                          <td>
+                            <button 
+                              className="btn btn-link p-0 text-start text-decoration-none" 
+                              onClick={() => navigate(`/alumno/${a?.id}`)}
+                              style={{ border: 'none', background: 'none', color: 'inherit', cursor: 'pointer' }}
+                            >
+                              {a?.nombre}
+                            </button>
+                          </td>
                           <td>{a?.dni ?? '-'}</td>
                           <td>{a?.cursoEtiqueta ?? '-'}</td>
                           <td>{a?.nivel ?? '-'}</td>
+                          <td className="d-print-none">
+                            <Button size="sm" variant="outline-primary" onClick={() => navigate(`/alumno/${a?.id}`)}>
+                              Ver detalle
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

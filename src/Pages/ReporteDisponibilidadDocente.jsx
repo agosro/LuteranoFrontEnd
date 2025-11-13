@@ -67,8 +67,9 @@ export default function ReporteDisponibilidadDocente() {
 
   const isOcupado = (diaKey, desde, hasta) => {
     const dia = (data?.agenda || []).find(x => String(x?.dia) === String(diaKey));
-    if (!dia) return false;
-    return (dia?.bloques || []).some(b => String(b?.horaDesde) === String(desde) && String(b?.horaHasta) === String(hasta));
+    if (!dia) return null;
+    const bloque = (dia?.bloques || []).find(b => String(b?.horaDesde) === String(desde) && String(b?.horaHasta) === String(hasta));
+    return bloque || null;
   };
 
   const exportCSV = () => {
@@ -80,7 +81,16 @@ export default function ReporteDisponibilidadDocente() {
     lines.push(["Hora", ...diasOrden.map(etiquetaDia)]);
     timeRows.forEach(r => {
       const row = [`${formatHM(r.desde)} a ${formatHM(r.hasta)}`];
-      diasOrden.forEach(d => row.push(isOcupado(d, r.desde, r.hasta) ? 'Ocupado' : 'Libre'));
+      diasOrden.forEach(d => {
+        const bloque = isOcupado(d, r.desde, r.hasta);
+        if (bloque) {
+          const materia = bloque.materiaNombre || '';
+          const curso = `${bloque.cursoAnio ?? ''} ${bloque.cursoDivision ?? ''}`.trim();
+          row.push(curso ? `${materia} (${curso})` : materia);
+        } else {
+          row.push('Libre');
+        }
+      });
       lines.push(row);
     });
     lines.push([]);
@@ -146,6 +156,11 @@ export default function ReporteDisponibilidadDocente() {
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
       <h2 className="mb-3">Disponibilidad Docente</h2>
+      
+      <p className="text-muted small mb-3">
+        Este reporte muestra la disponibilidad horaria semanal de un docente, indicando los bloques ocupados y libres. 
+        También incluye el detalle de las materias que dicta y los cursos asignados.
+      </p>
 
       <Card className="mb-4">
         <Card.Body>
@@ -221,10 +236,20 @@ export default function ReporteDisponibilidadDocente() {
                       <tr key={idx}>
                         <td>{formatHM(r.desde)} a {formatHM(r.hasta)}</td>
                         {diasOrden.map(d => {
-                          const ocupado = isOcupado(d, r.desde, r.hasta);
+                          const bloque = isOcupado(d, r.desde, r.hasta);
+                          if (bloque) {
+                            const materia = bloque.materiaNombre || 'Ocupado';
+                            const curso = `${bloque.cursoAnio ?? ''} ${bloque.cursoDivision ?? ''}`.trim();
+                            return (
+                              <td key={d} className="table-danger" style={{ fontSize: '0.85rem', padding: '4px' }}>
+                                <strong>{materia}</strong>
+                                {curso && <><br/><span className="text-muted small">({curso})</span></>}
+                              </td>
+                            );
+                          }
                           return (
-                            <td key={d} className={ocupado ? 'table-danger' : 'table-success'}>
-                              {ocupado ? 'Ocupado' : 'Libre'}
+                            <td key={d} className="table-success">
+                              Libre
                             </td>
                           );
                         })}

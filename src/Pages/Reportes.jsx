@@ -24,6 +24,10 @@ export default function Reportes() {
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-3"><BackButton /></div>
       <h2 className="mb-4 text-center">Reportes del Sistema</h2>
+      <p className="text-center text-muted mb-4">
+        Accedé a informes completos y estadísticas del desempeño académico de alumnos y docentes. 
+        Estos reportes te permiten analizar datos, exportar información y tomar decisiones basadas en resultados concretos.
+      </p>
 
       {categorias.map((categoria) => {
         const reportesDeCategoria = reportesFiltrados.filter((r) => r.categoria === categoria);

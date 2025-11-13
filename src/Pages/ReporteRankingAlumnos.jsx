@@ -44,9 +44,21 @@ export default function ReporteRankingAlumnos() {
       if (modo === 'curso') res = await rankingCurso(token, Number(cursoId), Number(anio));
       else if (modo === 'colegio') res = await rankingColegio(token, Number(anio));
       else res = await rankingTodosCursos(token, Number(anio));
+      
+      // Verificar si hay datos
+      if (modo === 'colegio' && (!res?.ranking || res.ranking.length === 0)) {
+        toast.info('No se encontraron datos para el año seleccionado');
+      } else if (modo === 'curso' && (!res?.ranking || res.ranking.length === 0)) {
+        toast.info('No se encontraron datos para el curso y año seleccionado');
+      } else if (modo === 'todos' && (!res?.cursosRanking || res.cursosRanking.length === 0)) {
+        toast.info('No se encontraron datos para el año seleccionado');
+      }
+      
       setData(res);
     } catch (e) {
+      console.error('Error en ranking:', e);
       setError(e?.message || 'Error al generar el reporte');
+      toast.error(e?.message || 'Error al generar el reporte');
     } finally { setLoading(false); }
   };
 

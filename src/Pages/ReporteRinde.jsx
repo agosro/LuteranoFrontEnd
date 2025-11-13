@@ -213,9 +213,12 @@ export default function ReporteRinde() {
     <div className="container py-3">
       <Breadcrumbs />
       <div className="mb-2"><BackButton /></div>
-      <div className="d-flex align-items-center justify-content-center mb-3">
+      <div className="d-flex align-items-center justify-content-center mb-2">
         <h2 className="m-0 text-center">Alumnos que rinden (Dic/Feb)</h2>
       </div>
+      <p className="text-muted text-center mb-3">
+        Este reporte muestra los alumnos que deben rendir materias en las mesas de examen de diciembre y febrero, indicando la condición en la que rinden (coloquio o examen final).
+      </p>
 
       <div className="card mb-3">
         <div className="card-body">

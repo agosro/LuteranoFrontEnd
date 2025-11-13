@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
@@ -9,6 +10,7 @@ import { toast } from 'react-toastify';
 export default function ReporteTardanzas() {
   const { user } = useAuth();
   const token = user?.token;
+  const navigate = useNavigate();
 
   const [modo, setModo] = useState('todos'); // 'todos' | 'curso'
   const [cursos, setCursos] = useState([]);
@@ -72,9 +74,10 @@ export default function ReporteTardanzas() {
   // Export CSV (respeta filtros actuales y los items mostrados)
   const exportCSV = () => {
     if (!items || items.length === 0) return;
-    const header = ["Alumno", "Curso", "Tardanzas"];
+    const header = ["Alumno", "DNI", "Curso", "Tardanzas"];
     const rows = items.map(it => [
       getNombreAlumno(it),
+      it.dni || '',
       getNombreCurso(it),
       getCantidadTardanzas(it)
     ]);
@@ -132,9 +135,12 @@ export default function ReporteTardanzas() {
     <div className="container py-3">
       <Breadcrumbs />
       <div className="mb-2"><BackButton /></div>
-      <div className="d-flex align-items-center justify-content-center mb-3">
+      <div className="d-flex align-items-center justify-content-center mb-2">
         <h2 className="m-0 text-center">Reporte de Tardanzas</h2>
       </div>
+      <p className="text-muted text-center mb-3">
+        Este reporte muestra la cantidad de tardanzas acumuladas por alumno en el período seleccionado. Hacé clic en el nombre del alumno para ver su detalle completo.
+      </p>
 
       <div className="card mb-3">
         <div className="card-body">
@@ -194,13 +200,15 @@ export default function ReporteTardanzas() {
               <thead className="table-light">
                 <tr>
                   <th>Alumno</th>
+                  <th>DNI</th>
                   <th>Curso</th>
                   <th className="text-end">Tardanzas</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 && (
-                  <tr><td colSpan={3} className="text-center text-muted py-3">Sin datos</td></tr>
+                  <tr><td colSpan={5} className="text-center text-muted py-3">Sin datos</td></tr>
                 )}
                 {items.map((it, idx) => {
                   const alumno = getNombreAlumno(it);
@@ -208,9 +216,27 @@ export default function ReporteTardanzas() {
                   const cant = getCantidadTardanzas(it);
                   return (
                     <tr key={idx}>
-                      <td>{alumno}</td>
+                      <td>
+                        <button 
+                          className="btn btn-link p-0 text-start" 
+                          onClick={() => navigate(`/alumno/${it.alumnoId}`)}
+                          disabled={!it.alumnoId}
+                        >
+                          {alumno}
+                        </button>
+                      </td>
+                      <td>{it.dni || '-'}</td>
                       <td>{curso}</td>
                       <td className="text-end"><span className="badge text-bg-warning text-dark">{cant}</span></td>
+                      <td>
+                        <button 
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => navigate(`/alumno/${it.alumnoId}`)}
+                          disabled={!it.alumnoId}
+                        >
+                          Ver detalle
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
