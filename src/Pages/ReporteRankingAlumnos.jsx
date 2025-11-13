@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, Row, Col, Form, Button, Spinner, Alert, Table, Accordion, Badge } from 'react-bootstrap';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
@@ -69,6 +71,90 @@ export default function ReporteRankingAlumnos() {
   const rankingColegioItems = useMemo(() => Array.isArray(data?.ranking) ? data.ranking : [], [data]);
   const todosCursosItems = useMemo(() => Array.isArray(data?.cursosRanking) ? data.cursosRanking : [], [data]);
 
+  // KPIs y gráficos
+  const kpisData = useMemo(() => {
+    if (!data) return null;
+
+    let promedios = [];
+    let totalAlumnos = 0;
+
+    if (modo === 'colegio') {
+      promedios = rankingColegioItems.map(r => r.promedio).filter(v => typeof v === 'number');
+      totalAlumnos = rankingColegioItems.length;
+    } else if (modo === 'curso') {
+      promedios = rankingCursoItems.map(r => r.promedio).filter(v => typeof v === 'number');
+      totalAlumnos = rankingCursoItems.length;
+    } else {
+      // modo === 'todos'
+      todosCursosItems.forEach(cr => {
+        const cursoPromedios = (cr?.ranking || []).map(r => r.promedio).filter(v => typeof v === 'number');
+        promedios.push(...cursoPromedios);
+        totalAlumnos += (cr?.ranking || []).length;
+      });
+    }
+
+    if (promedios.length === 0) return null;
+
+    const promedioGeneral = (promedios.reduce((a,b) => a + b, 0) / promedios.length).toFixed(2);
+    const notaMinima = Math.min(...promedios).toFixed(2);
+    const notaMaxima = Math.max(...promedios).toFixed(2);
+
+    // Distribución por rangos
+    const distribucion = [
+      { rango: '0-5', count: 0, color: '#dc3545' },
+      { rango: '6-6.9', count: 0, color: '#ffc107' },
+      { rango: '7-7.9', count: 0, color: '#17a2b8' },
+      { rango: '8-8.9', count: 0, color: '#28a745' },
+      { rango: '9-10', count: 0, color: '#20c997' }
+    ];
+
+    promedios.forEach(nota => {
+      if (nota >= 0 && nota < 6) distribucion[0].count++;
+      else if (nota >= 6 && nota < 7) distribucion[1].count++;
+      else if (nota >= 7 && nota < 8) distribucion[2].count++;
+      else if (nota >= 8 && nota < 9) distribucion[3].count++;
+      else if (nota >= 9) distribucion[4].count++;
+    });
+
+    // Top 3 alumnos para pie chart
+    let top3Data = [];
+    if (modo === 'colegio' && rankingColegioItems.length > 0) {
+      top3Data = rankingColegioItems.slice(0, 3).map((r, idx) => ({
+        name: `${idx + 1}° ${r.apellido || ''}, ${r.nombre || ''}`.trim(),
+        promedio: typeof r.promedio === 'number' ? parseFloat(r.promedio.toFixed(2)) : 0
+      }));
+    } else if (modo === 'curso' && rankingCursoItems.length > 0) {
+      top3Data = rankingCursoItems.slice(0, 3).map((r, idx) => ({
+        name: `${idx + 1}° ${r.apellido || ''}, ${r.nombre || ''}`.trim(),
+        promedio: typeof r.promedio === 'number' ? parseFloat(r.promedio.toFixed(2)) : 0
+      }));
+    }
+
+    // Distribución por curso (solo para modo 'todos')
+    let cursosData = [];
+    if (modo === 'todos' && todosCursosItems.length > 0) {
+      cursosData = todosCursosItems.map(cr => {
+        const cursoPromedios = (cr?.ranking || []).map(r => r.promedio).filter(v => typeof v === 'number');
+        const promedioCurso = cursoPromedios.length > 0 ? (cursoPromedios.reduce((a,b) => a + b, 0) / cursoPromedios.length).toFixed(2) : 0;
+        return {
+          curso: `${cr?.cursoAnio ?? ''} ${cr?.cursoDivision ?? ''}`.trim() || 'Curso',
+          promedio: parseFloat(promedioCurso),
+          alumnos: cr?.totalAlumnos ?? cursoPromedios.length
+        };
+      }).sort((a, b) => b.promedio - a.promedio);
+    }
+
+    return {
+      totalAlumnos,
+      promedioGeneral,
+      notaMinima,
+      notaMaxima,
+      distribucion,
+      top3Data,
+      cursosData
+    };
+  }, [data, modo, rankingColegioItems, rankingCursoItems, todosCursosItems]);
+
   const exportCSV = () => {
     try {
       const lines = [];
@@ -110,12 +196,94 @@ export default function ReporteRankingAlumnos() {
     const win = window.open('', '_blank'); if (!win) return;
     const css = `
       @page { size: landscape; margin: 14mm; }
-      body { font-family: Arial, sans-serif; padding: 10px; }
-      h3 { margin: 0 0 10px 0; }
-      .sub { color: #555; font-size: 12px; margin-bottom: 10px; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
-      thead th { background: #f0f0f0; }
+      body { 
+        font-family: 'Segoe UI', Arial, sans-serif; 
+        padding: 16px; 
+        color: #212529;
+      }
+      h3 { 
+        margin: 0 0 8px 0; 
+        font-size: 20px;
+        font-weight: 600;
+        color: #0d6efd;
+        border-bottom: 2px solid #0d6efd;
+        padding-bottom: 6px;
+      }
+      .sub { 
+        color: #6c757d; 
+        font-size: 12px; 
+        margin-bottom: 16px; 
+      }
+      .kpi-section {
+        background: #f8f9fa;
+        padding: 14px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+        border: 1px solid #dee2e6;
+      }
+      .kpi-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: #495057;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .kpi-card {
+        background: white;
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+      }
+      .kpi-label {
+        font-size: 10px;
+        color: #6c757d;
+        margin-bottom: 3px;
+      }
+      .kpi-value {
+        font-size: 16px;
+        font-weight: 600;
+        color: #212529;
+      }
+      .kpi-distribution {
+        font-size: 11px;
+        line-height: 1.6;
+        color: #495057;
+      }
+      .kpi-dist-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 3px 6px;
+        background: white;
+        border-radius: 3px;
+        margin-bottom: 3px;
+      }
+      table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        font-size: 11px;
+      }
+      th, td { 
+        border: 1px solid #dee2e6; 
+        padding: 6px 8px; 
+      }
+      thead th { 
+        background: #e9ecef; 
+        font-weight: 600;
+        color: #495057;
+      }
+      tbody tr:nth-child(even) {
+        background: #f8f9fa;
+      }
+      @media print {
+        body { padding: 10px; }
+        .kpi-section { page-break-inside: avoid; }
+      }
     `;
     const sub = () => {
       if (modo === 'curso') return `Año: ${anio} · Curso: ${cursoNombre || cursoId}`;
@@ -125,6 +293,31 @@ export default function ReporteRankingAlumnos() {
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Ranking de Alumnos</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>Ranking de Alumnos</h3>`);
     win.document.write(`<div class="sub">${sub()}</div>`);
+    
+    // KPIs en formato texto
+    if (kpisData) {
+      win.document.write(`<div class="kpi-section">`);
+      win.document.write(`<div class="kpi-title">📊 Resumen Estadístico</div>`);
+      
+      // Métricas principales
+      win.document.write(`<div class="kpi-grid">`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Total Alumnos</div><div class="kpi-value">${kpisData.totalAlumnos}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio General</div><div class="kpi-value">${kpisData.promedioGeneral}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Nota Máxima</div><div class="kpi-value">${kpisData.notaMaxima}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Nota Mínima</div><div class="kpi-value">${kpisData.notaMinima}</div></div>`);
+      win.document.write(`</div>`);
+      
+      // Distribución
+      win.document.write(`<div class="kpi-distribution">`);
+      win.document.write(`<strong>Distribución de Promedios:</strong><br>`);
+      kpisData.distribucion.forEach(d => {
+        win.document.write(`<div class="kpi-dist-item"><span>Rango ${d.rango}:</span><span><strong>${d.count}</strong> alumnos</span></div>`);
+      });
+      win.document.write(`</div>`);
+      
+      win.document.write(`</div>`);
+    }
+    
     win.document.write(`<div>${printRef.current.innerHTML}</div>`);
     win.document.write('</body></html>');
     win.document.close(); win.focus(); setTimeout(() => { win.print(); win.close(); }, 300);
@@ -175,6 +368,126 @@ export default function ReporteRankingAlumnos() {
       </Card>
 
       {error && <Alert variant="danger">{error}</Alert>}
+
+      {/* KPIs y Gráficos desplegables - FUERA del área de impresión */}
+      {!error && data && kpisData && (
+        <Accordion className="mb-3">
+          <Accordion.Item eventKey="0">
+            <Accordion.Header>
+              <BarChart3 size={18} className="me-2" />
+              <strong>Análisis Detallado y Gráficos</strong>
+            </Accordion.Header>
+            <Accordion.Body>
+              {/* KPIs en Cards */}
+              <Row className="g-3 mb-4">
+                <Col md={3}>
+                  <Card className="h-100 border-primary">
+                    <Card.Body className="text-center">
+                      <div className="text-muted small mb-1">Total Alumnos</div>
+                      <div className="h2 mb-0 text-primary">{kpisData.totalAlumnos}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="h-100 border-info">
+                    <Card.Body className="text-center">
+                      <div className="text-muted small mb-1">Promedio General</div>
+                      <div className="h2 mb-0 text-info">{kpisData.promedioGeneral}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="h-100 border-success">
+                    <Card.Body className="text-center">
+                      <div className="text-muted small mb-1">Nota Máxima</div>
+                      <div className="h2 mb-0 text-success">{kpisData.notaMaxima}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="h-100 border-danger">
+                    <Card.Body className="text-center">
+                      <div className="text-muted small mb-1">Nota Mínima</div>
+                      <div className="h2 mb-0 text-danger">{kpisData.notaMinima}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Gráficos */}
+              <Row className="g-3">
+                <Col md={modo === 'todos' ? 12 : 7}>
+                  <Card>
+                    <Card.Body>
+                      <h6 className="mb-3">Distribución de Promedios</h6>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={kpisData.distribucion}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="rango" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="count" name="Cantidad de alumnos" fill="#0066cc">
+                            {kpisData.distribucion.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                {modo !== 'todos' && kpisData.top3Data.length > 0 && (
+                  <Col md={5}>
+                    <Card>
+                      <Card.Body>
+                        <h6 className="mb-3">Top 3 Alumnos</h6>
+                        <ResponsiveContainer width="100%" height={250}>
+                          <BarChart data={kpisData.top3Data} layout="horizontal">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
+                            <YAxis domain={[0, 10]} />
+                            <Tooltip />
+                            <Bar dataKey="promedio" name="Promedio" fill="#ffc107" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
+                {modo === 'todos' && kpisData.cursosData.length > 0 && (
+                  <Col md={12}>
+                    <Card>
+                      <Card.Body>
+                        <h6 className="mb-3">Promedio por Curso</h6>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={kpisData.cursosData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="curso" />
+                            <YAxis domain={[0, 10]} />
+                            <Tooltip 
+                              formatter={(value, name) => {
+                                if (name === 'promedio') return [value, 'Promedio'];
+                                return [value, name];
+                              }}
+                              labelFormatter={(label) => {
+                                const curso = kpisData.cursosData.find(c => c.curso === label);
+                                return `${label} (${curso?.alumnos || 0} alumnos)`;
+                              }}
+                            />
+                            <Legend />
+                            <Bar dataKey="promedio" name="Promedio" fill="#0066cc" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
+              </Row>
+            </Accordion.Body>
+          </Accordion.Item>
+        </Accordion>
+      )}
 
       {!error && data && (
         <>

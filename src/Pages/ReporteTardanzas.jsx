@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Card, Row, Col, Accordion } from 'react-bootstrap';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
@@ -71,6 +74,75 @@ export default function ReporteTardanzas() {
 
   const totalTardanzas = useMemo(() => items.reduce((acc, it) => acc + (it?.cantidadTardanzas ?? 0), 0), [items]);
 
+  // KPIs y gráficos
+  const kpisData = useMemo(() => {
+    if (!items || items.length === 0) return null;
+
+    const tardanzas = items.map(it => Number(it?.cantidadTardanzas) || 0);
+    const totalAlumnos = items.length;
+    const promedioTardanzas = totalAlumnos > 0 ? (totalTardanzas / totalAlumnos).toFixed(1) : 0;
+    const tardanzaMinima = Math.min(...tardanzas);
+    const tardanzaMaxima = Math.max(...tardanzas);
+
+    // Distribución por rangos de tardanzas
+    const distribucion = [
+      { rango: '1-2', count: 0, color: '#28a745' },
+      { rango: '3-5', count: 0, color: '#17a2b8' },
+      { rango: '6-10', count: 0, color: '#ffc107' },
+      { rango: '11-20', count: 0, color: '#fd7e14' },
+      { rango: '21+', count: 0, color: '#dc3545' }
+    ];
+
+    tardanzas.forEach(tard => {
+      if (tard >= 1 && tard <= 2) distribucion[0].count++;
+      else if (tard >= 3 && tard <= 5) distribucion[1].count++;
+      else if (tard >= 6 && tard <= 10) distribucion[2].count++;
+      else if (tard >= 11 && tard <= 20) distribucion[3].count++;
+      else if (tard >= 21) distribucion[4].count++;
+    });
+
+    // Distribución por curso (si hay varios cursos)
+    const cursoCounts = {};
+    items.forEach(it => {
+      const curso = getNombreCurso(it);
+      if (!cursoCounts[curso]) {
+        cursoCounts[curso] = { total: 0, alumnos: 0 };
+      }
+      cursoCounts[curso].total += Number(it?.cantidadTardanzas) || 0;
+      cursoCounts[curso].alumnos += 1;
+    });
+
+    const cursoData = Object.entries(cursoCounts)
+      .map(([curso, data]) => ({
+        curso,
+        tardanzas: data.total,
+        promedio: (data.total / data.alumnos).toFixed(1),
+        alumnos: data.alumnos
+      }))
+      .sort((a, b) => b.tardanzas - a.tardanzas);
+
+    // Top 5 alumnos con más tardanzas
+    const top5 = [...items]
+      .sort((a, b) => (Number(b?.cantidadTardanzas) || 0) - (Number(a?.cantidadTardanzas) || 0))
+      .slice(0, 5)
+      .map(it => ({
+        nombre: getNombreAlumno(it).substring(0, 20),
+        tardanzas: Number(it?.cantidadTardanzas) || 0
+      }));
+
+    return {
+      totalAlumnos,
+      totalTardanzas,
+      promedioTardanzas,
+      tardanzaMinima,
+      tardanzaMaxima,
+      distribucion,
+      cursoData,
+      top5,
+      mostrarCursos: modo === 'todos' && cursoData.length > 1
+    };
+  }, [items, totalTardanzas, modo]);
+
   // Export CSV (respeta filtros actuales y los items mostrados)
   const exportCSV = () => {
     if (!items || items.length === 0) return;
@@ -106,6 +178,13 @@ export default function ReporteTardanzas() {
       body { font-family: Arial, sans-serif; padding: 16px; }
       h3 { margin: 0 0 12px 0; }
       .sub { margin: 0 0 12px 0; color: #555; font-size: 12px; }
+      .kpi-section { margin: 0 0 16px 0; padding: 12px; border: 1px solid #ddd; background: #f9f9f9; }
+      .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+      .kpi-card { padding: 8px; border: 1px solid #ccc; background: #fff; }
+      .kpi-label { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; }
+      .kpi-value { font-size: 18px; font-weight: bold; }
+      .dist-list { margin: 8px 0 0 0; padding-left: 0; list-style: none; font-size: 11px; }
+      .dist-list li { margin-bottom: 2px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
       thead tr:first-child th { background: #f0f0f0; }
@@ -121,9 +200,30 @@ export default function ReporteTardanzas() {
     };
     const rango = (desde || hasta) ? `${fmt(desde)} – ${fmt(hasta)}` : 'Todos';
     const sub = `Rango: ${rango} · Top N: ${limit ?? ''}`;
+    
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Tardanzas</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>${titulo}</h3>`);
     win.document.write(`<div class="sub">${sub}</div>`);
+    
+    // KPIs en PDF
+    if (kpisData) {
+      win.document.write(`<div class="kpi-section">`);
+      win.document.write(`<div class="kpi-grid">`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Total Alumnos</div><div class="kpi-value">${kpisData.totalAlumnos}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Total Tardanzas</div><div class="kpi-value">${kpisData.totalTardanzas}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio por Alumno</div><div class="kpi-value">${kpisData.promedioTardanzas}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Máximo</div><div class="kpi-value">${kpisData.tardanzaMaxima}</div><div style="font-size:10px;color:#666;">Mínimo: ${kpisData.tardanzaMinima}</div></div>`);
+      win.document.write(`</div>`);
+      
+      // Distribución
+      win.document.write(`<div><strong style="font-size:11px;">Distribución por rangos:</strong><ul class="dist-list">`);
+      kpisData.distribucion.forEach(d => {
+        win.document.write(`<li>${d.rango} tardanzas: ${d.count} alumnos</li>`);
+      });
+      win.document.write(`</ul></div>`);
+      win.document.write(`</div>`);
+    }
+    
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
     win.document.close();
@@ -182,7 +282,121 @@ export default function ReporteTardanzas() {
         </div>
       </div>
 
-      <div className="row g-2 mb-2">
+      {/* Acordeón con KPIs (se oculta en impresión) */}
+      {kpisData && (
+        <Accordion className="mb-3 d-print-none">
+          <Accordion.Item eventKey="0">
+            <Accordion.Header>
+              <BarChart3 size={20} className="me-2" />
+              <strong>KPIs y Gráficos de Tardanzas</strong>
+            </Accordion.Header>
+            <Accordion.Body>
+              <Row className="g-3 mb-3">
+                <Col sm={12} md={6} lg={3}>
+                  <Card className="h-100 border-primary">
+                    <Card.Body>
+                      <div className="text-primary mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Alumnos</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.totalAlumnos}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col sm={12} md={6} lg={3}>
+                  <Card className="h-100 border-warning">
+                    <Card.Body>
+                      <div className="text-warning mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Tardanzas</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.totalTardanzas}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col sm={12} md={6} lg={3}>
+                  <Card className="h-100 border-info">
+                    <Card.Body>
+                      <div className="text-info mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Promedio por Alumno</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.promedioTardanzas}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col sm={12} md={6} lg={3}>
+                  <Card className="h-100 border-danger">
+                    <Card.Body>
+                      <div className="text-danger mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Máximo</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.tardanzaMaxima}</div>
+                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>Mínimo: {kpisData.tardanzaMinima}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Gráficos */}
+              <Row className="g-3">
+                {/* Distribución por rangos */}
+                <Col sm={12} lg={6}>
+                  <Card className="h-100">
+                    <Card.Header><strong>Distribución por Rangos de Tardanzas</strong></Card.Header>
+                    <Card.Body>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={kpisData.distribucion}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="rango" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="count" name="Cantidad de alumnos">
+                            {kpisData.distribucion.map((entry, idx) => (
+                              <Cell key={`cell-${idx}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                {/* Top 5 alumnos con más tardanzas */}
+                <Col sm={12} lg={6}>
+                  <Card className="h-100">
+                    <Card.Header><strong>Top 5 Alumnos con Más Tardanzas</strong></Card.Header>
+                    <Card.Body>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={kpisData.top5} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" />
+                          <YAxis type="category" dataKey="nombre" width={100} />
+                          <Tooltip />
+                          <Bar dataKey="tardanzas" fill="#fd7e14" name="Tardanzas" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                {/* Distribución por curso (solo si modo='todos' y hay varios cursos) */}
+                {kpisData.mostrarCursos && (
+                  <Col sm={12}>
+                    <Card>
+                      <Card.Header><strong>Tardanzas por Curso</strong></Card.Header>
+                      <Card.Body>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={kpisData.cursoData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="curso" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="tardanzas" fill="#17a2b8" name="Total tardanzas" />
+                            <Bar dataKey="alumnos" fill="#6c757d" name="Cantidad alumnos" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )}
+              </Row>
+            </Accordion.Body>
+          </Accordion.Item>
+        </Accordion>
+      )}
+
+      <div className="row g-2 mb-2 d-print-none">
         <div className="col-auto"><span className="badge text-bg-secondary">Total filas: {items.length}</span></div>
         <div className="col-auto"><span className="badge text-bg-warning text-dark">Total tardanzas: {totalTardanzas}</span></div>
       </div>
