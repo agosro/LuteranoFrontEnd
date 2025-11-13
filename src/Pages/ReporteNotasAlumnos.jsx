@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge } from "react-bootstrap";
+import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge, Accordion } from "react-bootstrap";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import { useAuth } from "../Context/AuthContext";
 import { useLocation } from "react-router-dom";
@@ -275,7 +277,7 @@ export default function ReporteNotasAlumnos() {
   // DNI search now handled inside AsyncAlumnoSelect
 
   const resumenDto = data?.calificacionesAlumnoResumenDto;
-  const resumen = resumenDto?.materias || [];
+  const resumen = useMemo(() => resumenDto?.materias || [], [resumenDto]);
 
   const exportCSV = () => {
     if (!resumen || resumen.length === 0) return;
@@ -320,6 +322,109 @@ export default function ReporteNotasAlumnos() {
   const desaprobadas = totalMaterias - aprobadas;
   const promedioGeneralAlumno = pgList.length ? Math.round((pgList.reduce((a,b)=>a+b,0)/pgList.length)*10)/10 : null;
 
+  // KPIs y gráficos
+  const kpisData = useMemo(() => {
+    if (!resumen || resumen.length === 0) return null;
+
+    // Promedios E1 y E2
+    const e1List = resumen.map(r => r.e1).filter(v => typeof v === 'number');
+    const e2List = resumen.map(r => r.e2).filter(v => typeof v === 'number');
+    const promedioE1 = e1List.length ? (e1List.reduce((a,b)=>a+b,0)/e1List.length).toFixed(1) : null;
+    const promedioE2 = e2List.length ? (e2List.reduce((a,b)=>a+b,0)/e2List.length).toFixed(1) : null;
+
+    // Mejor y peor materia
+    const conPG = resumen.filter(r => typeof r.pg === 'number').sort((a,b) => b.pg - a.pg);
+    const mejorMateria = conPG[0] ? { nombre: conPG[0].materiaNombre?.substring(0, 30), pg: conPG[0].pg } : null;
+    const peorMateria = conPG[conPG.length - 1] ? { nombre: conPG[conPG.length - 1].materiaNombre?.substring(0, 30), pg: conPG[conPG.length - 1].pg } : null;
+
+    // Desviación estándar
+    let desviacion = null;
+    if (pgList.length > 1 && promedioGeneralAlumno != null) {
+      const varianza = pgList.reduce((acc, pg) => acc + Math.pow(pg - promedioGeneralAlumno, 2), 0) / pgList.length;
+      desviacion = Math.sqrt(varianza).toFixed(2);
+    }
+
+    // Distribución por rangos de notas
+    const distribucion = [
+      { rango: '0-3', count: 0, color: '#dc3545' },
+      { rango: '4-5', count: 0, color: '#fd7e14' },
+      { rango: '6-7', count: 0, color: '#ffc107' },
+      { rango: '8-10', count: 0, color: '#28a745' }
+    ];
+    pgList.forEach(pg => {
+      if (pg >= 0 && pg <= 3) distribucion[0].count++;
+      else if (pg >= 4 && pg <= 5) distribucion[1].count++;
+      else if (pg >= 6 && pg <= 7) distribucion[2].count++;
+      else if (pg >= 8 && pg <= 10) distribucion[3].count++;
+    });
+
+    // Datos para radar chart (top 10 materias por nombre corto)
+    const radarData = resumen
+      .filter(r => typeof r.pg === 'number')
+      .slice(0, 10)
+      .map(r => ({
+        materia: r.materiaNombre?.substring(0, 15) || 'Sin nombre',
+        pg: r.pg
+      }));
+
+    // Datos para comparación E1 vs E2 por materia (top 10)
+    const comparacionData = resumen
+      .filter(r => typeof r.e1 === 'number' || typeof r.e2 === 'number')
+      .slice(0, 10)
+      .map(r => ({
+        materia: r.materiaNombre?.substring(0, 20) || 'Sin nombre',
+        e1: r.e1 ?? 0,
+        e2: r.e2 ?? 0
+      }));
+
+    // Datos para evolución de notas (promedio de todas las N1, N2, N3, N4)
+    const evolucionE1 = { n1: 0, n2: 0, n3: 0, n4: 0, count: 0 };
+    const evolucionE2 = { n1: 0, n2: 0, n3: 0, n4: 0, count: 0 };
+    resumen.forEach(r => {
+      if (Array.isArray(r.e1Notas)) {
+        r.e1Notas.forEach((nota, idx) => {
+          if (typeof nota === 'number') {
+            if (idx === 0) evolucionE1.n1 += nota;
+            else if (idx === 1) evolucionE1.n2 += nota;
+            else if (idx === 2) evolucionE1.n3 += nota;
+            else if (idx === 3) evolucionE1.n4 += nota;
+          }
+        });
+        if (r.e1Notas.some(n => typeof n === 'number')) evolucionE1.count++;
+      }
+      if (Array.isArray(r.e2Notas)) {
+        r.e2Notas.forEach((nota, idx) => {
+          if (typeof nota === 'number') {
+            if (idx === 0) evolucionE2.n1 += nota;
+            else if (idx === 1) evolucionE2.n2 += nota;
+            else if (idx === 2) evolucionE2.n3 += nota;
+            else if (idx === 3) evolucionE2.n4 += nota;
+          }
+        });
+        if (r.e2Notas.some(n => typeof n === 'number')) evolucionE2.count++;
+      }
+    });
+
+    const evolucionData = [
+      { nota: 'N1', e1: evolucionE1.count ? (evolucionE1.n1 / evolucionE1.count).toFixed(1) : 0, e2: evolucionE2.count ? (evolucionE2.n1 / evolucionE2.count).toFixed(1) : 0 },
+      { nota: 'N2', e1: evolucionE1.count ? (evolucionE1.n2 / evolucionE1.count).toFixed(1) : 0, e2: evolucionE2.count ? (evolucionE2.n2 / evolucionE2.count).toFixed(1) : 0 },
+      { nota: 'N3', e1: evolucionE1.count ? (evolucionE1.n3 / evolucionE1.count).toFixed(1) : 0, e2: evolucionE2.count ? (evolucionE2.n3 / evolucionE2.count).toFixed(1) : 0 },
+      { nota: 'N4', e1: evolucionE1.count ? (evolucionE1.n4 / evolucionE1.count).toFixed(1) : 0, e2: evolucionE2.count ? (evolucionE2.n4 / evolucionE2.count).toFixed(1) : 0 }
+    ];
+
+    return {
+      promedioE1,
+      promedioE2,
+      mejorMateria,
+      peorMateria,
+      desviacion,
+      distribucion,
+      radarData,
+      comparacionData,
+      evolucionData
+    };
+  }, [resumen, pgList, promedioGeneralAlumno]);
+
   const printOnlyTable = () => {
     if (!printRef.current) return;
     const win = window.open('', '_blank');
@@ -327,12 +432,29 @@ export default function ReporteNotasAlumnos() {
     const css = `
       body { font-family: Arial, sans-serif; padding: 16px; }
       h3 { margin: 0 0 12px 0; }
+      .kpi-section { margin: 0 0 16px 0; padding: 12px; border: 1px solid #ddd; background: #f9f9f9; }
+      .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+      .kpi-card { padding: 8px; border: 1px solid #ccc; background: #fff; }
+      .kpi-label { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; }
+      .kpi-value { font-size: 18px; font-weight: bold; }
       table { width: 100%; border-collapse: collapse; }
       th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
       thead tr:first-child th { background: #f0f0f0; }
     `;
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Notas</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>Notas de ${resumenDto?.apellido || ''}, ${resumenDto?.nombre || ''} - Año ${resumenDto?.anio || anio}</h3>`);
+    
+    // KPIs en PDF
+    if (kpisData) {
+      win.document.write(`<div class="kpi-section">`);
+      win.document.write(`<div class="kpi-grid">`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio E1</div><div class="kpi-value">${kpisData.promedioE1 ?? '-'}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio E2</div><div class="kpi-value">${kpisData.promedioE2 ?? '-'}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Mejor Materia</div><div class="kpi-value">${kpisData.mejorMateria?.pg ?? '-'}</div><div style="font-size:10px;color:#666;">${kpisData.mejorMateria?.nombre || '-'}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Consistencia</div><div class="kpi-value">${kpisData.desviacion ?? '-'}</div><div style="font-size:10px;color:#666;">Desv. estándar</div></div>`);
+      win.document.write(`</div></div>`);
+    }
+    
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
     win.document.close();
@@ -458,8 +580,159 @@ export default function ReporteNotasAlumnos() {
 
       {!loading && data && !error && (
         <>
+          {/* Acordeón con KPIs y Gráficos */}
+          {kpisData && (
+            <Accordion className="mb-3 d-print-none">
+              <Accordion.Item eventKey="0">
+                <Accordion.Header>
+                  <BarChart3 size={20} className="me-2" />
+                  <strong>KPIs y Gráficos - Análisis de Rendimiento</strong>
+                </Accordion.Header>
+                <Accordion.Body>
+                  <Row className="g-3 mb-3">
+                    <Col sm={12} md={6} lg={3}>
+                      <Card className="h-100 border-primary">
+                        <Card.Body>
+                          <div className="text-primary mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Promedio E1</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.promedioE1 ?? '-'}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col sm={12} md={6} lg={3}>
+                      <Card className="h-100 border-info">
+                        <Card.Body>
+                          <div className="text-info mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Promedio E2</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.promedioE2 ?? '-'}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col sm={12} md={6} lg={3}>
+                      <Card className="h-100 border-success">
+                        <Card.Body>
+                          <div className="text-success mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Mejor Materia</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{kpisData.mejorMateria?.pg ?? '-'}</div>
+                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>{kpisData.mejorMateria?.nombre || '-'}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col sm={12} md={6} lg={3}>
+                      <Card className="h-100 border-secondary">
+                        <Card.Body>
+                          <div className="text-secondary mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                            Consistencia
+                            <span 
+                              className="ms-1" 
+                              style={{ cursor: 'help', fontSize: '0.75rem' }}
+                              title="Desviación estándar: mide qué tan uniforme es el rendimiento. Valor bajo (0.5-1.5) = notas similares en todas las materias. Valor alto (2.5-4.0) = mucha variación entre materias."
+                            >
+                              ℹ️
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.desviacion ?? '-'}</div>
+                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>Desv. estándar</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
+
+                  {/* Gráficos */}
+                  <Row className="g-3">
+                    {/* Radar Chart - Rendimiento por materia */}
+                    {kpisData.radarData.length > 0 && (
+                      <Col sm={12} lg={6}>
+                        <Card className="h-100">
+                          <Card.Header><strong>Rendimiento por Materia</strong></Card.Header>
+                          <Card.Body>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <RadarChart data={kpisData.radarData}>
+                                <PolarGrid />
+                                <PolarAngleAxis dataKey="materia" style={{ fontSize: '11px' }} />
+                                <PolarRadiusAxis domain={[0, 10]} />
+                                <Radar name="PG" dataKey="pg" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                                <Tooltip />
+                              </RadarChart>
+                            </ResponsiveContainer>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    )}
+
+                    {/* Distribución por rangos */}
+                    <Col sm={12} lg={6}>
+                      <Card className="h-100">
+                        <Card.Header><strong>Distribución de Notas</strong></Card.Header>
+                        <Card.Body>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={kpisData.distribucion.filter(d => d.count > 0)}
+                                dataKey="count"
+                                nameKey="rango"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ rango, percent }) => `${rango}: ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {kpisData.distribucion.map((entry, idx) => (
+                                  <Cell key={`cell-${idx}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+
+                    {/* Comparación E1 vs E2 */}
+                    {kpisData.comparacionData.length > 0 && (
+                      <Col sm={12} lg={6}>
+                        <Card className="h-100">
+                          <Card.Header><strong>E1 vs E2 por Materia</strong></Card.Header>
+                          <Card.Body>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <BarChart data={kpisData.comparacionData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="materia" angle={-45} textAnchor="end" height={100} />
+                                <YAxis domain={[0, 10]} />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="e1" fill="#8884d8" name="Etapa 1" />
+                                <Bar dataKey="e2" fill="#82ca9d" name="Etapa 2" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    )}
+
+                    {/* Evolución de notas N1→N4 */}
+                    <Col sm={12} lg={6}>
+                      <Card className="h-100">
+                        <Card.Header><strong>Evolución de Notas (Promedio)</strong></Card.Header>
+                        <Card.Body>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={kpisData.evolucionData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="nota" />
+                              <YAxis domain={[0, 10]} />
+                              <Tooltip />
+                              <Legend />
+                              <Line type="monotone" dataKey="e1" stroke="#8884d8" name="Etapa 1" strokeWidth={2} />
+                              <Line type="monotone" dataKey="e2" stroke="#82ca9d" name="Etapa 2" strokeWidth={2} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
+                </Accordion.Body>
+              </Accordion.Item>
+            </Accordion>
+          )}
+
           {/* Estadísticas rápidas */}
-          <Card className="mb-3">
+          <Card className="mb-3 d-print-none">
             <Card.Body>
               <Estadisticas
                 items={[
