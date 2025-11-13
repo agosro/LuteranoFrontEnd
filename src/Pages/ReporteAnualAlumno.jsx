@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge } from "react-bootstrap";
+import { Card, Button, Form, Row, Col, Table, Spinner, Alert, Badge, Accordion } from "react-bootstrap";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
@@ -209,6 +211,71 @@ export default function ReporteAnualAlumno() {
 
   const cantPrevias = materiasPrevia.length;
 
+  // KPIs y gráficos
+  const kpisData = useMemo(() => {
+    if (!materias || materias.length === 0) return null;
+
+    // Extraer todas las notas PG válidas
+    const pgList = materias.map(m => m.pg).filter(v => typeof v === 'number');
+    const totalMaterias = materias.length;
+    const aprobadas = materias.filter(m => (m.pg ?? 0) >= 6).length;
+    const desaprobadas = totalMaterias - aprobadas;
+    const porcentajeAprobacion = totalMaterias > 0 ? ((aprobadas / totalMaterias) * 100).toFixed(1) : 0;
+    // Usar el promedio del backend si está disponible, sino calcular
+    const promedio = dto?.promedioFinalCurso ?? (pgList.length ? (pgList.reduce((a,b) => a + b, 0) / pgList.length).toFixed(2) : null);
+    const notaMinima = pgList.length ? Math.min(...pgList) : null;
+    const notaMaxima = pgList.length ? Math.max(...pgList) : null;
+
+    // Distribución de notas por rangos
+    const distribucion = [
+      { rango: '0-3', count: 0, color: '#dc3545' },
+      { rango: '4-5', count: 0, color: '#ffc107' },
+      { rango: '6-7', count: 0, color: '#17a2b8' },
+      { rango: '8-9', count: 0, color: '#28a745' },
+      { rango: '10', count: 0, color: '#20c997' }
+    ];
+
+    pgList.forEach(nota => {
+      if (nota >= 0 && nota <= 3) distribucion[0].count++;
+      else if (nota >= 4 && nota <= 5) distribucion[1].count++;
+      else if (nota >= 6 && nota <= 7) distribucion[2].count++;
+      else if (nota >= 8 && nota <= 9) distribucion[3].count++;
+      else if (nota === 10) distribucion[4].count++;
+    });
+
+    // Datos para pie chart
+    const pieData = [
+      { name: 'Aprobadas', value: aprobadas, color: '#28a745' },
+      { name: 'Desaprobadas', value: desaprobadas, color: '#dc3545' }
+    ];
+
+    // Comparación E1 vs E2
+    const e1List = materias.map(m => m.e1).filter(v => typeof v === 'number');
+    const e2List = materias.map(m => m.e2).filter(v => typeof v === 'number');
+    const promedioE1 = e1List.length ? (e1List.reduce((a,b) => a + b, 0) / e1List.length).toFixed(2) : null;
+    const promedioE2 = e2List.length ? (e2List.reduce((a,b) => a + b, 0) / e2List.length).toFixed(2) : null;
+
+    const etapaComparacion = [
+      { etapa: 'Etapa 1', promedio: promedioE1 ? parseFloat(promedioE1) : 0 },
+      { etapa: 'Etapa 2', promedio: promedioE2 ? parseFloat(promedioE2) : 0 }
+    ];
+
+    return {
+      totalMaterias,
+      aprobadas,
+      desaprobadas,
+      porcentajeAprobacion,
+      promedio,
+      notaMinima,
+      notaMaxima,
+      distribucion,
+      pieData,
+      promedioE1,
+      promedioE2,
+      etapaComparacion
+    };
+  }, [materias, dto]);
+
   const exportCSV = () => {
     // Construir un CSV más completo: metadatos + tabla de materias + resumen de inasistencias y previas
     const lines = [];
@@ -282,17 +349,144 @@ export default function ReporteAnualAlumno() {
     const win = window.open('', '_blank');
     if (!win) return;
     const css = `
-      body { font-family: Arial, sans-serif; padding: 16px; }
-      h3 { margin: 0 0 12px 0; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
-      thead tr:first-child th { background: #f0f0f0; }
-      .card { border: 1px solid #ddd; margin-bottom: 12px; }
-      .card-header { background: #f7f7f7; padding: 6px 8px; font-weight: 600; }
-      .card-body { padding: 8px; }
-      .badge { font-size: 12px; }
+      body { 
+        font-family: 'Segoe UI', Arial, sans-serif; 
+        padding: 24px; 
+        color: #212529;
+      }
+      h3 { 
+        margin: 0 0 8px 0; 
+        font-size: 22px;
+        font-weight: 600;
+        color: #0d6efd;
+        border-bottom: 2px solid #0d6efd;
+        padding-bottom: 6px;
+      }
+      .kpi-section {
+        background: #f8f9fa;
+        padding: 16px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+      }
+      .kpi-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #495057;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .kpi-card {
+        background: white;
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+      }
+      .kpi-label {
+        font-size: 11px;
+        color: #6c757d;
+        margin-bottom: 4px;
+      }
+      .kpi-value {
+        font-size: 18px;
+        font-weight: 600;
+        color: #212529;
+      }
+      .kpi-distribution {
+        font-size: 12px;
+        line-height: 1.8;
+        color: #495057;
+      }
+      .kpi-dist-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 8px;
+        background: white;
+        border-radius: 3px;
+        margin-bottom: 4px;
+      }
+      table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin-bottom: 16px;
+        font-size: 11px;
+      }
+      th, td { 
+        border: 1px solid #dee2e6; 
+        padding: 6px 8px; 
+        text-align: left;
+      }
+      thead tr:first-child th { 
+        background: #e9ecef; 
+        font-weight: 600;
+        color: #495057;
+      }
+      tbody tr:nth-child(even) {
+        background: #f8f9fa;
+      }
+      .card { 
+        border: 1px solid #dee2e6; 
+        margin-bottom: 12px; 
+        border-radius: 6px;
+      }
+      .card-header { 
+        background: #e9ecef; 
+        padding: 8px 12px; 
+        font-weight: 600;
+        border-bottom: 1px solid #dee2e6;
+      }
+      .card-body { 
+        padding: 12px; 
+      }
+      .badge { 
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+      @media print {
+        body { padding: 12px; }
+        .kpi-section { page-break-inside: avoid; }
+      }
     `;
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte Anual de Alumno</title><style>${css}</style></head><body>`);
+    
+    // KPIs en formato texto
+    if (kpisData) {
+      win.document.write(`<div class="kpi-section">`);
+      win.document.write(`<div class="kpi-title">📊 Análisis del Rendimiento</div>`);
+      
+      // Métricas principales
+      win.document.write(`<div class="kpi-grid">`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">% Aprobación</div><div class="kpi-value">${kpisData.porcentajeAprobacion}%</div><div class="kpi-label">${kpisData.aprobadas}/${kpisData.totalMaterias}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio General</div><div class="kpi-value">${kpisData.promedio ?? '-'}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Nota Máxima</div><div class="kpi-value">${kpisData.notaMaxima ?? '-'}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Nota Mínima</div><div class="kpi-value">${kpisData.notaMinima ?? '-'}</div></div>`);
+      win.document.write(`</div>`);
+      
+      // Distribución y comparación de etapas
+      win.document.write(`<div class="kpi-distribution">`);
+      win.document.write(`<strong>Distribución de Notas:</strong><br>`);
+      kpisData.distribucion.forEach(d => {
+        win.document.write(`<div class="kpi-dist-item"><span>Rango ${d.rango}:</span><span><strong>${d.count}</strong> materias</span></div>`);
+      });
+      win.document.write(`<br><strong>Comparación por Etapas:</strong><br>`);
+      win.document.write(`<div class="kpi-dist-item"><span>Etapa 1:</span><span><strong>${kpisData.promedioE1 ?? '-'}</strong></span></div>`);
+      win.document.write(`<div class="kpi-dist-item"><span>Etapa 2:</span><span><strong>${kpisData.promedioE2 ?? '-'}</strong></span></div>`);
+      if (kpisData.promedioE1 && kpisData.promedioE2) {
+        const tendencia = parseFloat(kpisData.promedioE2) > parseFloat(kpisData.promedioE1) ? '↑ Mejoró' : parseFloat(kpisData.promedioE2) < parseFloat(kpisData.promedioE1) ? '↓ Bajó' : '→ Sin cambio';
+        win.document.write(`<div class="kpi-dist-item"><span>Tendencia:</span><span><strong>${tendencia}</strong></span></div>`);
+      }
+      win.document.write(`</div>`);
+      
+      win.document.write(`</div>`);
+    }
+    
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
     win.document.close();
@@ -407,6 +601,137 @@ export default function ReporteAnualAlumno() {
         </div>
       )}
 
+      {/* KPIs y Gráficos desplegables - FUERA del área de impresión */}
+      {!loading && dto && !error && kpisData && (
+        <Accordion className="mb-3">
+          <Accordion.Item eventKey="0">
+            <Accordion.Header>
+              <BarChart3 size={18} className="me-2" />
+              <strong>Análisis Detallado y Gráficos</strong>
+            </Accordion.Header>
+            <Accordion.Body>
+              {/* KPIs en Cards */}
+              <Row className="g-3 mb-4">
+                <Col md={3}>
+                  <Card className="h-100 border-primary">
+                    <Card.Body className="text-center">
+                      <div className="text-muted small mb-1">% Aprobación</div>
+                      <div className="h2 mb-0 text-primary">{kpisData.porcentajeAprobacion}%</div>
+                      <div className="small text-muted">{kpisData.aprobadas}/{kpisData.totalMaterias}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="h-100 border-info">
+                    <Card.Body className="text-center">
+                      <div className="text-muted small mb-1">Promedio General</div>
+                      <div className="h2 mb-0 text-info">{kpisData.promedio ?? '-'}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="h-100 border-success">
+                    <Card.Body className="text-center">
+                      <div className="text-muted small mb-1">Nota Máxima</div>
+                      <div className="h2 mb-0 text-success">{kpisData.notaMaxima ?? '-'}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="h-100 border-danger">
+                    <Card.Body className="text-center">
+                      <div className="text-muted small mb-1">Nota Mínima</div>
+                      <div className="h2 mb-0 text-danger">{kpisData.notaMinima ?? '-'}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Gráficos */}
+              <Row className="g-3">
+                <Col md={6}>
+                  <Card>
+                    <Card.Body>
+                      <h6 className="mb-3">Distribución de Notas</h6>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={kpisData.distribucion}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="rango" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="count" name="Cantidad de materias" fill="#0066cc">
+                            {kpisData.distribucion.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={6}>
+                  <Card>
+                    <Card.Body>
+                      <h6 className="mb-3">Aprobadas vs Desaprobadas</h6>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={kpisData.pieData}
+                            cx="50%"
+                            cy="45%"
+                            labelLine={false}
+                            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                            outerRadius={70}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {kpisData.pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value, name) => [`${value} materias`, name]} />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36}
+                            formatter={(value, entry) => `${value}: ${entry.payload.value} materias`}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={12}>
+                  <Card>
+                    <Card.Body>
+                      <h6 className="mb-3">Comparación de Promedios por Etapa</h6>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={kpisData.etapaComparacion} layout="horizontal">
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="etapa" />
+                          <YAxis domain={[0, 10]} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="promedio" name="Promedio" fill="#0066cc" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <div className="text-center mt-2 small text-muted">
+                        <strong>E1:</strong> {kpisData.promedioE1 ?? '-'} · <strong>E2:</strong> {kpisData.promedioE2 ?? '-'}
+                        {kpisData.promedioE1 && kpisData.promedioE2 && (
+                          <span className={`ms-2 ${parseFloat(kpisData.promedioE2) > parseFloat(kpisData.promedioE1) ? 'text-success' : parseFloat(kpisData.promedioE2) < parseFloat(kpisData.promedioE1) ? 'text-danger' : 'text-muted'}`}>
+                            {parseFloat(kpisData.promedioE2) > parseFloat(kpisData.promedioE1) ? '↑ Mejoró' : parseFloat(kpisData.promedioE2) < parseFloat(kpisData.promedioE1) ? '↓ Bajó' : '→ Sin cambio'}
+                          </span>
+                        )}
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            </Accordion.Body>
+          </Accordion.Item>
+        </Accordion>
+      )}
+
       {!loading && dto && !error && (
         <div ref={printRef}>
           {/* Encabezado del informe (estilo planilla) */}
@@ -439,7 +764,7 @@ export default function ReporteAnualAlumno() {
           </Card>
 
           {/* Estadísticas rápidas (sin Licencias) */}
-          <Card className="mb-3">
+          <Card className="mb-3 d-print-none">
             <Card.Body>
               <div className="row g-2">
                 <div className="col-auto"><span className="badge text-bg-secondary">Promedio final curso: {dto?.promedioFinalCurso ?? '-'}</span></div>
