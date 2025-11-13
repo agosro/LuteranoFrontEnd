@@ -24,4 +24,11 @@ export const reportePorDocente = async (token, anio, docenteId) => {
   return data
 };
 
-export default { reporteCompleto, reportePorMateria, reportePorDocente };
+export const reportePorCurso = async (token, anio, cursoId) => {
+  void token
+  const data = await httpClient.get(`/reportes/desempeno-docente/${anio}/curso/${cursoId}`)
+  if (typeof data?.code === 'number' && data.code < 0) throw new Error(data?.mensaje || 'Error al generar el reporte por curso')
+  return data
+};
+
+export default { reporteCompleto, reportePorMateria, reportePorDocente, reportePorCurso };
