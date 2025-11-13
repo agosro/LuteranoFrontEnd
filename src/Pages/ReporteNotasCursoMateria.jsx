@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Card, Row, Col, Form, Button, Table, Spinner, Alert, Badge } from "react-bootstrap";
+import { Card, Row, Col, Form, Button, Table, Spinner, Alert, Badge, Accordion } from "react-bootstrap";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 import { useAuth } from "../Context/AuthContext";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
 import { listarMateriasDeCurso } from "../Services/MateriaCursoService";
@@ -246,6 +248,50 @@ export default function ReporteNotasCursoMateria() {
   const desaprobadas = totalFilas - aprobadas;
   const promedioGeneralCurso = pgList.length ? Math.round((pgList.reduce((a,b)=>a+b,0)/pgList.length)*10)/10 : null;
 
+  // KPIs y gráficos
+  const kpisData = useMemo(() => {
+    if (!filasFiltradas.length) return null;
+
+    // Distribución por rangos de notas
+    const distribucion = [
+      { rango: '0-3', count: 0, color: '#dc3545' },
+      { rango: '4-5', count: 0, color: '#ffc107' },
+      { rango: '6-7', count: 0, color: '#17a2b8' },
+      { rango: '8-9', count: 0, color: '#28a745' },
+      { rango: '10', count: 0, color: '#20c997' }
+    ];
+
+    pgList.forEach(nota => {
+      if (nota >= 0 && nota <= 3) distribucion[0].count++;
+      else if (nota >= 4 && nota <= 5) distribucion[1].count++;
+      else if (nota >= 6 && nota <= 7) distribucion[2].count++;
+      else if (nota >= 8 && nota <= 9) distribucion[3].count++;
+      else if (nota === 10) distribucion[4].count++;
+    });
+
+    // Datos para pie chart
+    const pieData = [
+      { name: 'Aprobados', value: aprobadas, color: '#28a745' },
+      { name: 'Desaprobados', value: desaprobadas, color: '#dc3545' }
+    ];
+
+    const notaMinima = pgList.length ? Math.min(...pgList) : null;
+    const notaMaxima = pgList.length ? Math.max(...pgList) : null;
+    const porcentajeAprobacion = totalFilas > 0 ? ((aprobadas / totalFilas) * 100).toFixed(1) : 0;
+
+    return {
+      distribucion,
+      pieData,
+      notaMinima,
+      notaMaxima,
+      porcentajeAprobacion,
+      totalAlumnos: totalFilas,
+      aprobados: aprobadas,
+      desaprobados: desaprobadas,
+      promedio: promedioGeneralCurso
+    };
+  }, [filasFiltradas, pgList, aprobadas, desaprobadas, totalFilas, promedioGeneralCurso]);
+
   const e1Cols = periodo !== 'E2' ? 5 : 0;
   const e2Cols = periodo !== 'E1' ? 5 : 0;
   const showNF = materiasSeleccionadas.length === 1; // mostramos NF solo cuando hay materia específica
@@ -256,19 +302,135 @@ export default function ReporteNotasCursoMateria() {
     const win = window.open('', '_blank');
     if (!win) return;
     const css = `
-      body { font-family: Arial, sans-serif; padding: 16px; }
-      h3 { margin: 0 0 12px 0; }
-      .sub { margin: 0 0 12px 0; color: #555; font-size: 12px; }
-      .fw-bold { margin-top: 24px; margin-bottom: 8px; font-weight: 600; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-      th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
-      thead tr:first-child th { background: #f0f0f0; }
+      body { 
+        font-family: 'Segoe UI', Arial, sans-serif; 
+        padding: 24px; 
+        color: #212529;
+      }
+      h3 { 
+        margin: 0 0 8px 0; 
+        font-size: 22px;
+        font-weight: 600;
+        color: #0d6efd;
+        border-bottom: 2px solid #0d6efd;
+        padding-bottom: 6px;
+      }
+      .sub { 
+        margin: 0 0 16px 0; 
+        color: #6c757d; 
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .kpi-section {
+        background: #f8f9fa;
+        padding: 16px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+      }
+      .kpi-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #495057;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .kpi-card {
+        background: white;
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+      }
+      .kpi-label {
+        font-size: 11px;
+        color: #6c757d;
+        margin-bottom: 4px;
+      }
+      .kpi-value {
+        font-size: 18px;
+        font-weight: 600;
+        color: #212529;
+      }
+      .kpi-distribution {
+        font-size: 12px;
+        line-height: 1.8;
+        color: #495057;
+      }
+      .kpi-dist-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 8px;
+        background: white;
+        border-radius: 3px;
+        margin-bottom: 4px;
+      }
+      .fw-bold { 
+        margin-top: 20px; 
+        margin-bottom: 10px; 
+        font-weight: 600;
+        font-size: 14px;
+        color: #495057;
+      }
+      table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin-bottom: 16px;
+        font-size: 11px;
+      }
+      th, td { 
+        border: 1px solid #dee2e6; 
+        padding: 6px 8px; 
+        text-align: left;
+      }
+      thead tr:first-child th { 
+        background: #e9ecef; 
+        font-weight: 600;
+        color: #495057;
+      }
+      tbody tr:nth-child(even) {
+        background: #f8f9fa;
+      }
+      @media print {
+        body { padding: 12px; }
+        .kpi-section { page-break-inside: avoid; }
+      }
     `;
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Notas</title><style>${css}</style></head><body>`);
     const titulo = `${cursoLabel || 'Curso'} · Año ${data?.anio || anio}`;
     const sub = `Materia: ${materiaLabel}  |  Período: ${periodo}  |  Estado: ${estado}`;
     win.document.write(`<h3>${titulo}</h3>`);
     win.document.write(`<div class="sub">${sub}</div>`);
+    
+    // KPIs en formato texto
+    if (kpisData) {
+      win.document.write(`<div class="kpi-section">`);
+      win.document.write(`<div class="kpi-title">📊 Análisis Detallado</div>`);
+      
+      // Métricas principales
+      win.document.write(`<div class="kpi-grid">`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">% Aprobación</div><div class="kpi-value">${kpisData.porcentajeAprobacion}%</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio</div><div class="kpi-value">${kpisData.promedio ?? '-'}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Nota Máxima</div><div class="kpi-value">${kpisData.notaMaxima ?? '-'}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Nota Mínima</div><div class="kpi-value">${kpisData.notaMinima ?? '-'}</div></div>`);
+      win.document.write(`</div>`);
+      
+      // Distribución
+      win.document.write(`<div class="kpi-distribution">`);
+      win.document.write(`<strong>Distribución de Notas:</strong><br>`);
+      kpisData.distribucion.forEach(d => {
+        win.document.write(`<div class="kpi-dist-item"><span>Rango ${d.rango}:</span><span><strong>${d.count}</strong> alumnos</span></div>`);
+      });
+      win.document.write(`</div>`);
+      
+      win.document.write(`</div>`);
+    }
+    
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
     win.document.close();
@@ -463,6 +625,111 @@ export default function ReporteNotasCursoMateria() {
                 ]}
               />
             </div>
+
+            {/* KPIs y Gráficos desplegables */}
+            {kpisData && data && (
+              <Accordion className="mb-3 d-print-none">
+                <Accordion.Item eventKey="0">
+                  <Accordion.Header>
+                    <BarChart3 size={18} className="me-2" />
+                    <strong>Análisis Detallado y Gráficos</strong>
+                  </Accordion.Header>
+                  <Accordion.Body>
+                    {/* KPIs en Cards */}
+                    <Row className="g-3 mb-4">
+                      <Col md={3}>
+                        <Card className="h-100 border-primary">
+                          <Card.Body className="text-center">
+                            <div className="text-muted small mb-1">% Aprobación</div>
+                            <div className="h2 mb-0 text-primary">{kpisData.porcentajeAprobacion}%</div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      <Col md={3}>
+                        <Card className="h-100 border-info">
+                          <Card.Body className="text-center">
+                            <div className="text-muted small mb-1">Promedio</div>
+                            <div className="h2 mb-0 text-info">{kpisData.promedio ?? '-'}</div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      <Col md={3}>
+                        <Card className="h-100 border-success">
+                          <Card.Body className="text-center">
+                            <div className="text-muted small mb-1">Nota Máxima</div>
+                            <div className="h2 mb-0 text-success">{kpisData.notaMaxima ?? '-'}</div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      <Col md={3}>
+                        <Card className="h-100 border-danger">
+                          <Card.Body className="text-center">
+                            <div className="text-muted small mb-1">Nota Mínima</div>
+                            <div className="h2 mb-0 text-danger">{kpisData.notaMinima ?? '-'}</div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    </Row>
+
+                    {/* Gráficos */}
+                    <Row className="g-3">
+                      <Col md={7}>
+                        <Card>
+                          <Card.Body>
+                            <h6 className="mb-3">Distribución de Notas</h6>
+                            <ResponsiveContainer width="100%" height={250}>
+                              <BarChart data={kpisData.distribucion}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="rango" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="count" name="Cantidad de alumnos" fill="#0066cc">
+                                  {kpisData.distribucion.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      <Col md={5}>
+                        <Card>
+                          <Card.Body>
+                            <h6 className="mb-3">Aprobados vs Desaprobados</h6>
+                            <ResponsiveContainer width="100%" height={250}>
+                              <PieChart>
+                                <Pie
+                                  data={kpisData.pieData}
+                                  cx="50%"
+                                  cy="45%"
+                                  labelLine={false}
+                                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                                  outerRadius={70}
+                                  fill="#8884d8"
+                                  dataKey="value"
+                                >
+                                  {kpisData.pieData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                                <Tooltip formatter={(value, name) => [`${value} alumnos`, name]} />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={36}
+                                  formatter={(value, entry) => `${value}: ${entry.payload.value} alumnos`}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    </Row>
+                  </Accordion.Body>
+                </Accordion.Item>
+              </Accordion>
+            )}
 
             {/* Acciones de exportación fuera del header y del área imprimible */}
             <div className="d-flex justify-content-end gap-2 mb-3">
