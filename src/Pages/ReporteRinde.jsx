@@ -1,4 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { Accordion, Card, Row, Col } from 'react-bootstrap';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
@@ -145,6 +148,75 @@ export default function ReporteRinde() {
     return Array.from(out.values());
   }, [filasFiltradas]);
 
+  // KPIs y gráficos
+  const kpisData = useMemo(() => {
+    if (!filasFiltradas || filasFiltradas.length === 0) return null;
+
+    const totalAlumnos = agrupadosPorAlumno.length;
+    const totalMaterias = filasFiltradas.length;
+    const totalColoquio = filasFiltradas.filter(f => f.condicion === 'COLOQUIO').length;
+    const totalExamen = filasFiltradas.filter(f => f.condicion === 'EXAMEN').length;
+    const promedioMateriasPorAlumno = totalAlumnos > 0 ? (totalMaterias / totalAlumnos).toFixed(1) : 0;
+
+    // Distribución Coloquio vs Examen para pie chart
+    const condicionData = [
+      { name: 'Coloquio', value: totalColoquio, color: '#ffc107' },
+      { name: 'Examen', value: totalExamen, color: '#dc3545' }
+    ].filter(d => d.value > 0);
+
+    // Top materias con más alumnos
+    const materiasCounts = {};
+    filasFiltradas.forEach(f => {
+      const key = f.materiaNombre || 'Sin nombre';
+      if (!materiasCounts[key]) materiasCounts[key] = 0;
+      materiasCounts[key]++;
+    });
+    const topMaterias = Object.entries(materiasCounts)
+      .map(([materia, count]) => ({ materia: materia.substring(0, 30), count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Distribución por cantidad de materias que rinde cada alumno
+    const distribucionMaterias = [
+      { rango: '1 materia', count: 0 },
+      { rango: '2 materias', count: 0 },
+      { rango: '3 materias', count: 0 },
+      { rango: '4 materias', count: 0 },
+      { rango: '5+ materias', count: 0 }
+    ];
+    agrupadosPorAlumno.forEach(a => {
+      const cant = a.totalMaterias;
+      if (cant === 1) distribucionMaterias[0].count++;
+      else if (cant === 2) distribucionMaterias[1].count++;
+      else if (cant === 3) distribucionMaterias[2].count++;
+      else if (cant === 4) distribucionMaterias[3].count++;
+      else if (cant >= 5) distribucionMaterias[4].count++;
+    });
+
+    // Top alumnos con más materias
+    const topAlumnos = [...agrupadosPorAlumno]
+      .sort((a, b) => b.totalMaterias - a.totalMaterias)
+      .slice(0, 10)
+      .map(a => ({
+        nombre: `${a.apellido || ''} ${a.nombre || ''}`.trim().substring(0, 25),
+        materias: a.totalMaterias
+      }));
+
+    return {
+      totalAlumnos,
+      totalMaterias,
+      totalColoquio,
+      totalExamen,
+      promedioMateriasPorAlumno,
+      porcentajeColoquio: totalMaterias > 0 ? ((totalColoquio / totalMaterias) * 100).toFixed(1) : 0,
+      porcentajeExamen: totalMaterias > 0 ? ((totalExamen / totalMaterias) * 100).toFixed(1) : 0,
+      condicionData,
+      topMaterias,
+      distribucionMaterias,
+      topAlumnos
+    };
+  }, [filasFiltradas, agrupadosPorAlumno]);
+
   const cursoLabel = useMemo(() => {
     const opt = cursos.find(c => String(c.value) === String(cursoId));
     return opt?.label || '';
@@ -187,6 +259,11 @@ export default function ReporteRinde() {
       body { font-family: Arial, sans-serif; padding: 0 8px; }
       h3 { margin: 0 0 8px 0; }
       .sub { color: #555; font-size: 12px; margin-bottom: 10px; }
+      .kpi-section { margin: 0 0 16px 0; padding: 12px; border: 1px solid #ddd; background: #f9f9f9; }
+      .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 8px; }
+      .kpi-card { padding: 8px; border: 1px solid #ccc; background: #fff; }
+      .kpi-label { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; }
+      .kpi-value { font-size: 18px; font-weight: bold; }
       table { width: 100%; border-collapse: collapse; }
       th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
       thead tr:first-child th { background: #f0f0f0; }
@@ -202,6 +279,18 @@ export default function ReporteRinde() {
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Alumnos que rinden</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>Alumnos que rinden (Dic/Feb)</h3>`);
     if (meta) win.document.write(`<div class="sub">${meta}</div>`);
+    
+    // KPIs en PDF
+    if (kpisData) {
+      win.document.write(`<div class="kpi-section">`);
+      win.document.write(`<div class="kpi-grid">`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Total Alumnos</div><div class="kpi-value">${kpisData.totalAlumnos}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Total Materias</div><div class="kpi-value">${kpisData.totalMaterias}</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio por Alumno</div><div class="kpi-value">${kpisData.promedioMateriasPorAlumno}</div><div style="font-size:10px;color:#666;">materias/alumno</div></div>`);
+      win.document.write(`<div class="kpi-card"><div class="kpi-label">Coloquio / Examen</div><div class="kpi-value">${kpisData.totalColoquio} / ${kpisData.totalExamen}</div><div style="font-size:10px;color:#666;">${kpisData.porcentajeColoquio}% / ${kpisData.porcentajeExamen}%</div></div>`);
+      win.document.write(`</div></div>`);
+    }
+    
     win.document.write(`<div>${printRef.current.innerHTML}</div>`);
     win.document.write('</body></html>');
     win.document.close();
@@ -250,7 +339,151 @@ export default function ReporteRinde() {
 
       {res && (
         <>
-          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 mb-3">
+          {/* Acordeón con KPIs (se oculta en impresión) */}
+          {kpisData && (
+            <Accordion className="mb-3 d-print-none">
+              <Accordion.Item eventKey="0">
+                <Accordion.Header>
+                  <BarChart3 size={20} className="me-2" />
+                  <strong>KPIs y Gráficos - Alumnos que Rinden</strong>
+                </Accordion.Header>
+                <Accordion.Body>
+                  <Row className="g-3 mb-3">
+                    <Col sm={12} md={6} lg={3}>
+                      <Card className="h-100 border-primary">
+                        <Card.Body>
+                          <div className="text-primary mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Alumnos</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.totalAlumnos}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col sm={12} md={6} lg={3}>
+                      <Card className="h-100 border-warning">
+                        <Card.Body>
+                          <div className="text-warning mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total Materias</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.totalMaterias}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col sm={12} md={6} lg={3}>
+                      <Card className="h-100 border-info">
+                        <Card.Body>
+                          <div className="text-info mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Promedio por Alumno</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.promedioMateriasPorAlumno}</div>
+                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>materias/alumno</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col sm={12} md={6} lg={3}>
+                      <Card className="h-100 border-secondary">
+                        <Card.Body>
+                          <div className="text-secondary mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Coloquio / Examen</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                            <span className="text-warning">{kpisData.totalColoquio}</span>
+                            {' / '}
+                            <span className="text-danger">{kpisData.totalExamen}</span>
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>{kpisData.porcentajeColoquio}% / {kpisData.porcentajeExamen}%</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
+
+                  {/* Gráficos */}
+                  <Row className="g-3">
+                    {/* Distribución Coloquio vs Examen */}
+                    {kpisData.condicionData.length > 0 && (
+                      <Col sm={12} lg={6}>
+                        <Card className="h-100">
+                          <Card.Header><strong>Condición: Coloquio vs Examen</strong></Card.Header>
+                          <Card.Body>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <PieChart>
+                                <Pie
+                                  data={kpisData.condicionData}
+                                  dataKey="value"
+                                  nameKey="name"
+                                  cx="50%"
+                                  cy="50%"
+                                  outerRadius={80}
+                                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                                >
+                                  {kpisData.condicionData.map((entry, idx) => (
+                                    <Cell key={`cell-${idx}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                                <Tooltip />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    )}
+
+                    {/* Distribución por cantidad de materias */}
+                    <Col sm={12} lg={6}>
+                      <Card className="h-100">
+                        <Card.Header><strong>Distribución por Cantidad de Materias</strong></Card.Header>
+                        <Card.Body>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={kpisData.distribucionMaterias}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="rango" angle={-15} textAnchor="end" height={80} />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="count" fill="#17a2b8" name="Cantidad de alumnos" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+
+                    {/* Top materias con más alumnos */}
+                    {kpisData.topMaterias.length > 0 && (
+                      <Col sm={12} lg={6}>
+                        <Card className="h-100">
+                          <Card.Header><strong>Top Materias con Más Alumnos</strong></Card.Header>
+                          <Card.Body>
+                            <ResponsiveContainer width="100%" height={Math.max(300, kpisData.topMaterias.length * 35)}>
+                              <BarChart data={kpisData.topMaterias} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" />
+                                <YAxis type="category" dataKey="materia" width={120} />
+                                <Tooltip />
+                                <Bar dataKey="count" fill="#fd7e14" name="Alumnos" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    )}
+
+                    {/* Top alumnos con más materias */}
+                    {kpisData.topAlumnos.length > 0 && (
+                      <Col sm={12} lg={6}>
+                        <Card className="h-100">
+                          <Card.Header><strong>Top Alumnos con Más Materias</strong></Card.Header>
+                          <Card.Body>
+                            <ResponsiveContainer width="100%" height={Math.max(300, kpisData.topAlumnos.length * 35)}>
+                              <BarChart data={kpisData.topAlumnos} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" />
+                                <YAxis type="category" dataKey="nombre" width={120} />
+                                <Tooltip />
+                                <Bar dataKey="materias" fill="#dc3545" name="Materias a rendir" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    )}
+                  </Row>
+                </Accordion.Body>
+              </Accordion.Item>
+            </Accordion>
+          )}
+
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 mb-3 d-print-none">
             <div className="d-flex flex-wrap gap-2">
               <span className="badge text-bg-secondary">Total filas: {filasFiltradas.length}</span>
               <span className="badge text-bg-info text-dark">Alumnos únicos: {vista === 'alumno' ? agrupadosPorAlumnoFiltrados.length : agrupadosPorAlumno.length}</span>
