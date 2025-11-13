@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, Row, Col, Form, Button, Spinner, Table, Badge, Alert, Accordion } from 'react-bootstrap';
+import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
@@ -25,6 +26,7 @@ export default function ReporteDesempenoDocente() {
   const [docenteId, setDocenteId] = useState('');
   const [cargando, setCargando] = useState(false);
   const [data, setData] = useState(null);
+  const [showKpis, setShowKpis] = useState(false);
   const printRef = useRef(null);
 
   useEffect(() => {
@@ -93,6 +95,76 @@ export default function ReporteDesempenoDocente() {
     return col;
   }, [data, resultadosMateria]);
 
+  // KPIs calculados
+  const kpis = useMemo(() => {
+    if (!data) return null;
+    
+    // Contadores para estados según backend: EXCELENTE (>=90), BUENO (>=75), REGULAR (>=60), PREOCUPANTE (<60)
+    let excelentes = 0;
+    let buenos = 0;
+    let regulares = 0;
+    let preocupantes = 0;
+    let totalAprobacion = 0;
+    let countAprobacion = 0;
+    let totalPromedio = 0;
+    let countPromedio = 0;
+    
+    // Contar desde resultadosDocente directo
+    resultadosDocente.forEach(d => {
+      const estado = d.estadoAnalisis?.toUpperCase();
+      if (estado === 'EXCELENTE') excelentes++;
+      else if (estado === 'BUENO') buenos++;
+      else if (estado === 'REGULAR') regulares++;
+      else if (estado === 'PREOCUPANTE') preocupantes++;
+      
+      if (typeof d.porcentajeAprobacion === 'number') {
+        totalAprobacion += d.porcentajeAprobacion;
+        countAprobacion++;
+      }
+      if (typeof d.promedioGeneral === 'number') {
+        totalPromedio += d.promedioGeneral;
+        countPromedio++;
+      }
+    });
+    
+    // Si no hay datos en resultadosDocente, contar desde resultadosMateria
+    if (resultadosDocente.length === 0 && resultadosMateria.length > 0) {
+      resultadosMateria.forEach(m => {
+        if (Array.isArray(m.resultadosPorDocente)) {
+          m.resultadosPorDocente.forEach(d => {
+            const estado = d.estadoAnalisis?.toUpperCase();
+            if (estado === 'EXCELENTE') excelentes++;
+            else if (estado === 'BUENO') buenos++;
+            else if (estado === 'REGULAR') regulares++;
+            else if (estado === 'PREOCUPANTE') preocupantes++;
+            
+            if (typeof d.porcentajeAprobacion === 'number') {
+              totalAprobacion += d.porcentajeAprobacion;
+              countAprobacion++;
+            }
+            if (typeof d.promedioGeneral === 'number') {
+              totalPromedio += d.promedioGeneral;
+              countPromedio++;
+            }
+          });
+        }
+      });
+    }
+    
+    const promedioAprobacion = countAprobacion > 0 ? totalAprobacion / countAprobacion : 0;
+    const promedioGeneralTotal = countPromedio > 0 ? totalPromedio / countPromedio : 0;
+    
+    return {
+      promedioAprobacion,
+      promedioGeneralTotal,
+      excelentes,
+      buenos,
+      regulares,
+      preocupantes,
+      totalRegistros: excelentes + buenos + regulares + preocupantes
+    };
+  }, [data, resultadosDocente, resultadosMateria]);
+
   const docenteRows = useMemo(() => {
     return (Array.isArray(resultadosDocente) ? resultadosDocente : []).map((d) => ({
       docente: d.nombreCompletoDocente || `${d.apellidoDocente || ''}, ${d.nombreDocente || ''}`,
@@ -133,15 +205,164 @@ export default function ReporteDesempenoDocente() {
     if (!printRef.current) { toast.info('No hay contenido para imprimir'); return; }
     const win = window.open('', '_blank');
     if (!win) return;
+    
     const css = `
-      @page { size: landscape; margin: 16mm; }
-      body { font-family: Arial, sans-serif; padding: 12px; }
-      h3 { margin: 0 0 10px 0; }
-      .sub { color: #555; font-size: 12px; margin-bottom: 10px; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #333; padding: 6px 8px; font-size: 12px; }
-      thead th { background: #f0f0f0; }
+      @page { size: landscape; margin: 12mm; }
+      body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        padding: 16px; 
+        color: #333;
+        background: white;
+      }
+      h3 { 
+        margin: 0 0 8px 0; 
+        color: #0066cc;
+        font-size: 22px;
+        border-bottom: 3px solid #0066cc;
+        padding-bottom: 8px;
+      }
+      h4 { 
+        margin: 16px 0 12px 0; 
+        color: #333;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      h5 {
+        margin: 12px 0 8px 0;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .filtros { 
+        color: #666; 
+        font-size: 11px; 
+        margin-bottom: 16px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-left: 4px solid #0066cc;
+      }
+      .kpis-section {
+        margin: 16px 0;
+        page-break-inside: avoid;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .kpi-card {
+        border: 2px solid #ddd;
+        border-radius: 6px;
+        padding: 10px;
+        text-align: center;
+        background: #fafafa;
+      }
+      .kpi-card.primary { border-color: #0066cc; }
+      .kpi-card.info { border-color: #17a2b8; }
+      .kpi-card.success { border-color: #28a745; }
+      .kpi-card.warning { border-color: #ffc107; }
+      .kpi-card.danger { border-color: #dc3545; }
+      .kpi-label {
+        font-size: 10px;
+        color: #666;
+        margin-bottom: 4px;
+      }
+      .kpi-value {
+        font-size: 20px;
+        font-weight: bold;
+        margin: 0;
+      }
+      .kpi-card.primary .kpi-value { color: #0066cc; }
+      .kpi-card.info .kpi-value { color: #17a2b8; }
+      .kpi-card.success .kpi-value { color: #28a745; }
+      .kpi-card.warning .kpi-value { color: #ffc107; }
+      .kpi-card.danger .kpi-value { color: #dc3545; }
+      .context-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .context-card {
+        background: #e9ecef;
+        padding: 6px;
+        border-radius: 4px;
+        text-align: center;
+      }
+      .context-label {
+        font-size: 9px;
+        color: #666;
+      }
+      .context-value {
+        font-weight: bold;
+        font-size: 13px;
+      }
+      table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin: 12px 0;
+        page-break-inside: auto;
+      }
+      thead { 
+        display: table-header-group;
+      }
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+      th, td { 
+        border: 1px solid #444; 
+        padding: 6px 8px; 
+        font-size: 10px;
+        text-align: left;
+      }
+      th { 
+        background: #2c3e50; 
+        color: white;
+        font-weight: 600;
+      }
+      tbody tr:nth-child(even) {
+        background: #f8f9fa;
+      }
+      .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 9px;
+        font-weight: 600;
+      }
+      .badge-success { background: #28a745; color: white; }
+      .badge-info { background: #17a2b8; color: white; }
+      .badge-warning { background: #ffc107; color: #333; }
+      .badge-danger { background: #dc3545; color: white; }
+      .badge-secondary { background: #6c757d; color: white; }
+      /* Mostrar accordions expandidos en impresión */
+      .accordion-button { display: none !important; }
+      .accordion-button::after { display: none !important; }
+      .accordion-item { border: none !important; margin-bottom: 16px; }
+      .accordion-header { 
+        background: #e9ecef; 
+        padding: 8px 12px;
+        border-left: 4px solid #0066cc;
+        margin-bottom: 8px;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .accordion-body { 
+        display: block !important; 
+        padding: 0 !important;
+      }
+      .accordion-collapse { display: block !important; }
+      ul { margin: 8px 0; padding-left: 20px; }
+      li { margin: 4px 0; font-size: 11px; }
+      p { margin: 8px 0; font-size: 11px; line-height: 1.4; }
+      .text-muted { color: #666 !important; }
+      .small { font-size: 10px !important; }
+      @media print {
+        .d-print-none { display: none !important; }
+      }
     `;
+    
     const findMateriaLabel = () => (materiasOpts.find(o => String(o.value)===String(materiaId))?.label || 'Todas');
     const findDocenteLabel = () => docenteOpt?.label || 'Todos';
     const findCursoLabel = () => {
@@ -153,15 +374,41 @@ export default function ReporteDesempenoDocente() {
       `Curso: ${cursoId ? findCursoLabel() : 'Todos'}`,
       `Materia: ${materiaId ? findMateriaLabel() : 'Todas'}`,
       `Docente: ${docenteId ? findDocenteLabel() : 'Todos'}`,
-    ].join(' · ');
-    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Desempeño Docente</title><style>${css}</style></head><body>`);
-    win.document.write(`<h3>Reporte de desempeño docente</h3>`);
-    win.document.write(`<div class="sub">${filtros}</div>`);
+    ].join(' • ');
+    
+    // Construir HTML de KPIs como texto simple
+    let kpisHtml = '';
+    if (kpis) {
+      kpisHtml = `
+        <div style="margin: 16px 0; padding: 12px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+          <h4 style="margin: 0 0 12px 0; font-size: 14px;">📊 Indicadores Clave de Desempeño</h4>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 11px;">
+            <div><strong>% Aprobación Promedio:</strong> ${kpis.promedioAprobacion.toFixed(1)}%</div>
+            <div><strong>Promedio General:</strong> ${kpis.promedioGeneralTotal.toFixed(2)}</div>
+            <div><strong>Excelentes (≥90%):</strong> ${kpis.excelentes}</div>
+            <div><strong>Buenos (≥75%):</strong> ${kpis.buenos}</div>
+            <div><strong>Regulares (≥60%):</strong> ${kpis.regulares}</div>
+            <div><strong>Preocupantes (&lt;60%):</strong> ${kpis.preocupantes}</div>
+          </div>
+          <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #dee2e6; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 10px;">
+            <div><strong>Materias:</strong> ${data.totalMaterias ?? (resultadosMateria.length || '-')}</div>
+            <div><strong>Docentes:</strong> ${data.totalDocentes ?? '-'}</div>
+            <div><strong>Alumnos:</strong> ${data.totalAlumnos ?? '-'}</div>
+            <div><strong>Cursos:</strong> ${data.totalCursos ?? '-'}</div>
+          </div>
+        </div>
+      `;
+    }
+    
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Desempeño Docente - ${anio}</title><style>${css}</style></head><body>`);
+    win.document.write(`<h3>Reporte de Desempeño Docente - Año ${anio}</h3>`);
+    win.document.write(`<div class="filtros">📋 Filtros aplicados: ${filtros}</div>`);
+    win.document.write(kpisHtml);
     win.document.write(`<div>${printRef.current.innerHTML}</div>`);
     win.document.write('</body></html>');
     win.document.close();
     win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 300);
+    setTimeout(() => { win.print(); win.close(); }, 500);
   };
 
   return (
@@ -242,23 +489,114 @@ export default function ReporteDesempenoDocente() {
             </Col>
           </Row>
 
-          {/* Resultados */}
-          {data && (
-            <div ref={printRef}>
-              <hr />
-              <Alert variant="info" className="mb-3">
-                {data.mensaje || 'Reporte generado'}
-              </Alert>
+      {/* Resultados */}
+      {data && (
+        <div ref={printRef}>
+          <hr />
 
-              <Row className="g-3 mb-3">
-                <Col md={3}><strong>Materias:</strong> {data.totalMaterias ?? (resultadosMateria.length || '-')}</Col>
-                <Col md={3}><strong>Docentes:</strong> {data.totalDocentes ?? '-'}</Col>
-                <Col md={3}><strong>Alumnos:</strong> {data.totalAlumnos ?? '-'}</Col>
-                <Col md={3}><strong>Cursos:</strong> {data.totalCursos ?? '-'}</Col>
-              </Row>
-              {data.resumenEjecutivo && <p className="text-muted">{data.resumenEjecutivo}</p>}
+          {/* KPIs visuales */}
+          {kpis && (
+            <Accordion className="mb-4 d-print-none">
+              <Accordion.Item eventKey="0">
+                <Accordion.Header>
+                  <BarChart3 size={18} className="me-2" />
+                  <strong>Indicadores Clave de Desempeño</strong>
+                </Accordion.Header>
+                <Accordion.Body>
+                  <Row className="g-3 mb-4">
+                    <Col md={3}>
+                      <Card className="h-100 border-primary">
+                        <Card.Body className="text-center">
+                          <div className="text-muted small mb-1">% Aprobación Promedio</div>
+                          <div className="h2 mb-0 text-primary">{kpis.promedioAprobacion.toFixed(1)}%</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col md={3}>
+                      <Card className="h-100 border-info">
+                        <Card.Body className="text-center">
+                          <div className="text-muted small mb-1">Promedio General</div>
+                          <div className="h2 mb-0 text-info">{kpis.promedioGeneralTotal.toFixed(2)}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col md={3}>
+                      <Card className="h-100 border-success">
+                        <Card.Body className="text-center">
+                          <div className="text-muted small mb-1">Excelentes (≥90%)</div>
+                          <div className="h2 mb-0 text-success">{kpis.excelentes}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col md={3}>
+                      <Card className="h-100 border-info">
+                        <Card.Body className="text-center">
+                          <div className="text-muted small mb-1">Buenos (≥75%)</div>
+                          <div className="h2 mb-0 text-info">{kpis.buenos}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
+                  <Row className="g-3 mb-4">
+                    <Col md={6}>
+                      <Card className="h-100 border-warning">
+                        <Card.Body className="text-center">
+                          <div className="text-muted small mb-1">Regulares (≥60%)</div>
+                          <div className="h2 mb-0 text-warning">{kpis.regulares}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col md={6}>
+                      <Card className="h-100 border-danger">
+                        <Card.Body className="text-center">
+                          <div className="text-muted small mb-1">Preocupantes (&lt;60%)</div>
+                          <div className="h2 mb-0 text-danger">{kpis.preocupantes}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
 
-              {Array.isArray(data.hallazgosImportantes) && data.hallazgosImportantes.length > 0 && (
+                  {/* Información contextual */}
+                  <Row className="g-3">
+                    <Col md={3}>
+                      <Card className="h-100 bg-light">
+                        <Card.Body className="text-center py-2">
+                          <div className="text-muted small">Materias</div>
+                          <div className="fw-bold">{data.totalMaterias ?? (resultadosMateria.length || '-')}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col md={3}>
+                      <Card className="h-100 bg-light">
+                        <Card.Body className="text-center py-2">
+                          <div className="text-muted small">Docentes</div>
+                          <div className="fw-bold">{data.totalDocentes ?? '-'}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col md={3}>
+                      <Card className="h-100 bg-light">
+                        <Card.Body className="text-center py-2">
+                          <div className="text-muted small">Alumnos</div>
+                          <div className="fw-bold">{data.totalAlumnos ?? '-'}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col md={3}>
+                      <Card className="h-100 bg-light">
+                        <Card.Body className="text-center py-2">
+                          <div className="text-muted small">Cursos</div>
+                          <div className="fw-bold">{data.totalCursos ?? '-'}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
+                </Accordion.Body>
+              </Accordion.Item>
+            </Accordion>
+          )}
+
+          {data.resumenEjecutivo && <p className="text-muted">{data.resumenEjecutivo}</p>}              {Array.isArray(data.hallazgosImportantes) && data.hallazgosImportantes.length > 0 && (
                 <>
                   <h5>Hallazgos importantes</h5>
                   <ul>
