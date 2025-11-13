@@ -626,8 +626,8 @@ export default function ReporteNotasCursoMateria() {
               />
             </div>
 
-            {/* KPIs y Gráficos desplegables */}
-            {kpisData && data && (
+            {/* KPIs y Gráficos desplegables - Solo con una materia seleccionada */}
+            {kpisData && data && materiasSeleccionadas.length === 1 && (
               <Accordion className="mb-3 d-print-none">
                 <Accordion.Item eventKey="0">
                   <Accordion.Header>

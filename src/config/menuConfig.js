@@ -45,11 +45,12 @@ export const menuConfig = [
   {
     label: "Espacios Áulicos", // 🆕
     icon: FaDoorOpen,
-    roles: ["ROLE_ADMIN", "ROLE_DOCENTE", "ROLE_PRECEPTOR"],
+    roles: ["ROLE_ADMIN", "ROLE_DOCENTE", "ROLE_PRECEPTOR", "ROLE_AUXILIAR"],
     subItems: [
       { label: "Reservar", path: "/espacios-aulicos/reservar", roles: ["ROLE_ADMIN","ROLE_DOCENTE","ROLE_PRECEPTOR", "ROLE_DIRECTOR"] },
       { label: "Mis Reservas", path: "/espacios-aulicos/mis-reservas", roles: ["ROLE_ADMIN","ROLE_DOCENTE","ROLE_PRECEPTOR", "ROLE_DIRECTOR"] },
       { label: "Gestionar Reservas", path: "/espacios-aulicos/gestionar", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
+      { label: "Gestionar Espacios", path: "/configuracion/espacios-aulicos", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_AUXILIAR"] },
     ],
   },
   {
@@ -81,14 +82,11 @@ export const menuConfig = [
   {
     label: "Configuración",
     icon: FaCog,
-    // Agregamos ROLE_AUXILIAR únicamente para gestionar espacios áulicos
-    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_AUXILIAR"],
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"],
     subItems: [
       { label: "Ciclo lectivo", path: "/configuracion/ciclo-lectivo", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Importar Alumnos", path: "/configuracion/importar-alumnos", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Importar Calificaciones", path: "/configuracion/importar-calificaciones", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
-      // Habilitar para ROLE_AUXILIAR
-      { label: "Gestionar Espacios", path: "/configuracion/espacios-aulicos", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_AUXILIAR"] },
       { label: "Promoción Masiva", path: "/configuracion/promocion-masiva", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
       { label: "Reactivar Alumnos", path: "/configuracion/reactivar-alumnos", roles: ["ROLE_ADMIN","ROLE_DIRECTOR" ] },
 
