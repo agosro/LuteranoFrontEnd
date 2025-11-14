@@ -21,7 +21,7 @@ const baseApiUrl = typeof import.meta !== 'undefined' && import.meta.env && impo
       .replace(/\/api$/i, '')    // si termina exactamente en /api lo quitamos
   : ''
 
-async function request(path, { method = 'GET', body = null, headers = {}, skipAuth = false, signal, timeoutMs = 30000 } = {}) {
+async function request(path, { method = 'GET', body = null, headers = {}, skipAuth = false, signal, timeoutMs = 60000 } = {}) {
   // Normalización de la URL:
   // Siempre usamos la variable de entorno VITE_API_URL (dev y prod) para construir la URL base.
   // IMPORTANTE: Respetamos el path tal cual lo envían los Services (algunos empiezan con /api y otros no),

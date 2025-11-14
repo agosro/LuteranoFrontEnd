@@ -87,9 +87,9 @@ export default function ReporteRankingAlumnos() {
     } else {
       // modo === 'todos'
       todosCursosItems.forEach(cr => {
-        const cursoPromedios = (cr?.ranking || []).map(r => r.promedio).filter(v => typeof v === 'number');
+        const cursoPromedios = (cr?.topAlumnos || []).map(r => r.promedio).filter(v => typeof v === 'number');
         promedios.push(...cursoPromedios);
-        totalAlumnos += (cr?.ranking || []).length;
+        totalAlumnos += (cr?.topAlumnos || []).length;
       });
     }
 
@@ -134,10 +134,10 @@ export default function ReporteRankingAlumnos() {
     let cursosData = [];
     if (modo === 'todos' && todosCursosItems.length > 0) {
       cursosData = todosCursosItems.map(cr => {
-        const cursoPromedios = (cr?.ranking || []).map(r => r.promedio).filter(v => typeof v === 'number');
+        const cursoPromedios = (cr?.topAlumnos || []).map(r => r.promedio).filter(v => typeof v === 'number');
         const promedioCurso = cursoPromedios.length > 0 ? (cursoPromedios.reduce((a,b) => a + b, 0) / cursoPromedios.length).toFixed(2) : 0;
         return {
-          curso: `${cr?.cursoAnio ?? ''} ${cr?.cursoDivision ?? ''}`.trim() || 'Curso',
+          curso: `${cr?.curso?.anio ?? ''} ${cr?.curso?.division ?? ''}`.trim() || 'Curso',
           promedio: parseFloat(promedioCurso),
           alumnos: cr?.totalAlumnos ?? cursoPromedios.length
         };
@@ -162,7 +162,7 @@ export default function ReporteRankingAlumnos() {
         lines.push(['Puesto','Alumno','DNI','Curso','Promedio']);
         (rankingColegioItems || []).forEach((r, idx) => {
           const name = `${r.apellido || ''}, ${r.nombre || ''}`.trim();
-          const curso = `${r.cursoAnio ?? ''} ${r.cursoDivision ?? ''}`.trim();
+          const curso = r.curso ? `${r.curso.anio ?? ''} ${r.curso.division ?? ''}`.trim() : '';
           lines.push([idx + 1, name, r.dni ?? '', curso, (typeof r.promedio === 'number' ? r.promedio.toFixed(2) : r.promedio || '')]);
         });
       } else if (modo === 'curso') {
@@ -177,8 +177,8 @@ export default function ReporteRankingAlumnos() {
       } else {
         lines.push(['Curso','Puesto','Alumno','DNI','Promedio']);
         (todosCursosItems || []).forEach(cr => {
-          const curso = `${cr?.cursoAnio ?? ''} ${cr?.cursoDivision ?? ''}`.trim() || cr?.cursoNombre || '';
-          (cr?.ranking || []).forEach((r, idx) => {
+          const curso = `${cr?.curso?.anio ?? ''} ${cr?.curso?.division ?? ''}`.trim() || '';
+          (cr?.topAlumnos || []).forEach((r, idx) => {
             const name = `${r.apellido || ''}, ${r.nombre || ''}`.trim();
             lines.push([curso, idx + 1, name, r.dni ?? '', (typeof r.promedio === 'number' ? r.promedio.toFixed(2) : r.promedio || '')]);
           });
@@ -520,7 +520,7 @@ export default function ReporteRankingAlumnos() {
                           <td>{idx + 1}</td>
                           <td>{`${r.apellido || ''}, ${r.nombre || ''}`.trim()}</td>
                           <td>{r.dni ?? '-'}</td>
-                          <td>{`${r.cursoAnio ?? ''} ${r.cursoDivision ?? ''}`.trim()}</td>
+                          <td>{r.curso ? `${r.curso.anio ?? ''} ${r.curso.division ?? ''}`.trim() : '-'}</td>
                           <td className="text-end"><Badge bg="light" text="dark">{typeof r.promedio === 'number' ? r.promedio.toFixed(2) : (r.promedio || '-')}</Badge></td>
                         </tr>
                       ))}
@@ -567,7 +567,7 @@ export default function ReporteRankingAlumnos() {
                   <Accordion.Item key={idx} eventKey={String(idx)}>
                     <Accordion.Header>
                       <div className="w-100 d-flex justify-content-between">
-                        <span><strong>{`${cr?.cursoAnio ?? ''} ${cr?.cursoDivision ?? ''}`.trim() || cr?.cursoNombre || 'Curso'}</strong></span>
+                        <span><strong>{`${cr?.curso?.anio ?? ''} ${cr?.curso?.division ?? ''}`.trim() || 'Curso'}</strong></span>
                         <span className="text-muted small">Alumnos: {cr?.totalAlumnos ?? '-'}</span>
                       </div>
                     </Accordion.Header>
@@ -582,10 +582,10 @@ export default function ReporteRankingAlumnos() {
                           </tr>
                         </thead>
                         <tbody>
-                          {(cr?.ranking || []).length === 0 && (
+                          {(cr?.topAlumnos || []).length === 0 && (
                             <tr><td colSpan={4} className="text-center text-muted py-3">Sin datos</td></tr>
                           )}
-                          {(cr?.ranking || []).map((r, jx) => (
+                          {(cr?.topAlumnos || []).map((r, jx) => (
                             <tr key={jx}>
                               <td>{jx + 1}</td>
                               <td>{`${r.apellido || ''}, ${r.nombre || ''}`.trim()}</td>
