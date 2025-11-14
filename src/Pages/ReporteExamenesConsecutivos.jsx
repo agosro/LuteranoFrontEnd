@@ -125,7 +125,7 @@ export default function ReporteExamenesConsecutivos() {
   
   const groupedCasos = useMemo(() => {
     const map = new Map();
-    const rank = (r) => (r === 'CRÍTICO' ? 3 : r === 'ALTO' ? 2 : r === 'MEDIO' ? 1 : 0);
+    const rank = (r) => (r === 'EMERGENCIA' ? 4 : r === 'CRÍTICO' ? 3 : r === 'ALTO' ? 2 : r === 'MEDIO' ? 1 : 0);
     casosFiltrados.forEach((c) => {
       const nombre = c?.nombreCompleto || `${c?.alumnoApellido || ''}, ${c?.alumnoNombre || ''}`.trim();
       const key = c?.alumnoId ?? nombre;
@@ -141,7 +141,7 @@ export default function ReporteExamenesConsecutivos() {
       if (cursoStr) g.cursos.add(cursoStr);
       g.maxR = Math.max(g.maxR, rank(c?.estadoRiesgo));
     });
-    const label = (n) => (n === 3 ? 'CRÍTICO' : n === 2 ? 'ALTO' : n === 1 ? 'MEDIO' : null);
+    const label = (n) => (n === 4 ? 'EMERGENCIA' : n === 3 ? 'CRÍTICO' : n === 2 ? 'ALTO' : n === 1 ? 'MEDIO' : null);
     const grupos = Array.from(map.values()).map(g => ({
       ...g,
       materias: Array.from(g.materias),
@@ -208,7 +208,7 @@ export default function ReporteExamenesConsecutivos() {
   // Recalcular resumen por materia desde los casos detectados (frontend)
   const resumenPorMateriaCalculado = useMemo(() => {
     const materiaMap = new Map();
-    const rank = (r) => (r === 'CRÍTICO' ? 3 : r === 'ALTO' ? 2 : r === 'MEDIO' ? 1 : 0);
+    const rank = (r) => (r === 'EMERGENCIA' ? 4 : r === 'CRÍTICO' ? 3 : r === 'ALTO' ? 2 : r === 'MEDIO' ? 1 : 0);
     
     // Recorrer todos los casos y agrupar por materia
     casos.forEach(c => {
@@ -238,6 +238,7 @@ export default function ReporteExamenesConsecutivos() {
     
     // Calcular resumen final
     return Array.from(materiaMap.values()).map(m => {
+      const alumnosEmergencia = Array.from(m.alumnosRiesgo.values()).filter(r => r === 'EMERGENCIA').length;
       const alumnosCriticos = Array.from(m.alumnosRiesgo.values()).filter(r => r === 'CRÍTICO').length;
       const alumnosAltos = Array.from(m.alumnosRiesgo.values()).filter(r => r === 'ALTO').length;
       const alumnosMedios = Array.from(m.alumnosRiesgo.values()).filter(r => r === 'MEDIO').length;
@@ -247,6 +248,7 @@ export default function ReporteExamenesConsecutivos() {
         materiaNombre: m.materiaNombre,
         totalAlumnos: m.alumnosRiesgo.size,
         totalInstancias: m.instancias.length,
+        alumnosEmergencia,
         alumnosCriticos,
         alumnosAltos,
         alumnosMedios
@@ -275,6 +277,8 @@ export default function ReporteExamenesConsecutivos() {
       if (typeof data?.totalAlumnosEnRiesgo !== 'undefined') lines.push(['Total alumnos en riesgo', data.totalAlumnosEnRiesgo]);
       if (typeof data?.totalMateriasAfectadas !== 'undefined') lines.push(['Total materias afectadas', data.totalMateriasAfectadas]);
       if (typeof data?.totalCursosAfectados !== 'undefined') lines.push(['Total cursos afectados', data.totalCursosAfectados]);
+      if (typeof data?.casosEmergencia !== 'undefined') lines.push(['Casos emergencia', data.casosEmergencia]);
+      if (typeof data?.casosEmergencia !== 'undefined') lines.push(['Casos emergencia', data.casosEmergencia]);
       if (typeof data?.casosCriticos !== 'undefined') lines.push(['Casos críticos', data.casosCriticos]);
       if (typeof data?.casosAltos !== 'undefined') lines.push(['Casos altos', data.casosAltos]);
       if (typeof data?.casosMedios !== 'undefined') lines.push(['Casos medios', data.casosMedios]);
@@ -282,11 +286,12 @@ export default function ReporteExamenesConsecutivos() {
       lines.push([]);
       if (resumenPorMateria.length) {
         lines.push(['Resumen por materia']);
-        lines.push(['Materia','Alumnos','Instancias','Críticos','Altos','Medios']);
+        lines.push(['Materia','Alumnos','Instancias','Emergencia','Críticos','Altos','Medios']);
         resumenPorMateria.forEach(r => lines.push([
           r.materiaNombre || '-', 
           r.totalAlumnos ?? r.totalCasos ?? '', 
           r.totalInstancias ?? r.totalCasos ?? '', 
+          r.alumnosEmergencia ?? r.casosEmergencia ?? '', 
           r.alumnosCriticos ?? r.casosCriticos ?? '', 
           r.alumnosAltos ?? r.casosAltos ?? '', 
           r.alumnosMedios ?? r.casosMedios ?? ''
@@ -302,16 +307,20 @@ export default function ReporteExamenesConsecutivos() {
           const alumno = idx === 0 ? g.nombre : ''; // Solo mostrar nombre en la primera fila
           const mat = c.materiaNombre || '-';
           const curso = `${c.anio ? c.anio + '°' : ''} ${c.division ?? ''}`.trim() || c.cursoNombre || '';
-          const etapa1 = c.etapaPrimeraNota;
-          const num1 = c.numeroPrimeraNota;
-          const nota1 = c.primeraNota;
-          const etapa2 = c.etapaSegundaNota;
-          const num2 = c.numeroSegundaNota;
-          const nota2 = c.segundaNota;
-          
-          const detalleExamenes = etapa1 === etapa2 
-            ? `Etapa ${etapa1}: Examen ${num1} (nota: ${nota1}) y Examen ${num2} (nota: ${nota2})`
-            : `Etapa ${etapa1} - Examen ${num1} (nota: ${nota1}) | Etapa ${etapa2} - Examen ${num2} (nota: ${nota2})`;
+          // Usar la descripción del backend si está disponible, sino construir como antes
+          const detalleExamenes = c.descripcionConsecutivo || (() => {
+            const etapa1 = c.etapaPrimeraNota;
+            const num1 = c.numeroPrimeraNota;
+            const nota1 = c.primeraNota;
+            const etapa2 = c.etapaSegundaNota;
+            const num2 = c.numeroSegundaNota;
+            const nota2 = c.segundaNota;
+            const cantidad = c.cantidadConsecutivas || 2;
+            
+            return etapa1 === etapa2 
+              ? `Etapa ${etapa1}: Examen ${num1} (nota: ${nota1}) y Examen ${num2} (nota: ${nota2}) - ${cantidad} consecutivos`
+              : `Etapa ${etapa1} - Examen ${num1} (nota: ${nota1}) | Etapa ${etapa2} - Examen ${num2} (nota: ${nota2}) - ${cantidad} consecutivos`;
+          })();
           
           lines.push([alumno, mat, curso, detalleExamenes]);
         });
@@ -373,6 +382,44 @@ export default function ReporteExamenesConsecutivos() {
       <p className="text-muted mb-3">
         Este reporte identifica alumnos en riesgo académico de no promover debido a exámenes consecutivos desaprobados{['ROLE_ADMIN', 'ROLE_DIRECTOR'].includes(rol) && ', permitiendo detectar patrones y casos que se repiten en materias específicas'}, facilitando la intervención temprana del equipo docente.
       </p>
+
+      {/* Explicación del Sistema de Clasificación */}
+      <Alert variant="info" className="mb-3">
+        <Alert.Heading className="h6 mb-3">
+          <i className="fas fa-info-circle me-2"></i>
+          ¿Cómo se Determina el Nivel de Riesgo?
+        </Alert.Heading>
+        <p className="mb-2 small">
+          El sistema analiza <strong>todos los casos de exámenes consecutivos desaprobados por materia</strong> y calcula un puntaje considerando múltiples factores:
+        </p>
+        <Row className="mb-3">
+          <Col md={6}>
+            <div className="small">
+              <strong>Factores Evaluados:</strong>
+              <ul className="mt-1 mb-2 ps-3">
+                <li><strong>Secuencia más larga:</strong> 5+ consecutivos (+50 pts), 4 consecutivos (+40 pts), 3 consecutivos (+25 pts), 2 consecutivos (+15 pts)</li>
+                <li><strong>Persistencia:</strong> 3+ secuencias (+30 pts), 2 secuencias (+20 pts)</li>
+                <li><strong>Gravedad notas:</strong> Promedio ≤2.5 (+20 pts), ≤3.5 (+15 pts), ≤4.5 (+10 pts), >4.5 (+5 pts)</li>
+                <li><strong>Patrón entre etapas:</strong> Dificultades en múltiples etapas (+15 pts)</li>
+              </ul>
+            </div>
+          </Col>
+          <Col md={6}>
+            <div className="small">
+              <strong>Clasificación Final:</strong>
+              <ul className="mt-1 mb-2 ps-3">
+                <li><span className="badge bg-dark text-white">EMERGENCIA</span> 80+ puntos: Falla sistemática que requiere intervención inmediata</li>
+                <li><span className="badge bg-danger text-white">CRÍTICO</span> 60-79 puntos: Dificultad grave que requiere apoyo urgente</li>
+                <li><span className="badge bg-warning text-dark">ALTO</span> 40-59 puntos: Problema persistente que necesita seguimiento</li>
+                <li><span className="badge bg-info text-white">MEDIO</span> &lt;40 puntos: Dificultad puntual para monitorear</li>
+              </ul>
+            </div>
+          </Col>
+        </Row>
+        <div className="small text-muted">
+          <strong>Ejemplo:</strong> Un alumno con 2 secuencias de 2 consecutivos en diferentes etapas de Matemática obtendría: 15 (secuencia) + 20 (persistencia) + 10 (notas) + 15 (etapas) = 60 puntos → <span className="badge bg-danger text-white">CRÍTICO</span>
+        </div>
+      </Alert>
       <div className="mb-3">
         {cicloLectivo?.id ? (
           <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
@@ -432,23 +479,30 @@ export default function ReporteExamenesConsecutivos() {
           </div>
 
           <div ref={printRef}>
-            {/* Banner de interpretación del riesgo */}
+            {/* Explicación del nuevo sistema de scoring */}
             <Card className="mb-3">
-              <Card.Body className="py-2">
-                <div className="fw-semibold mb-2">Niveles de riesgo (según promedio de ambas notas):</div>
-                <div className="d-flex align-items-center gap-4 flex-wrap">
+              <Card.Body className="py-3">
+                <div className="fw-semibold mb-3 text-primary">📊 Sistema de Clasificación Inteligente por Materia</div>
+                <div className="d-flex align-items-center gap-4 flex-wrap mb-3">
                   <div className="d-flex align-items-center gap-2">
-                    <Badge bg="danger">CRÍTICO</Badge>
-                    <span className="text-muted">Promedio ≤ 4.0</span>
+                    <Badge bg="dark" className="px-3">EMERGENCIA</Badge>
+                    <span className="text-muted">80+ puntos</span>
                   </div>
                   <div className="d-flex align-items-center gap-2">
-                    <Badge bg="warning" text="dark">ALTO</Badge>
-                    <span className="text-muted">Promedio ≤ 5.0</span>
+                    <Badge bg="danger" className="px-3">CRÍTICO</Badge>
+                    <span className="text-muted">60-79 puntos</span>
                   </div>
                   <div className="d-flex align-items-center gap-2">
-                    <Badge bg="info" text="dark">MEDIO</Badge>
-                    <span className="text-muted">Promedio entre 5.1 y 6.9</span>
+                    <Badge bg="warning" text="dark" className="px-3">ALTO</Badge>
+                    <span className="text-muted">40-59 puntos</span>
                   </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <Badge bg="info" text="dark" className="px-3">MEDIO</Badge>
+                    <span className="text-muted">&lt;40 puntos</span>
+                  </div>
+                </div>
+                <div className="text-muted small">
+                  ℹ️ La clasificación considera múltiples factores por materia: cantidad de secuencias, persistencia temporal, gravedad de notas y patrones entre etapas.
                 </div>
               </Card.Body>
             </Card>
@@ -519,10 +573,11 @@ export default function ReporteExamenesConsecutivos() {
               {typeof data.totalCursosAfectados !== 'undefined' && ambito !== 'materia' && (
                 <Col md={3} sm={6}><Card className="text-center"><Card.Body><div className="text-muted small">Cursos afectados</div><div className="h4 m-0">{data.totalCursosAfectados}</div></Card.Body></Card></Col>
               )}
-              {(typeof data.casosCriticos !== 'undefined' || typeof data.casosAltos !== 'undefined' || typeof data.casosMedios !== 'undefined') && (
+              {(typeof data.casosEmergencia !== 'undefined' || typeof data.casosCriticos !== 'undefined' || typeof data.casosAltos !== 'undefined' || typeof data.casosMedios !== 'undefined') && (
                 <Col md={3} sm={6}><Card className="text-center"><Card.Body>
                   <div className="text-muted small mb-1">Riesgo</div>
                   <div className="d-flex gap-2 justify-content-center flex-wrap">
+                    {typeof data.casosEmergencia !== 'undefined' && <Badge bg="dark">Emergencia: {data.casosEmergencia}</Badge>}
                     {typeof data.casosCriticos !== 'undefined' && <Badge bg="danger">Críticos: {data.casosCriticos}</Badge>}
                     {typeof data.casosAltos !== 'undefined' && <Badge bg="warning" text="dark">Altos: {data.casosAltos}</Badge>}
                     {typeof data.casosMedios !== 'undefined' && <Badge bg="info" text="dark">Medios: {data.casosMedios}</Badge>}
@@ -542,6 +597,7 @@ export default function ReporteExamenesConsecutivos() {
                         <th>Materia</th>
                         <th className="text-end">Alumnos</th>
                         <th className="text-end">Instancias</th>
+                        <th className="text-end">Emerg.</th>
                         <th className="text-end">Críticos</th>
                         <th className="text-end">Altos</th>
                         <th className="text-end">Medios</th>
@@ -568,6 +624,7 @@ export default function ReporteExamenesConsecutivos() {
                           </td>
                           <td className="text-end">{r.totalAlumnos ?? r.totalCasos ?? '-'}</td>
                           <td className="text-end">{r.totalInstancias ?? r.totalCasos ?? '-'}</td>
+                          <td className="text-end">{r.alumnosEmergencia ?? r.casosEmergencia ?? '-'}</td>
                           <td className="text-end">{r.alumnosCriticos ?? r.casosCriticos ?? '-'}</td>
                           <td className="text-end">{r.alumnosAltos ?? r.casosAltos ?? '-'}</td>
                           <td className="text-end">{r.alumnosMedios ?? r.casosMedios ?? '-'}</td>
@@ -622,7 +679,7 @@ export default function ReporteExamenesConsecutivos() {
                         <strong>{g.nombre}</strong>
                         {g.maxRiesgoLabel && (
                           <Badge 
-                            bg={g.maxRiesgoLabel === 'CRÍTICO' ? 'danger' : g.maxRiesgoLabel === 'ALTO' ? 'warning' : 'info'} 
+                            bg={g.maxRiesgoLabel === 'EMERGENCIA' ? 'dark' : g.maxRiesgoLabel === 'CRÍTICO' ? 'danger' : g.maxRiesgoLabel === 'ALTO' ? 'warning' : 'info'} 
                             text={g.maxRiesgoLabel === 'ALTO' || g.maxRiesgoLabel === 'MEDIO' ? 'dark' : undefined} 
                             className="ms-2"
                           >
@@ -669,16 +726,20 @@ export default function ReporteExamenesConsecutivos() {
                           </thead>
                           <tbody>
                             {g.casos.map((c, ci) => {
-                              const etapa1 = c.etapaPrimeraNota;
-                              const num1 = c.numeroPrimeraNota;
-                              const nota1 = c.primeraNota;
-                              const etapa2 = c.etapaSegundaNota;
-                              const num2 = c.numeroSegundaNota;
-                              const nota2 = c.segundaNota;
-                              
-                              const detalleExamenes = etapa1 === etapa2 
-                                ? `Etapa ${etapa1}: Examen ${num1} (nota: ${nota1}) y Examen ${num2} (nota: ${nota2})`
-                                : `Etapa ${etapa1} - Examen ${num1} (nota: ${nota1}) | Etapa ${etapa2} - Examen ${num2} (nota: ${nota2})`;
+                              // Usar la descripción del backend si está disponible, sino construir como antes
+                              const detalleExamenes = c.descripcionConsecutivo || (() => {
+                                const etapa1 = c.etapaPrimeraNota;
+                                const num1 = c.numeroPrimeraNota;
+                                const nota1 = c.primeraNota;
+                                const etapa2 = c.etapaSegundaNota;
+                                const num2 = c.numeroSegundaNota;
+                                const nota2 = c.segundaNota;
+                                const cantidad = c.cantidadConsecutivas || 2;
+                                
+                                return etapa1 === etapa2 
+                                  ? `Etapa ${etapa1}: Examen ${num1} (nota: ${nota1}) y Examen ${num2} (nota: ${nota2}) - ${cantidad} consecutivos`
+                                  : `Etapa ${etapa1} - Examen ${num1} (nota: ${nota1}) | Etapa ${etapa2} - Examen ${num2} (nota: ${nota2}) - ${cantidad} consecutivos`;
+                              })();
                               
                               return (
                                 <tr key={ci}>
