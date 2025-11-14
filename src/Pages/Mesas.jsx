@@ -38,6 +38,7 @@ export default function Mesas() {
   const [tablaFiltroMateriaSel, setTablaFiltroMateriaSel] = useState(''); // nombre exacto
   const [tablaMateriaOpciones, setTablaMateriaOpciones] = useState([]); // array de nombres
   const [tablaFiltroTurno, setTablaFiltroTurno] = useState(''); // nombre exacto de turno
+  const [tablaFiltroTipo, setTablaFiltroTipo] = useState(''); // tipo de mesa
   const [filtrosVisibles, setFiltrosVisibles] = useState(false);
   const buscarBtnRef = useRef(null);
   const [loading, setLoading] = useState(false);
@@ -49,7 +50,7 @@ export default function Mesas() {
 
   // Estado antiguo de creación inline eliminado; nuevo modal de creación:
   const [showCrearMesa, setShowCrearMesa] = useState(false);
-  const [crearMesaForm, setCrearMesaForm] = useState({ anio: '', cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '' });
+  const [crearMesaForm, setCrearMesaForm] = useState({ anio: '', cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
   const [turnosPorAnio, setTurnosPorAnio] = useState(new Map()); // anio -> turnos
   const [crearMesaLoading, setCrearMesaLoading] = useState(false);
   const [crearMesaError, setCrearMesaError] = useState('');
@@ -63,7 +64,7 @@ export default function Mesas() {
   const [seleccionConvocados, setSeleccionConvocados] = useState(new Set());
   const [notasEdit, setNotasEdit] = useState({});
   const [showEditMesa, setShowEditMesa] = useState(false);
-  const [editMesaForm, setEditMesaForm] = useState({ id: null, materiaCursoId: '', fecha: '', aulaId: '' });
+  const [editMesaForm, setEditMesaForm] = useState({ id: null, materiaCursoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
   const [showActa, setShowActa] = useState(false);
   const [acta, setActa] = useState(null);
   const [actaForm, setActaForm] = useState({ id: null, numeroActa: '', observaciones: '' });
@@ -173,13 +174,14 @@ export default function Mesas() {
         materiaCursoId: Number(crearMesaForm.materiaCursoId),
         turnoId: Number(crearMesaForm.turnoId),
         fecha: crearMesaForm.fecha,
+        tipoMesa: crearMesaForm.tipoMesa,
       };
       if (crearMesaForm.aulaId) payload.aulaId = Number(crearMesaForm.aulaId);
       await crearMesa(token, payload);
       await refreshMesas();
       toast.success('Mesa creada');
       setShowCrearMesa(false);
-      setCrearMesaForm({ cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '' });
+      setCrearMesaForm({ cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
     } catch (e) {
       setCrearMesaError(e.message || 'No se pudo crear la mesa');
       toast.error(e.message);
@@ -239,8 +241,9 @@ export default function Mesas() {
     return mesas
       .filter(m => !tablaFiltroEstado || m.estado === tablaFiltroEstado)
       .filter(m => !tablaFiltroMateriaSel || String(m.materiaNombre || materiaNombrePorId.get(m.materiaCursoId) || '').trim() === tablaFiltroMateriaSel)
-      .filter(m => !tablaFiltroTurno || (m.turnoNombre || turnoPorFecha(m.fecha) || '').trim() === tablaFiltroTurno);
-  }, [mesas, tablaFiltroEstado, tablaFiltroMateriaSel, tablaFiltroTurno, materiaNombrePorId, turnoPorFecha]);
+      .filter(m => !tablaFiltroTurno || (m.turnoNombre || turnoPorFecha(m.fecha) || '').trim() === tablaFiltroTurno)
+      .filter(m => !tablaFiltroTipo || (m.tipoMesa || 'EXAMEN') === tablaFiltroTipo);
+  }, [mesas, tablaFiltroEstado, tablaFiltroMateriaSel, tablaFiltroTurno, tablaFiltroTipo, materiaNombrePorId, turnoPorFecha]);
   const totalPaginas = Math.max(1, Math.ceil(mesasFiltradas.length / pageSize));
   const items = mesasFiltradas.slice((pagina - 1) * pageSize, pagina * pageSize);
   const onPaginaChange = (p) => setPagina(Math.max(1, Math.min(totalPaginas, p)));
@@ -306,7 +309,7 @@ export default function Mesas() {
             </Col>
             <Col className="text-md-end">
               <Button variant="outline-dark" className="me-2" onClick={()=> navigate('/mesa-de-examen/historial')}>Ver historial</Button>
-              <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
+              <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
             </Col>
           </Row>
 
@@ -343,8 +346,18 @@ export default function Mesas() {
                   </Form.Select>
                 </Form.Group>
               </Col>
+              <Col md={3} sm={6} xs={12}>
+                <Form.Group>
+                  <Form.Label>Tipo</Form.Label>
+                  <Form.Select value={tablaFiltroTipo} onChange={(e)=> { setTablaFiltroTipo(e.target.value); setPagina(1); }}>
+                    <option value="">Todos</option>
+                    <option value="EXAMEN">Examen final</option>
+                    <option value="COLOQUIO">Coloquio</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
               <Col md="auto" className="d-flex align-items-end">
-                <Button variant="secondary" onClick={()=>{ setTablaFiltroEstado(''); setTablaFiltroMateriaSel(''); setTablaFiltroTurno(''); setPagina(1); }}>Limpiar filtros</Button>
+                <Button variant="secondary" onClick={()=>{ setTablaFiltroEstado(''); setTablaFiltroMateriaSel(''); setTablaFiltroTurno(''); setTablaFiltroTipo(''); setPagina(1); }}>Limpiar filtros</Button>
               </Col>
             </Row>
           )}
@@ -361,6 +374,7 @@ export default function Mesas() {
                   <th>Materia</th>
                   <th>Turno</th>
                   <th>Aula</th>
+                  <th>Tipo</th>
                   <th>Estado</th>
                   <th>Convocados</th>
                   <th className="text-end">Acciones</th>
@@ -384,6 +398,11 @@ export default function Mesas() {
                       <td>{m.materiaNombre || materiaNombrePorId.get(m.materiaCursoId) || '-'}</td>
                       <td>{m.turnoNombre || turnoPorFecha(m.fecha) || '-'}</td>
                       <td>{aulaNombrePorId.get(m.aulaId) || '-'}</td>
+                      <td>
+                        <Badge bg={m.tipoMesa === 'COLOQUIO' ? 'info' : 'primary'}>
+                          {m.tipoMesa === 'COLOQUIO' ? 'Coloquio' : 'Examen Final'}
+                        </Badge>
+                      </td>
                       <td>
                         {m.estado === 'FINALIZADA' ? <Badge bg="secondary">Finalizada</Badge> : <Badge bg="success">Creada</Badge>}
                       </td>
@@ -418,7 +437,7 @@ export default function Mesas() {
                 })}
                 {mesasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-4 text-muted">No hay mesas para este curso</td>
+                    <td colSpan={8} className="text-center py-4 text-muted">No hay mesas para este curso</td>
                   </tr>
                 )}
               </tbody>
@@ -713,6 +732,31 @@ export default function Mesas() {
                   </Form.Select>
                 </Form.Group>
               </Col>
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Tipo de mesa</Form.Label>
+                  <Form.Select 
+                    value={editMesaForm.tipoMesa} 
+                    onChange={(e)=>setEditMesaForm(v=>({...v, tipoMesa: e.target.value}))}
+                    disabled={mesaSel && (mesaSel.alumnos?.length > 0 || mesaSel.docentes?.length > 0)}
+                  >
+                    <option value="EXAMEN">Examen final</option>
+                    <option value="COLOQUIO">Coloquio</option>
+                  </Form.Select>
+                  {mesaSel && (mesaSel.alumnos?.length > 0 || mesaSel.docentes?.length > 0) && (
+                    <Form.Text className="text-warning">
+                      No se puede cambiar el tipo porque ya tiene alumnos o docentes asignados
+                    </Form.Text>
+                  )}
+                  {!(mesaSel && (mesaSel.alumnos?.length > 0 || mesaSel.docentes?.length > 0)) && (
+                    <Form.Text className="text-muted">
+                      {editMesaForm.tipoMesa === 'COLOQUIO' 
+                        ? 'Coloquio: 1 docente (debe ser de la materia)' 
+                        : 'Examen final: 3 docentes (al menos uno de la materia)'}
+                    </Form.Text>
+                  )}
+                </Form.Group>
+              </Col>
             </Row>
           </Form>
           <div className="mt-2 text-muted" style={{fontSize:'.9rem'}}>
@@ -728,6 +772,7 @@ export default function Mesas() {
               if (editMesaForm.fecha) payload.fecha = editMesaForm.fecha;
               if (editMesaForm.materiaCursoId) payload.materiaCursoId = Number(editMesaForm.materiaCursoId);
               if (editMesaForm.aulaId) payload.aulaId = Number(editMesaForm.aulaId);
+              if (editMesaForm.tipoMesa) payload.tipoMesa = editMesaForm.tipoMesa;
               await actualizarMesa(token, payload);
               await refreshMesas();
               toast.success('Mesa actualizada');
@@ -871,6 +916,20 @@ export default function Mesas() {
                     <option value="">-- Sin aula --</option>
                     {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre || a.id}</option>)}
                   </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Tipo de mesa</Form.Label>
+                  <Form.Select value={crearMesaForm.tipoMesa} onChange={(e)=> setCrearMesaForm(f=>({...f, tipoMesa: e.target.value}))}>
+                    <option value="EXAMEN">Examen final</option>
+                    <option value="COLOQUIO">Coloquio</option>
+                  </Form.Select>
+                  <Form.Text className="text-muted">
+                    {crearMesaForm.tipoMesa === 'COLOQUIO' 
+                      ? 'Coloquio: 1 docente (debe ser de la materia)' 
+                      : 'Examen final: 3 docentes (al menos uno de la materia)'}
+                  </Form.Text>
                 </Form.Group>
               </Col>
             </Row>

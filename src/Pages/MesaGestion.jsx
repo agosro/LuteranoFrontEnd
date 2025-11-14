@@ -10,7 +10,7 @@ import { listarMateriasDeCurso } from '../Services/MateriaCursoService.js';
 import { obtenerCursoPorId, listarCursos } from '../Services/CursoService.js';
 import { listarAulas } from '../Services/AulaService.js';
 import { listarDocentesAsignados, listarDocentesDisponibles, asignarDocentes } from '../Services/MesaExamenDocenteService.js';
-import { listarRindenPorCurso } from '../Services/ReporteRindeService.js';
+import { listarRindenPorCurso, listarTodosLosAlumnosPorCurso } from '../Services/ReporteRindeService.js';
 import { listarTurnos } from '../Services/TurnoExamenService.js';
 
 export default function MesaGestion() {
@@ -28,7 +28,7 @@ export default function MesaGestion() {
   // Datos básicos
   const [materias, setMaterias] = useState([]);
   const [aulas, setAulas] = useState([]);
-  const [datosForm, setDatosForm] = useState({ materiaCursoId: '', fecha: '', aulaId: '' });
+  const [datosForm, setDatosForm] = useState({ materiaCursoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
   const [datosSaving, setDatosSaving] = useState(false);
 
   // Docentes
@@ -41,6 +41,7 @@ export default function MesaGestion() {
   const [elegibles, setElegibles] = useState([]);
   const [convSeleccionados, setConvSeleccionados] = useState(new Set());
   const [convSaving, setConvSaving] = useState(false);
+  const [mostrarTodos, setMostrarTodos] = useState(false); // Toggle para mostrar todos vs solo elegibles
 
   // Notas
   const [notasEdit, setNotasEdit] = useState({});
@@ -53,13 +54,97 @@ export default function MesaGestion() {
     return `${d.padStart(2,'0')}-${m.padStart(2,'0')}-${y}`;
   };
 
+  const recargarAlumnos = useCallback(async (mesa, tipoMesaOverride = null) => {
+    try {
+      const anio = new Date().getFullYear();
+      const mats = await listarMateriasDeCurso(token, mesa.cursoId);
+      const mat = mats.find(mt => Number(mt.materiaCursoId) === Number(mesa.materiaCursoId));
+      const materiaId = mat?.materiaId;
+      
+      // Usar el servicio correcto según el toggle
+      const servicioReporte = mostrarTodos ? listarTodosLosAlumnosPorCurso : listarRindenPorCurso;
+      const rep = await servicioReporte(token, { cursoId: mesa.cursoId, anio });
+      const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
+      const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
+      
+      // Si mostrarTodos está activado, no filtrar por condición de mesa
+      let filtradasPorTipo = filtradas;
+      if (!mostrarTodos) {
+        // Filtrar por tipo de mesa solo cuando mostrarTodos está desactivado
+        const tipoMesa = tipoMesaOverride || mesa.tipoMesa || 'EXAMEN';
+        filtradasPorTipo = tipoMesa === 'COLOQUIO' 
+          ? filtradas.filter(f => f.condicion === 'COLOQUIO')
+          : filtradas;
+      }
+      
+      const lista = filtradasPorTipo.map(r => ({ 
+        id: Number(r.alumnoId), 
+        alumnoId: Number(r.alumnoId), 
+        dni: r.dni, 
+        apellido: r.apellido, 
+        nombre: r.nombre, 
+        condicion: r.condicion,
+        estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
+      }));
+      
+      setElegibles(lista);
+      const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
+      setConvSeleccionados(actuales);
+    } catch {
+      setElegibles([]);
+      setConvSeleccionados(new Set());
+    }
+  }, [token, mostrarTodos]);
+
+  const refreshSinAlumnos = useCallback(async () => {
+    try {
+      const m = await obtenerMesa(token, mesaId);
+      setMesa(m);
+      setDatosForm({ materiaCursoId: m.materiaCursoId || '', fecha: m.fecha || '', aulaId: m.aulaId || '', tipoMesa: m.tipoMesa || 'EXAMEN' });
+      const [cursoResp, cursosAll, mats, als, asig, disp] = await Promise.all([
+        obtenerCursoPorId(token, m.cursoId),
+        listarCursos(token),
+        listarMateriasDeCurso(token, m.cursoId),
+        listarAulas(token),
+        listarDocentesAsignados(token, mesaId),
+        listarDocentesDisponibles(token, mesaId),
+      ]);
+      // Resolver forma del curso (tolerar distintas envolturas del backend)
+      let resolved = null;
+      const candidates = [cursoResp?.curso, cursoResp?.cursoDto, cursoResp?.cursoDTO, cursoResp];
+      for (const c of candidates) { if (c && (c.anio !== undefined || c.division !== undefined)) { resolved = c; break; } }
+      if (!resolved && Array.isArray(cursosAll)) {
+        const hit = cursosAll.find(x => Number(x.id) === Number(m.cursoId));
+        if (hit) resolved = hit;
+      }
+      setCurso(resolved);
+      setMaterias(Array.isArray(mats) ? mats : []);
+      setAulas(Array.isArray(als) ? als : []);
+      setDocAsignados(Array.isArray(asig) ? asig : []);
+      setDocDisponibles(Array.isArray(disp) ? disp : []);
+
+      // Notas
+      const initNotas = {};
+      (m.alumnos||[]).forEach(a => { initNotas[a.alumnoId] = a.notaFinal ?? ''; });
+      setNotasEdit(initNotas);
+
+      try {
+        const anio = new Date().getFullYear();
+        const ts = await listarTurnos(token, anio);
+        setTurnos(Array.isArray(ts) ? ts : []);
+      } catch { setTurnos([]); }
+    } catch (e) {
+      setMsg({ type: 'error', text: e.message });
+    }
+  }, [token, mesaId]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setMsg({ type: null, text: '' });
     try {
       const m = await obtenerMesa(token, mesaId);
       setMesa(m);
-      setDatosForm({ materiaCursoId: m.materiaCursoId || '', fecha: m.fecha || '', aulaId: m.aulaId || '' });
+      setDatosForm({ materiaCursoId: m.materiaCursoId || '', fecha: m.fecha || '', aulaId: m.aulaId || '', tipoMesa: m.tipoMesa || 'EXAMEN' });
       const [cursoResp, cursosAll, mats, als, asig, disp] = await Promise.all([
         obtenerCursoPorId(token, m.cursoId),
         listarCursos(token),
@@ -90,10 +175,32 @@ export default function MesaGestion() {
         const anio = yearStr ? Number(yearStr) : new Date().getFullYear();
         const mat = mats.find(mt => Number(mt.materiaCursoId) === Number(m.materiaCursoId));
         const materiaId = mat?.materiaId;
-        const rep = await listarRindenPorCurso(token, { cursoId: m.cursoId, anio });
+        
+        // Usar el servicio correcto según el toggle
+        const servicioReporte = mostrarTodos ? listarTodosLosAlumnosPorCurso : listarRindenPorCurso;
+        const rep = await servicioReporte(token, { cursoId: m.cursoId, anio });
         const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
         const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
-        const lista = filtradas.map(r => ({ id: Number(r.alumnoId), alumnoId: Number(r.alumnoId), dni: r.dni, apellido: r.apellido, nombre: r.nombre, condicion: r.condicion }));
+        
+        // Si mostrarTodos está activado, no filtrar por condición de mesa
+        let filtradasPorTipo = filtradas;
+        if (!mostrarTodos) {
+          // Filtrar por tipo de mesa solo cuando mostrarTodos está desactivado
+          const tipoMesa = m.tipoMesa || 'EXAMEN';
+          filtradasPorTipo = tipoMesa === 'COLOQUIO' 
+            ? filtradas.filter(f => f.condicion === 'COLOQUIO')
+            : filtradas;
+        }
+        
+        const lista = filtradasPorTipo.map(r => ({ 
+          id: Number(r.alumnoId), 
+          alumnoId: Number(r.alumnoId), 
+          dni: r.dni, 
+          apellido: r.apellido, 
+          nombre: r.nombre, 
+          condicion: r.condicion,
+          estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
+        }));
         setElegibles(lista);
         const actuales = new Set((m.alumnos||[]).map(a => Number(a.alumnoId)));
         setConvSeleccionados(actuales);
@@ -118,9 +225,16 @@ export default function MesaGestion() {
     } finally {
       setLoading(false);
     }
-  }, [mesaId, token]);
+  }, [mesaId, token, mostrarTodos]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Recargar alumnos cuando cambie el toggle
+  useEffect(() => {
+    if (mesa) {
+      recargarAlumnos(mesa);
+    }
+  }, [mostrarTodos, mesa, recargarAlumnos]);
 
   const guardarDatos = async () => {
     try {
@@ -129,8 +243,21 @@ export default function MesaGestion() {
       if (datosForm.fecha) payload.fecha = datosForm.fecha;
       if (datosForm.materiaCursoId) payload.materiaCursoId = Number(datosForm.materiaCursoId);
       if (datosForm.aulaId) payload.aulaId = Number(datosForm.aulaId);
-      await actualizarMesa(token, payload);
-      await refresh();
+      if (datosForm.tipoMesa) payload.tipoMesa = datosForm.tipoMesa;
+      
+      const mesaActualizada = await actualizarMesa(token, payload);
+      
+      // Actualizar inmediatamente el estado con la mesa actualizada
+      setMesa(mesaActualizada);
+      
+      // Si cambió el tipo de mesa, recargar alumnos inmediatamente y luego refresh sin alumnos
+      if (payload.tipoMesa) {
+        await recargarAlumnos(mesaActualizada, payload.tipoMesa);
+        await refreshSinAlumnos();
+      } else {
+        await refresh();
+      }
+      
       toast.success('Mesa actualizada');
     } catch (e) {
       toast.error(e.message);
@@ -139,7 +266,17 @@ export default function MesaGestion() {
 
   const guardarDocentes = async () => {
     try {
-      if (docSeleccionados.size !== 3) { toast.warn('Debés seleccionar exactamente 3 docentes'); return; }
+      const tipoMesa = datosForm.tipoMesa || mesa?.tipoMesa || 'EXAMEN';
+      const cantidadRequerida = tipoMesa === 'COLOQUIO' ? 1 : 3;
+      
+      if (docSeleccionados.size !== cantidadRequerida) { 
+        const mensaje = tipoMesa === 'COLOQUIO' 
+          ? 'Debés seleccionar exactamente 1 docente para un coloquio' 
+          : 'Debés seleccionar exactamente 3 docentes para un examen final';
+        toast.warn(mensaje); 
+        return; 
+      }
+      
       setDocSaving(true);
       const ids = Array.from(docSeleccionados);
       await asignarDocentes(token, mesaId, ids);
@@ -155,7 +292,10 @@ export default function MesaGestion() {
       setConvSaving(true);
       const mesaActual = await obtenerMesa(token, mesaId);
       const actuales = new Set((mesaActual?.alumnos||[]).map(a=>Number(a.alumnoId)));
-      const aAgregar = Array.from(convSeleccionados).filter(id => !actuales.has(id));
+      const aAgregarIds = Array.from(convSeleccionados).filter(id => !actuales.has(id));
+      
+      const aAgregar = Array.from(aAgregarIds);
+      
       if (aAgregar.length) await agregarConvocados(token, mesaId, aAgregar);
       const aQuitar = Array.from(actuales).filter(id => !convSeleccionados.has(id));
       for (const id of aQuitar) { await quitarConvocado(token, mesaId, id); }
@@ -222,6 +362,9 @@ export default function MesaGestion() {
                 });
                 return hit?.nombre || '-';
               })()}</strong>
+              {' '}— Tipo: <Badge bg={(datosForm.tipoMesa || mesa?.tipoMesa || 'EXAMEN') === 'COLOQUIO' ? 'info' : 'primary'}>
+                {(datosForm.tipoMesa || mesa?.tipoMesa || 'EXAMEN') === 'COLOQUIO' ? 'Coloquio' : 'Examen Final'}
+              </Badge>
               {' '}— Estado: {mesa.estado === 'FINALIZADA' ? <Badge bg="secondary">Finalizada</Badge> : <Badge bg="success">Creada</Badge>}
             </p>
           )}
@@ -263,6 +406,31 @@ export default function MesaGestion() {
                       </Form.Select>
                     </Form.Group>
                   </Col>
+                  <Col md={3}>
+                    <Form.Group>
+                      <Form.Label>Tipo de mesa</Form.Label>
+                      <Form.Select 
+                        value={datosForm.tipoMesa} 
+                        onChange={(e)=> setDatosForm(v=>({...v, tipoMesa: e.target.value}))} 
+                        disabled={mesa?.estado==='FINALIZADA' || (mesa?.alumnos?.length > 0 || mesa?.docentes?.length > 0)}
+                      >
+                        <option value="EXAMEN">Examen final</option>
+                        <option value="COLOQUIO">Coloquio</option>
+                      </Form.Select>
+                      {mesa && (mesa.alumnos?.length > 0 || mesa.docentes?.length > 0) && (
+                        <Form.Text className="text-warning">
+                          No se puede cambiar el tipo porque ya tiene alumnos o docentes asignados
+                        </Form.Text>
+                      )}
+                      {!(mesa && (mesa.alumnos?.length > 0 || mesa.docentes?.length > 0)) && mesa?.estado !== 'FINALIZADA' && (
+                        <Form.Text className="text-muted">
+                          {datosForm.tipoMesa === 'COLOQUIO' 
+                            ? 'Coloquio: 1 docente (debe ser de la materia)' 
+                            : 'Examen final: 3 docentes (al menos uno de la materia)'}
+                        </Form.Text>
+                      )}
+                    </Form.Group>
+                  </Col>
                   <Col xs={12} className="mt-2">
                     <Button variant="primary" onClick={guardarDatos} disabled={datosSaving || mesa?.estado==='FINALIZADA'}>Guardar</Button>
                   </Col>
@@ -270,7 +438,11 @@ export default function MesaGestion() {
               </Tab>
 
               <Tab eventKey="docentes" title="Docentes">
-                <p className="text-muted">Seleccioná exactamente 3 docentes. Los ya asignados aparecen tildados.</p>
+                <p className="text-muted">
+                  {(datosForm.tipoMesa || mesa?.tipoMesa || 'EXAMEN') === 'COLOQUIO' 
+                    ? 'Seleccioná exactamente 1 docente que dé la materia. Los ya asignados aparecen tildados.' 
+                    : 'Seleccioná exactamente 3 docentes. Al menos uno debe dar la materia. Los ya asignados aparecen tildados.'}
+                </p>
                 <div className="border rounded" style={{maxHeight:300, overflowY:'auto'}}>
                   <Table hover responsive className="mb-0">
                     <thead><tr><th style={{width:48}}></th><th>Apellido</th><th>Nombre</th><th>Origen</th></tr></thead>
@@ -300,12 +472,29 @@ export default function MesaGestion() {
                   </Table>
                 </div>
                 <div className="mt-3">
-                  <Button variant="primary" onClick={guardarDocentes} disabled={docSaving || docSeleccionados.size!==3}>Guardar docentes</Button>
+                  <Button 
+                    variant="primary" 
+                    onClick={guardarDocentes} 
+                    disabled={
+                      docSaving || 
+                      ((datosForm.tipoMesa || mesa?.tipoMesa || 'EXAMEN') === 'COLOQUIO' ? docSeleccionados.size !== 1 : docSeleccionados.size !== 3)
+                    }
+                  >
+                    Guardar docentes
+                  </Button>
                 </div>
               </Tab>
 
               <Tab eventKey="convocados" title="Convocados">
-                <p className="text-muted">Marcá los alumnos a convocar para esta mesa.</p>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <p className="text-muted mb-0">Marcá los alumnos a convocar para esta mesa.</p>
+                  <Form.Check 
+                    type="switch"
+                    label="Mostrar todos los alumnos (incluye aprobados)"
+                    checked={mostrarTodos}
+                    onChange={(e) => setMostrarTodos(e.target.checked)}
+                  />
+                </div>
                 <div className="border rounded" style={{maxHeight:360, overflowY:'auto'}}>
                   <Table hover responsive className="mb-0">
                     <thead>
@@ -315,30 +504,50 @@ export default function MesaGestion() {
                         <th>Apellido</th>
                         <th>Nombre</th>
                         <th>Condición</th>
+                        {mostrarTodos && <th>Estado Académico</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {elegibles.map(al => {
                         const id = Number(al.id ?? al.alumnoId);
                         const checked = convSeleccionados.has(id);
+                        const estaAprobado = al.estadoAcademico === 'PROMOCIONADO' || al.estadoAcademico === 'APROBADO_MESA';
                         return (
-                          <tr key={id}>
+                          <tr key={id} className={estaAprobado ? 'table-success' : ''}>
                             <td>
-                              <Form.Check type="checkbox" checked={checked} onChange={(e)=>{
-                                const next = new Set(convSeleccionados);
-                                if (e.target.checked) next.add(id); else next.delete(id);
-                                setConvSeleccionados(next);
-                              }}/>
+                              <Form.Check 
+                                type="checkbox" 
+                                checked={checked} 
+                                disabled={estaAprobado} // Deshabilitar si ya está aprobado
+                                onChange={(e)=>{
+                                  const next = new Set(convSeleccionados);
+                                  if (e.target.checked) next.add(id); else next.delete(id);
+                                  setConvSeleccionados(next);
+                                }}
+                              />
                             </td>
                             <td>{al.dni}</td>
                             <td>{al.apellido}</td>
                             <td>{al.nombre}</td>
                             <td>{(al.condicion ?? '').toString()}</td>
+                            {mostrarTodos && (
+                              <td>
+                                <Badge bg={
+                                  al.estadoAcademico === 'PROMOCIONADO' ? 'success' :
+                                  al.estadoAcademico === 'APROBADO_MESA' ? 'info' : 
+                                  'warning'
+                                }>
+                                  {al.estadoAcademico === 'PROMOCIONADO' ? 'Promocionado' :
+                                   al.estadoAcademico === 'APROBADO_MESA' ? 'Aprobado por Mesa' :
+                                   'Debe Rendir'}
+                                </Badge>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
                       {elegibles.length===0 && (
-                        <tr><td colSpan={5} className="text-center py-3 text-muted">No hay alumnos elegibles</td></tr>
+                        <tr><td colSpan={mostrarTodos ? 6 : 5} className="text-center py-3 text-muted">No hay alumnos {mostrarTodos ? 'registrados' : 'elegibles'}</td></tr>
                       )}
                     </tbody>
                   </Table>
