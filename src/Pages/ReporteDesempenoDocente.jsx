@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, Row, Col, Form, Button, Spinner, Table, Badge, Alert, Accordion } from 'react-bootstrap';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
@@ -153,6 +154,22 @@ export default function ReporteDesempenoDocente() {
     
     const promedioAprobacion = countAprobacion > 0 ? totalAprobacion / countAprobacion : 0;
     const promedioGeneralTotal = countPromedio > 0 ? totalPromedio / countPromedio : 0;
+
+    // Calcular conteos únicos correctamente (no confiar en el backend)
+    const docentesUnicos = new Set(resultadosDocente.map(d => d.docenteId).filter(Boolean)).size;
+    const materiasUnicas = new Set(resultadosDocente.map(d => d.materiaId).filter(Boolean)).size;
+    const cursosUnicos = new Set(resultadosDocente.map(d => d.cursoId).filter(Boolean)).size;
+    
+    // Para alumnos, sumar totalAlumnos únicos por curso (no por fila)
+    const alumnosPorCurso = new Map();
+    resultadosDocente.forEach(d => {
+      if (d.cursoId && typeof d.totalAlumnos === 'number') {
+        if (!alumnosPorCurso.has(d.cursoId)) {
+          alumnosPorCurso.set(d.cursoId, d.totalAlumnos);
+        }
+      }
+    });
+    const totalAlumnosUnicos = Array.from(alumnosPorCurso.values()).reduce((a, b) => a + b, 0);
     
     return {
       promedioAprobacion,
@@ -161,9 +178,119 @@ export default function ReporteDesempenoDocente() {
       buenos,
       regulares,
       preocupantes,
-      totalRegistros: excelentes + buenos + regulares + preocupantes
+      totalRegistros: excelentes + buenos + regulares + preocupantes,
+      // Usar conteos únicos calculados, no los del backend
+      totalDocentes: docentesUnicos || data.totalDocentes,
+      totalMaterias: materiasUnicas || resultadosMateria.length || data.totalMaterias,
+      totalCursos: cursosUnicos || data.totalCursos,
+      totalAlumnos: totalAlumnosUnicos || data.totalAlumnos
     };
   }, [data, resultadosDocente, resultadosMateria]);
+
+  // Datos para gráficos con lógica de visibilidad según contexto
+  const chartsData = useMemo(() => {
+    if (!data || !resultadosDocente.length) return null;
+
+    const totalRegistros = resultadosDocente.length;
+    const docentesUnicos = new Set(resultadosDocente.map(d => d.docenteId || d.nombreCompletoDocente)).size;
+    const materiasUnicas = new Set(resultadosDocente.map(d => d.materiaId || d.nombreMateria)).size;
+
+    // Determinar si es vista de un solo docente
+    const esDocenteUnico = docentesUnicos === 1;
+
+    // 1. Top 10 Mejores Docentes por Promedio (BarChart horizontal) - Solo si hay 5+ docentes únicos
+    let topDocentes = [];
+    if (docentesUnicos >= 5) {
+      topDocentes = [...resultadosDocente]
+        .filter(d => typeof d.promedioGeneral === 'number')
+        .sort((a, b) => b.promedioGeneral - a.promedioGeneral)
+        .slice(0, 10)
+        .map(d => ({
+          nombre: (d.nombreCompletoDocente || `${d.apellidoDocente || ''} ${d.nombreDocente || ''}`).substring(0, 25),
+          promedio: d.promedioGeneral,
+          materia: (d.nombreMateria || '').substring(0, 15)
+        }));
+    }
+
+    // 2. Comparación entre Docentes de la Misma Materia (BarChart) - Solo si hay 2+ docentes en una materia
+    let comparacionDocentes = [];
+    if (materiaId && totalRegistros >= 2 && docentesUnicos >= 2) {
+      // Filtrado por materia específica, comparar docentes
+      comparacionDocentes = [...resultadosDocente]
+        .filter(d => typeof d.promedioGeneral === 'number')
+        .sort((a, b) => b.promedioGeneral - a.promedioGeneral)
+        .map(d => ({
+          nombre: (d.nombreCompletoDocente || `${d.apellidoDocente || ''} ${d.nombreDocente || ''}`).substring(0, 20),
+          promedio: d.promedioGeneral,
+          aprobacion: d.porcentajeAprobacion
+        }));
+    }
+
+    // 3. Rendimiento por Curso (si hay múltiples cursos y no hay filtro de curso) - Solo vista general
+    let cursosData = [];
+    if (!cursoId && totalRegistros >= 3 && !esDocenteUnico) {
+      const cursoMap = new Map();
+      resultadosDocente.forEach(d => {
+        const curso = d.cursoCompleto || 'Sin curso';
+        if (!cursoMap.has(curso)) {
+          cursoMap.set(curso, { total: 0, sum: 0 });
+        }
+        const entry = cursoMap.get(curso);
+        if (typeof d.promedioGeneral === 'number') {
+          entry.sum += d.promedioGeneral;
+          entry.total++;
+        }
+      });
+
+      cursosData = Array.from(cursoMap.entries())
+        .map(([curso, stats]) => ({
+          curso: curso.substring(0, 15),
+          promedio: stats.total > 0 ? (stats.sum / stats.total) : 0
+        }))
+        .filter(c => c.promedio > 0)
+        .sort((a, b) => b.promedio - a.promedio)
+        .slice(0, 10);
+      
+      // Solo mostrar si hay 2+ cursos diferentes
+      if (cursosData.length < 2) cursosData = [];
+    }
+
+    // 4. Rendimiento por Materia del Docente (si es docente único)
+    let materiasDocenteData = [];
+    if (esDocenteUnico && materiasUnicas >= 2) {
+      const materiaMap = new Map();
+      resultadosDocente.forEach(d => {
+        const materia = d.nombreMateria || 'Sin materia';
+        if (!materiaMap.has(materia)) {
+          materiaMap.set(materia, { total: 0, sum: 0 });
+        }
+        const entry = materiaMap.get(materia);
+        if (typeof d.promedioGeneral === 'number') {
+          entry.sum += d.promedioGeneral;
+          entry.total++;
+        }
+      });
+
+      materiasDocenteData = Array.from(materiaMap.entries())
+        .map(([materia, stats]) => ({
+          materia: materia.substring(0, 20),
+          promedio: stats.total > 0 ? (stats.sum / stats.total) : 0
+        }))
+        .filter(m => m.promedio > 0)
+        .sort((a, b) => b.promedio - a.promedio);
+    }
+
+    return {
+      topDocentes,
+      cursosData,
+      comparacionDocentes,
+      materiasDocenteData,
+      totalRegistros,
+      docentesUnicos,
+      materiasUnicas,
+      esDocenteUnico
+    };
+  }, [data, resultadosDocente, materiaId, cursoId]);
 
   const docenteRows = useMemo(() => {
     return (Array.isArray(resultadosDocente) ? resultadosDocente : []).map((d) => ({
@@ -391,10 +518,10 @@ export default function ReporteDesempenoDocente() {
             <div><strong>Preocupantes (&lt;60%):</strong> ${kpis.preocupantes}</div>
           </div>
           <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #dee2e6; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 10px;">
-            <div><strong>Materias:</strong> ${data.totalMaterias ?? (resultadosMateria.length || '-')}</div>
-            <div><strong>Docentes:</strong> ${data.totalDocentes ?? '-'}</div>
-            <div><strong>Alumnos:</strong> ${data.totalAlumnos ?? '-'}</div>
-            <div><strong>Cursos:</strong> ${data.totalCursos ?? '-'}</div>
+            <div><strong>Materias:</strong> ${kpis.totalMaterias ?? '-'}</div>
+            <div><strong>Docentes:</strong> ${kpis.totalDocentes ?? '-'}</div>
+            <div><strong>Alumnos:</strong> ${kpis.totalAlumnos ?? '-'}</div>
+            <div><strong>Cursos:</strong> ${kpis.totalCursos ?? '-'}</div>
           </div>
         </div>
       `;
@@ -562,7 +689,7 @@ export default function ReporteDesempenoDocente() {
                       <Card className="h-100 bg-light">
                         <Card.Body className="text-center py-2">
                           <div className="text-muted small">Materias</div>
-                          <div className="fw-bold">{data.totalMaterias ?? (resultadosMateria.length || '-')}</div>
+                          <div className="fw-bold">{kpis.totalMaterias ?? '-'}</div>
                         </Card.Body>
                       </Card>
                     </Col>
@@ -570,7 +697,7 @@ export default function ReporteDesempenoDocente() {
                       <Card className="h-100 bg-light">
                         <Card.Body className="text-center py-2">
                           <div className="text-muted small">Docentes</div>
-                          <div className="fw-bold">{data.totalDocentes ?? '-'}</div>
+                          <div className="fw-bold">{kpis.totalDocentes ?? '-'}</div>
                         </Card.Body>
                       </Card>
                     </Col>
@@ -578,7 +705,7 @@ export default function ReporteDesempenoDocente() {
                       <Card className="h-100 bg-light">
                         <Card.Body className="text-center py-2">
                           <div className="text-muted small">Alumnos</div>
-                          <div className="fw-bold">{data.totalAlumnos ?? '-'}</div>
+                          <div className="fw-bold">{kpis.totalAlumnos ?? '-'}</div>
                         </Card.Body>
                       </Card>
                     </Col>
@@ -586,35 +713,128 @@ export default function ReporteDesempenoDocente() {
                       <Card className="h-100 bg-light">
                         <Card.Body className="text-center py-2">
                           <div className="text-muted small">Cursos</div>
-                          <div className="fw-bold">{data.totalCursos ?? '-'}</div>
+                          <div className="fw-bold">{kpis.totalCursos ?? '-'}</div>
                         </Card.Body>
                       </Card>
                     </Col>
                   </Row>
+
+                  {/* Gráficos de análisis */}
+                  {chartsData && (
+                    <>
+                      <hr className="my-4" />
+                      <h5 className="mb-3">Análisis Comparativo</h5>
+                      
+                      <Row className="g-3 mb-3">
+                        {/* Rendimiento por Materia del Docente - Solo cuando es docente único */}
+                        {chartsData.materiasDocenteData.length > 0 && (
+                          <Col md={chartsData.cursosData.length > 0 ? 6 : 12}>
+                            <Card className="h-100">
+                              <Card.Header><strong>Rendimiento del Docente por Materia</strong></Card.Header>
+                              <Card.Body>
+                                <ResponsiveContainer width="100%" height={280}>
+                                  <BarChart data={chartsData.materiasDocenteData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="materia" angle={-20} textAnchor="end" height={60} />
+                                    <YAxis domain={[0, 10]} />
+                                    <Tooltip />
+                                    <Bar dataKey="promedio" name="Promedio" fill="#0066cc" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                                <div className="text-muted small mt-2">
+                                  * Promedio de todas las divisiones donde dicta cada materia
+                                </div>
+                              </Card.Body>
+                            </Card>
+                          </Col>
+                        )}
+
+                        {/* Rendimiento por Curso - Solo si no hay filtro de curso y hay 2+ cursos */}
+                        {chartsData.cursosData.length > 0 && (
+                          <Col md={chartsData.materiasDocenteData.length > 0 ? 6 : 12}>
+                            <Card className="h-100">
+                              <Card.Header><strong>Promedio por Curso (Top 10)</strong></Card.Header>
+                              <Card.Body>
+                                <ResponsiveContainer width="100%" height={280}>
+                                  <BarChart data={chartsData.cursosData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="curso" angle={-20} textAnchor="end" height={60} />
+                                    <YAxis domain={[0, 10]} />
+                                    <Tooltip />
+                                    <Bar dataKey="promedio" name="Promedio" fill="#0066cc" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </Card.Body>
+                            </Card>
+                          </Col>
+                        )}
+                      </Row>
+
+                      {/* Comparación entre Docentes de la Misma Materia - Solo si hay materia filtrada y 2+ docentes */}
+                      {chartsData.comparacionDocentes.length > 0 && (
+                        <Row className="g-3 mb-3">
+                          <Col>
+                            <Card>
+                              <Card.Header><strong>Comparación entre Docentes (Misma Materia)</strong></Card.Header>
+                              <Card.Body>
+                                <ResponsiveContainer width="100%" height={Math.max(250, chartsData.comparacionDocentes.length * 50)}>
+                                  <BarChart data={chartsData.comparacionDocentes} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="number" domain={[0, 10]} />
+                                    <YAxis type="category" dataKey="nombre" width={130} />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="promedio" name="Promedio General" fill="#0066cc" />
+                                    <Bar dataKey="aprobacion" name="% Aprobación (÷10)" fill="#28a745" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                                <div className="text-muted small mt-2">
+                                  * El % de Aprobación está dividido por 10 para mostrarse en la misma escala que el Promedio General (0-10)
+                                </div>
+                              </Card.Body>
+                            </Card>
+                          </Col>
+                        </Row>
+                      )}
+
+                      {/* Top 10 Docentes - Solo si hay 5+ docentes únicos y NO hay filtro de docente individual */}
+                      {chartsData.topDocentes.length > 0 && !docenteId && (
+                        <Row className="g-3">
+                          <Col>
+                            <Card>
+                              <Card.Header><strong>Top 10 Docentes con Mejor Promedio</strong></Card.Header>
+                              <Card.Body>
+                                <ResponsiveContainer width="100%" height={Math.max(300, chartsData.topDocentes.length * 40)}>
+                                  <BarChart data={chartsData.topDocentes} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="number" domain={[0, 10]} />
+                                    <YAxis type="category" dataKey="nombre" width={150} />
+                                    <Tooltip 
+                                      formatter={(value, name) => {
+                                        if (name === 'promedio') return [value.toFixed(2), 'Promedio'];
+                                        return [value, name];
+                                      }}
+                                      labelFormatter={(label) => {
+                                        const item = chartsData.topDocentes.find(d => d.nombre === label);
+                                        return item ? `${label} (${item.materia})` : label;
+                                      }}
+                                    />
+                                    <Bar dataKey="promedio" name="Promedio" fill="#28a745" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </Card.Body>
+                            </Card>
+                          </Col>
+                        </Row>
+                      )}
+                    </>
+                  )}
                 </Accordion.Body>
               </Accordion.Item>
             </Accordion>
           )}
 
-          {data.resumenEjecutivo && <p className="text-muted">{data.resumenEjecutivo}</p>}              {Array.isArray(data.hallazgosImportantes) && data.hallazgosImportantes.length > 0 && (
-                <>
-                  <h5>Hallazgos importantes</h5>
-                  <ul>
-                    {data.hallazgosImportantes.map((h, idx) => <li key={idx}>{h}</li>)}
-                  </ul>
-                </>
-              )}
-
-              {Array.isArray(data.recomendaciones) && data.recomendaciones.length > 0 && (
-                <>
-                  <h5>Recomendaciones</h5>
-                  <ul>
-                    {data.recomendaciones.map((r, idx) => <li key={idx}>{r}</li>)}
-                  </ul>
-                </>
-              )}
-
-              {resultadosMateria.length > 0 && (
+          {resultadosMateria.length > 0 && (
                 <>
                   <h4 className="mt-4">Resultados por materia</h4>
                   <Accordion alwaysOpen className="mt-2">

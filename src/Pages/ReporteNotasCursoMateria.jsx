@@ -114,6 +114,7 @@ export default function ReporteNotasCursoMateria() {
     setError("");
     setData(null);
     if (!cursoId) { setError("Seleccioná un curso"); return; }
+    if (materiasSeleccionadas.length === 0) { setError("Seleccioná al menos una materia"); return; }
     try {
       setLoading(true);
       // Traemos todo el curso; luego filtramos materia si está elegida
@@ -309,6 +310,32 @@ export default function ReporteNotasCursoMateria() {
     const notaMaxima = pgList.length ? Math.max(...pgList) : null;
     const porcentajeAprobacion = totalFilas > 0 ? ((aprobadas / totalFilas) * 100).toFixed(1) : 0;
 
+    // Comparación E1 vs E2 (solo cuando hay una materia seleccionada y período = Todos)
+    let comparacionEtapas = null;
+    if (materiasSeleccionadas.length === 1 && periodo === 'Todos') {
+      const e1Values = filasFiltradas.map(f => f.m.e1).filter(v => typeof v === 'number');
+      const e2Values = filasFiltradas.map(f => f.m.e2).filter(v => typeof v === 'number');
+      
+      if (e1Values.length > 0 || e2Values.length > 0) {
+        const promedioE1 = e1Values.length > 0 ? (e1Values.reduce((a,b) => a+b, 0) / e1Values.length).toFixed(2) : 0;
+        const promedioE2 = e2Values.length > 0 ? (e2Values.reduce((a,b) => a+b, 0) / e2Values.length).toFixed(2) : 0;
+        
+        const aprobadosE1 = e1Values.filter(v => v >= 6).length;
+        const aprobadosE2 = e2Values.filter(v => v >= 6).length;
+        
+        comparacionEtapas = {
+          promedios: [
+            { etapa: 'Etapa 1', promedio: Number(promedioE1) },
+            { etapa: 'Etapa 2', promedio: Number(promedioE2) }
+          ],
+          aprobacion: [
+            { etapa: 'Etapa 1', aprobados: aprobadosE1, desaprobados: e1Values.length - aprobadosE1 },
+            { etapa: 'Etapa 2', aprobados: aprobadosE2, desaprobados: e2Values.length - aprobadosE2 }
+          ]
+        };
+      }
+    }
+
     return {
       distribucion,
       pieData,
@@ -318,9 +345,10 @@ export default function ReporteNotasCursoMateria() {
       totalAlumnos: totalFilas,
       aprobados: aprobadas,
       desaprobados: desaprobadas,
-      promedio: promedioGeneralCurso
+      promedio: promedioGeneralCurso,
+      comparacionEtapas
     };
-  }, [filasFiltradas, pgList, aprobadas, desaprobadas, totalFilas, promedioGeneralCurso]);
+  }, [filasFiltradas, pgList, aprobadas, desaprobadas, totalFilas, promedioGeneralCurso, materiasSeleccionadas, periodo]);
 
   const e1Cols = periodo !== 'E2' ? 5 : 0;
   const e2Cols = periodo !== 'E1' ? 5 : 0;
@@ -607,7 +635,13 @@ export default function ReporteNotasCursoMateria() {
                 </Form.Select>
               </Col>
               <Col md={2} className="d-flex align-items-end">
-                <Button type="submit" variant="primary" disabled={loading}>{loading ? <><Spinner size="sm" animation="border" className="me-2"/>Generando...</> : "Generar"}</Button>
+                <Button 
+                  type="submit" 
+                  variant="primary" 
+                  disabled={loading || !cursoId || materiasSeleccionadas.length === 0}
+                >
+                  {loading ? <><Spinner size="sm" animation="border" className="me-2"/>Generando...</> : "Generar"}
+                </Button>
               </Col>
             </Row>
           </Form>
@@ -656,8 +690,8 @@ export default function ReporteNotasCursoMateria() {
               />
             </div>
 
-            {/* KPIs y Gráficos desplegables */}
-            {kpisData && data && (
+            {/* KPIs y Gráficos desplegables - Solo con una materia seleccionada */}
+            {kpisData && data && materiasSeleccionadas.length === 1 && (
               <Accordion className="mb-3 d-print-none">
                 <Accordion.Item eventKey="0">
                   <Accordion.Header>
@@ -756,6 +790,53 @@ export default function ReporteNotasCursoMateria() {
                         </Card>
                       </Col>
                     </Row>
+
+                    {/* Comparación E1 vs E2 - Solo cuando hay una materia y período = Todos */}
+                    {kpisData.comparacionEtapas && (
+                      <Row className="g-3 mt-3">
+                        <Col md={6}>
+                          <Card>
+                            <Card.Body>
+                              <h6 className="mb-3">Comparación de Promedios: Etapa 1 vs Etapa 2</h6>
+                              <ResponsiveContainer width="100%" height={250}>
+                                <BarChart data={kpisData.comparacionEtapas.promedios}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="etapa" />
+                                  <YAxis domain={[0, 10]} />
+                                  <Tooltip />
+                                  <Legend />
+                                  <Bar dataKey="promedio" name="Promedio" fill="#0066cc" />
+                                </BarChart>
+                              </ResponsiveContainer>
+                              <div className="text-muted small mt-2 text-center">
+                                Comparación del rendimiento promedio entre ambas etapas
+                              </div>
+                            </Card.Body>
+                          </Card>
+                        </Col>
+                        <Col md={6}>
+                          <Card>
+                            <Card.Body>
+                              <h6 className="mb-3">Comparación de Aprobación: Etapa 1 vs Etapa 2</h6>
+                              <ResponsiveContainer width="100%" height={250}>
+                                <BarChart data={kpisData.comparacionEtapas.aprobacion}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="etapa" />
+                                  <YAxis />
+                                  <Tooltip />
+                                  <Legend />
+                                  <Bar dataKey="aprobados" name="Aprobados" fill="#28a745" stackId="a" />
+                                  <Bar dataKey="desaprobados" name="Desaprobados" fill="#dc3545" stackId="a" />
+                                </BarChart>
+                              </ResponsiveContainer>
+                              <div className="text-muted small mt-2 text-center">
+                                Cantidad de alumnos aprobados/desaprobados por etapa
+                              </div>
+                            </Card.Body>
+                          </Card>
+                        </Col>
+                      </Row>
+                    )}
                   </Accordion.Body>
                 </Accordion.Item>
               </Accordion>
@@ -932,14 +1013,29 @@ export default function ReporteNotasCursoMateria() {
                     const map = new Map();
                     for (const r of filasFiltradas) {
                       const key = r.m?.materiaId || r.m?.materiaNombre || r.materiaNombre;
-                      if (!map.has(key)) map.set(key, { nombre: r.m?.materiaNombre || r.materiaNombre || '-', filas: [] });
+                      if (!map.has(key)) map.set(key, { materiaId: r.m?.materiaId, nombre: r.m?.materiaNombre || r.materiaNombre || '-', filas: [] });
                       map.get(key).filas.push(r);
                     }
                     const grupos = Array.from(map.values()).sort((x,y)=> collator.compare(x.nombre||"", y.nombre||""));
                     if (grupos.length===0) return <div className="text-center text-muted">Sin datos</div>;
                     return grupos.map((g, gi) => (
                       <div key={`gm-${gi}`}>
-                        <div className="fw-bold mb-2">Materia: {g.nombre}</div>
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <div className="fw-bold">Materia: {g.nombre}</div>
+                          {materiasSeleccionadas.length > 1 && g.materiaId && (
+                            <Button
+                              size="sm"
+                              variant="outline-primary"
+                              onClick={() => {
+                                const url = `/reportes/notas-por-curso?cursoId=${cursoId}&materiaId=${g.materiaId}&anio=${anio}`;
+                                window.open(url, '_blank');
+                              }}
+                            >
+                              <BarChart3 size={16} className="me-1" />
+                              Ver Gráficos
+                            </Button>
+                          )}
+                        </div>
                         <Table striped bordered hover responsive size="sm">
                           <thead>
                             <tr>

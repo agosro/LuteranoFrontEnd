@@ -4,7 +4,7 @@ import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
 import { obtenerHistorialActualAlumno } from "../Services/HistorialCursoService";
 import { isoToDisplay } from "../utils/fechas";
@@ -17,7 +17,8 @@ export default function ReporteLegajoAlumno() {
   const { user } = useAuth();
   const token = user?.token;
   const location = useLocation();
-  const preselectedAlumnoId = location.state?.preselectedAlumnoId;
+  const [searchParams] = useSearchParams();
+  const preselectedAlumnoId = location.state?.preselectedAlumnoId || searchParams.get('alumnoId');
   const { cicloLectivo } = useCicloLectivo();
 
   const [alumnoId, setAlumnoId] = useState(preselectedAlumnoId || "");
@@ -134,6 +135,45 @@ export default function ReporteLegajoAlumno() {
   }, [token, cursoId, alumnoId, cicloLectivo?.id]);
 
   // Búsqueda y carga de alumnos encapsuladas en AsyncAlumnoSelect
+
+  // Auto-generar legajo si viene alumnoId por URL
+  useEffect(() => {
+    if (!token || !preselectedAlumnoId || datos) return;
+    
+    const autoGenerar = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        
+        // Esperar un poco para que se carguen los alumnos
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Buscar el alumno en la lista
+        const alumnoEncontrado = alumnos.find(a => String(a.id) === String(preselectedAlumnoId));
+        
+        if (!alumnoEncontrado && alumnos.length === 0) {
+          // Todavía se están cargando los alumnos, esperar más
+          return;
+        }
+        
+        // Generar el legajo
+        const base = alumnoEncontrado || {};
+        let vigente = null;
+        try {
+          const res = await obtenerHistorialActualAlumno(token, preselectedAlumnoId);
+          vigente = res?.historialCurso || null;
+        } catch { /* opcional */ }
+        
+        setDatos({ alumno: base, vigente });
+      } catch (err) {
+        setError(err.message || "Error al generar legajo");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    autoGenerar();
+  }, [token, preselectedAlumnoId, alumnos, datos]);
 
   const alumnoSel = useMemo(() => alumnos.find(a => String(a.id) === String(alumnoId)) || null, [alumnos, alumnoId]);
 

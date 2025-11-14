@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Button, Form, Row, Col, Spinner, Alert, Table, Badge, Accordion } from "react-bootstrap";
+import { Card, Button, Form, Row, Col, Spinner, Alert, Table, Badge, Accordion, ButtonGroup } from "react-bootstrap";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, FileText, GraduationCap } from 'lucide-react';
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
@@ -17,6 +17,7 @@ export default function ReporteAsistenciaPerfecta() {
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [modo, setModo] = useState('todos'); // 'todos' | 'curso' | 'top'
   const [soloConPerfectos, setSoloConPerfectos] = useState(true); // aplica a 'todos'
+  const [topNPorCurso, setTopNPorCurso] = useState('todos'); // 'todos' | '3' | '5' | '10'
   const [cursosOpts, setCursosOpts] = useState([]);
   const [cursoId, setCursoId] = useState('');
   const [limit, setLimit] = useState(10);
@@ -73,12 +74,22 @@ export default function ReporteAsistenciaPerfecta() {
     (cursosFiltradosTodos || []).forEach(row => {
       const curso = row?.curso || {};
       const etiqueta = `${curso?.anio || ''} ${curso?.division || ''}`.trim();
-      (row?.alumnos || []).forEach(a => {
+      let alumnosCurso = row?.alumnos || [];
+      
+      // Aplicar filtro Top N por curso si está configurado
+      if (topNPorCurso !== 'todos') {
+        const topN = Number(topNPorCurso);
+        alumnosCurso = alumnosCurso.slice(0, topN);
+      }
+      
+      alumnosCurso.forEach(a => {
         out.push({
           id: a?.id,
+          alumnoId: a?.alumnoId || a?.id,
           nombre: `${a?.apellido || ''}, ${a?.nombre || ''}`.trim(),
           dni: a?.dni || '',
           cursoEtiqueta: etiqueta,
+          cursoId: curso?.id,
           nivel: curso?.nivel || ''
         });
       });
@@ -86,7 +97,7 @@ export default function ReporteAsistenciaPerfecta() {
     // ordenar por curso y apellido
     out.sort((x,y) => (x.cursoEtiqueta||'').localeCompare(y.cursoEtiqueta||'') || (x.nombre||'').localeCompare(y.nombre||''));
     return out;
-  }, [cursosFiltradosTodos]);
+  }, [cursosFiltradosTodos, topNPorCurso]);
 
   const alumnosCurso = useMemo(() => {
     if (!cursoId) return [];
@@ -95,9 +106,11 @@ export default function ReporteAsistenciaPerfecta() {
     const etiqueta = `${curso?.anio || ''} ${curso?.division || ''}`.trim();
     const lista = (row?.alumnos || []).map(a => ({
       id: a?.id,
+      alumnoId: a?.alumnoId || a?.id,
       nombre: `${a?.apellido || ''}, ${a?.nombre || ''}`.trim(),
       dni: a?.dni || '',
       cursoEtiqueta: etiqueta,
+      cursoId: curso?.id,
       nivel: curso?.nivel || ''
     }));
     lista.sort((x,y) => (x.nombre||'').localeCompare(y.nombre||''));
@@ -120,6 +133,45 @@ export default function ReporteAsistenciaPerfecta() {
     const cursosConPerfectos = cursos.filter(c => (c?.totalPerfectos || 0) > 0).length;
     const cursosSinPerfectos = totalCursos - cursosConPerfectos;
     const promedioPerfectosPorCurso = totalCursos > 0 ? (totalPerfectos / totalCursos).toFixed(1) : 0;
+
+    // Datos específicos para modo "Por Curso"
+    let cursoSeleccionado = null;
+    let comparacionCurso = null;
+    if (modo === 'curso' && cursoId) {
+      const cursoData = cursos.find(c => String(c?.curso?.id) === String(cursoId));
+      if (cursoData) {
+        const perfectosCurso = cursoData.totalPerfectos || 0;
+        const promedio = Number(promedioPerfectosPorCurso);
+        const posicion = [...cursos]
+          .sort((a, b) => (b?.totalPerfectos || 0) - (a?.totalPerfectos || 0))
+          .findIndex(c => String(c?.curso?.id) === String(cursoId)) + 1;
+        
+        cursoSeleccionado = {
+          nombre: `${cursoData.curso?.anio || ''} ${cursoData.curso?.division || ''}`.trim(),
+          perfectos: perfectosCurso,
+          posicion,
+          totalCursos
+        };
+        
+        comparacionCurso = [
+          { categoria: 'Este Curso', valor: perfectosCurso },
+          { categoria: 'Promedio Institucional', valor: promedio }
+        ];
+      }
+    }
+
+    // Distribución por curso (1°, 2°, 3°, etc.) para modo Todos
+    const cursosData = {};
+    if (modo === 'todos') {
+      cursos.forEach(row => {
+        const anioCurso = row?.curso?.anio || 'Sin año';
+        if (!cursosData[anioCurso]) cursosData[anioCurso] = 0;
+        cursosData[anioCurso] += row?.totalPerfectos || 0;
+      });
+    }
+    const distribucionPorCurso = Object.entries(cursosData)
+      .map(([anio, total]) => ({ anio, total }))
+      .sort((a, b) => String(a.anio).localeCompare(String(b.anio)));
 
     // Top 10 cursos con más alumnos perfectos
     const topCursos = [...cursos]
@@ -175,9 +227,12 @@ export default function ReporteAsistenciaPerfecta() {
       topCursos,
       nivelesData,
       distribucionData,
-      rangosData
+      rangosData,
+      cursoSeleccionado,
+      comparacionCurso,
+      distribucionPorCurso
     };
-  }, [cursos, totalPerfectos]);
+  }, [cursos, totalPerfectos, modo, cursoId]);
 
   const exportCSV = () => {
     const lines = [];
@@ -298,15 +353,26 @@ export default function ReporteAsistenciaPerfecta() {
                 </Col>
               )}
               {modo === 'todos' && (
-                <Col md={4} className="d-flex align-items-end">
-                  <Form.Check
-                    type="switch"
-                    id="soloPerfectosSwitch"
-                    label="Mostrar solo cursos con perfectos"
-                    checked={soloConPerfectos}
-                    onChange={(e) => setSoloConPerfectos(e.target.checked)}
-                  />
-                </Col>
+                <>
+                  <Col md={3}>
+                    <Form.Label>Limitar por curso</Form.Label>
+                    <Form.Select value={topNPorCurso} onChange={(e) => setTopNPorCurso(e.target.value)}>
+                      <option value="todos">Todos los alumnos</option>
+                      <option value="3">Top 3 por curso</option>
+                      <option value="5">Top 5 por curso</option>
+                      <option value="10">Top 10 por curso</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={3} className="d-flex align-items-end">
+                    <Form.Check
+                      type="switch"
+                      id="soloPerfectosSwitch"
+                      label="Solo cursos con perfectos"
+                      checked={soloConPerfectos}
+                      onChange={(e) => setSoloConPerfectos(e.target.checked)}
+                    />
+                  </Col>
+                </>
               )}
               <Col md={3} className="d-flex align-items-end">
                 <Button type="submit" variant="primary" disabled={loading}>
@@ -323,7 +389,7 @@ export default function ReporteAsistenciaPerfecta() {
       {!loading && data && !error && (
         <>
           {/* Acordeón con KPIs (se oculta en impresión) */}
-          {kpisData && (
+          {kpisData && (modo !== 'todos' || topNPorCurso === 'todos') && (
             <Accordion className="mb-3 d-print-none">
               <Accordion.Item eventKey="0">
                 <Accordion.Header>
@@ -368,10 +434,58 @@ export default function ReporteAsistenciaPerfecta() {
                     </Col>
                   </Row>
 
-                  {/* Gráficos */}
+                  {/* Gráficos contextuales según modo */}
                   <Row className="g-3">
-                    {/* Top cursos con más perfectos */}
-                    {kpisData.topCursos.length > 0 && (
+                    {/* Comparación Curso Seleccionado vs Promedio - Solo en modo "Por Curso" */}
+                    {modo === 'curso' && kpisData.comparacionCurso && (
+                      <>
+                        <Col sm={12}>
+                          <Alert variant="info" className="mb-3">
+                            <strong>{kpisData.cursoSeleccionado.nombre}</strong> tiene <strong>{kpisData.cursoSeleccionado.perfectos}</strong> alumno(s) con asistencia perfecta.
+                            Posición en ranking: <strong>#{kpisData.cursoSeleccionado.posicion}</strong> de {kpisData.cursoSeleccionado.totalCursos} cursos.
+                          </Alert>
+                        </Col>
+                        <Col sm={12} lg={6}>
+                          <Card className="h-100">
+                            <Card.Header><strong>Comparación con Promedio Institucional</strong></Card.Header>
+                            <Card.Body>
+                              <ResponsiveContainer width="100%" height={250}>
+                                <BarChart data={kpisData.comparacionCurso}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="categoria" />
+                                  <YAxis />
+                                  <Tooltip />
+                                  <Bar dataKey="valor" name="Alumnos perfectos" fill="#0066cc" />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </Card.Body>
+                          </Card>
+                        </Col>
+                      </>
+                    )}
+
+                    {/* Distribución por Curso - Solo en modo "Todos" sin filtro Top N */}
+                    {modo === 'todos' && topNPorCurso === 'todos' && kpisData.distribucionPorCurso.length > 0 && (
+                      <Col sm={12} lg={6}>
+                        <Card className="h-100">
+                          <Card.Header><strong>Distribución por Curso (1°, 2°, 3°...)</strong></Card.Header>
+                          <Card.Body>
+                            <ResponsiveContainer width="100%" height={250}>
+                              <BarChart data={kpisData.distribucionPorCurso}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="anio" />
+                                <YAxis />
+                                <Tooltip />
+                                <Bar dataKey="total" name="Total perfectos" fill="#17a2b8" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    )}
+
+                    {/* Top cursos con más perfectos - Solo en modo "Todos" sin filtro Top N y modo "Top Cursos" */}
+                    {kpisData.topCursos.length > 0 && modo !== 'curso' && (modo === 'top' || (modo === 'todos' && topNPorCurso === 'todos')) && (
                       <Col sm={12} lg={6}>
                         <Card className="h-100">
                           <Card.Header><strong>Top 10 Cursos con Más Perfectos</strong></Card.Header>
@@ -527,7 +641,7 @@ export default function ReporteAsistenciaPerfecta() {
                         <th>DNI</th>
                         <th>Curso</th>
                         <th>Nivel</th>
-                        <th className="d-print-none">Acciones</th>
+                        <th className="d-print-none text-center" style={{ width: '200px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -548,10 +662,31 @@ export default function ReporteAsistenciaPerfecta() {
                           <td>{a?.dni ?? '-'}</td>
                           <td>{a?.cursoEtiqueta ?? '-'}</td>
                           <td>{a?.nivel ?? '-'}</td>
-                          <td className="d-print-none">
-                            <Button size="sm" variant="outline-primary" onClick={() => navigate(`/alumno/${a?.id}`)}>
-                              Ver detalle
-                            </Button>
+                          <td className="d-print-none text-center">
+                            <ButtonGroup size="sm">
+                              <Button 
+                                variant="outline-secondary"
+                                onClick={() => {
+                                  const url = `/reportes/legajo-alumno?alumnoId=${a?.alumnoId || a?.id}`;
+                                  window.open(url, '_blank');
+                                }}
+                                title="Ver legajo completo"
+                              >
+                                <FileText size={16} className="me-1" />
+                                Legajo
+                              </Button>
+                              <Button 
+                                variant="outline-info"
+                                onClick={() => {
+                                  const url = `/reportes/notas-alumnos?alumnoId=${a?.alumnoId || a?.id}&anio=${anio}`;
+                                  window.open(url, '_blank');
+                                }}
+                                title="Ver notas del alumno"
+                              >
+                                <GraduationCap size={16} className="me-1" />
+                                Notas
+                              </Button>
+                            </ButtonGroup>
                           </td>
                         </tr>
                       ))}
