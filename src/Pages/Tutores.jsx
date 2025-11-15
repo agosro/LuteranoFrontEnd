@@ -3,9 +3,9 @@ import React, { useEffect, useState } from "react";
 import {
   listarTutores,
   crearTutor,
-  editarTutor,
   eliminarTutor,
 } from "../Services/TutorService";
+import { listarAlumnosACargo } from "../Services/TutorAlumnoService";
 import { camposTutor } from "../Entidades/camposTutor";
 import ModalVerEntidad from "../Components/Modals/ModalVerEntidad";
 import ModalCrearEntidad from "../Components/Modals/ModalCrear";
@@ -15,7 +15,7 @@ import TablaGenerica from "../Components/TablaLista";
 import BotonCrear from "../Components/Botones/BotonCrear";
 import { toast } from "react-toastify";
 import { useAuth } from "../Context/AuthContext";
-import { inputLocalToBackendISO, isoToInputLocal } from "../utils/fechas";
+import { inputLocalToBackendISO } from "../utils/fechas";
 
 export default function ListaTutores() {
   const { user } = useAuth();
@@ -27,9 +27,11 @@ export default function ListaTutores() {
   // Estados para modales
   const [tutorSeleccionado, setTutorSeleccionado] = useState(null);
   const [modalVerShow, setModalVerShow] = useState(false);
-  const [modalEditarShow, setModalEditarShow] = useState(false);
+  // const [modalEditarShow, setModalEditarShow] = useState(false);
   const [modalCrearShow, setModalCrearShow] = useState(false);
   const [modalEliminarShow, setModalEliminarShow] = useState(false);
+  const [alumnosCargoModal, setAlumnosCargoModal] = useState([]);
+  const [alumnosCargoLoading, setAlumnosCargoLoading] = useState(false);
 
   const [formData, setFormData] = useState({});
 
@@ -63,26 +65,20 @@ export default function ListaTutores() {
     setModalCrearShow(true);
   };
 
-  const abrirModalEditar = (tutor) => {
-    setTutorSeleccionado(tutor);
-    setFormData({
-      id: tutor.id,
-      nombre: tutor.nombre,
-      apellido: tutor.apellido,
-      genero: tutor.genero,
-      tipoDoc: tutor.tipoDoc || "DNI",
-      dni: tutor.dni,
-      email: tutor.email,
-      direccion: tutor.direccion,
-      telefono: tutor.telefono,
-      fechaNacimiento: isoToInputLocal(tutor.fechaNacimiento),
-      fechaIngreso: isoToInputLocal(tutor.fechaIngreso),
-    });
-    setModalEditarShow(true);
-  };
 
-  const abrirModalVer = (tutor) => {
+
+  const abrirModalVer = async (tutor) => {
     setTutorSeleccionado(tutor);
+    setAlumnosCargoLoading(true);
+    try {
+      const alumnos = await listarAlumnosACargo(token, tutor.id);
+      setAlumnosCargoModal(Array.isArray(alumnos) ? alumnos : []);
+    } catch (error) {
+      console.warn("No se pudo cargar alumnos a cargo", error);
+      setAlumnosCargoModal([]);
+    } finally {
+      setAlumnosCargoLoading(false);
+    }
     setModalVerShow(true);
   };
 
@@ -97,11 +93,7 @@ export default function ListaTutores() {
     setModalCrearShow(false);
   };
 
-  const cerrarModalEditar = () => {
-    setTutorSeleccionado(null);
-    setFormData({});
-    setModalEditarShow(false);
-  };
+
 
   const cerrarModalVer = () => {
     setTutorSeleccionado(null);
@@ -140,32 +132,7 @@ export default function ListaTutores() {
     }
   };
 
-  const handleUpdate = async (datos) => {
-    try {
-      const tutorEditado = {
-        id: datos.id,
-        nombre: datos.nombre,
-        apellido: datos.apellido,
-        genero: datos.genero,
-        tipoDoc: datos.tipoDoc || "DNI",
-        dni: datos.dni,
-        email: datos.email,
-        direccion: datos.direccion,
-        telefono: datos.telefono,
-        fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento),
-        fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso),
-      };
 
-      const editResponse = await editarTutor(tutorEditado, token);
-      toast.success(editResponse.mensaje || "Tutor actualizado con éxito");
-      cerrarModalEditar();
-      const tutoresActualizados = await listarTutores(token);
-      setTutores(tutoresActualizados);
-    } catch (error) {
-      toast.error(error.message || "Error al actualizar tutor");
-      console.error("Error al actualizar tutor:", error);
-    }
-  };
 
   const handleDelete = async () => {
     if (!tutorSeleccionado) return;
@@ -198,7 +165,14 @@ export default function ListaTutores() {
     id: tutorSeleccionado.id,
     nombre: tutorSeleccionado.nombre || "",
     apellido: tutorSeleccionado.apellido || "",
+    dni: tutorSeleccionado.dni || "",
+    email: tutorSeleccionado.email || "",
     telefono: tutorSeleccionado.telefono || "",
+    alumnos: alumnosCargoModal.map(a => ({
+      nombre: a.nombre,
+      apellido: a.apellido,
+      dni: a.dni
+    })),
   } : null;
 
   return (
@@ -208,7 +182,7 @@ export default function ListaTutores() {
         columnas={columnasTutores}
         datos={tutores}
         onView={abrirModalVer}
-        onEdit={abrirModalEditar}
+        // onEdit eliminado
         onDelete={abrirModalEliminar}
         camposFiltrado={["nombreApellido", "email"]}
         botonCrear={<BotonCrear texto="Crear tutor" onClick={abrirModalCrear} />}
@@ -225,15 +199,7 @@ export default function ListaTutores() {
         titulo="Crear Tutor"
       />
 
-      <ModalEditarEntidad
-        show={modalEditarShow}
-        onClose={cerrarModalEditar}
-        campos={camposTutor(false)}  // modo edición
-        formData={formData}
-        onInputChange={handleInputChange}
-        onSubmit={handleUpdate}
-        titulo="Editar Tutor"
-      />
+
 
       <ModalVerEntidad
         show={modalVerShow}
@@ -242,7 +208,24 @@ export default function ListaTutores() {
         campos={[
           { name: 'nombre', label: 'Nombre' },
           { name: 'apellido', label: 'Apellido' },
+          { name: 'dni', label: 'DNI' },
+          { name: 'email', label: 'Email' },
           { name: 'telefono', label: 'Teléfono' },
+          {
+            name: 'alumnos',
+            label: 'Alumnos a cargo',
+            render: (alumnos) => alumnosCargoLoading ? (
+              <span className="text-muted">Cargando...</span>
+            ) : Array.isArray(alumnos) && alumnos.length ? (
+              alumnos.map((a, i) => (
+                <span key={a.dni || i}>
+                  {a.apellido}, {a.nombre} ({a.dni}){i < alumnos.length - 1 ? ', ' : ''}
+                </span>
+              ))
+            ) : (
+              <span className="text-muted">-</span>
+            )
+          },
         ]}
         titulo={`Datos del tutor: ${tutorSeleccionado?.nombre} ${tutorSeleccionado?.apellido}`}
         detallePathBase="tutores"

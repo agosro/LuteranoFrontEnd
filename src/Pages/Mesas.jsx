@@ -4,7 +4,7 @@ import { listarCursos } from '../Services/CursoService.js';
 import { listarMateriasDeCurso } from '../Services/MateriaCursoService.js';
 import { listarAulas } from '../Services/AulaService.js';
 import { listarTurnos } from '../Services/TurnoExamenService.js';
-import { crearMesa, listarMesasPorCurso, eliminarMesa, finalizarMesa, actualizarMesa, obtenerMesa, agregarConvocados, quitarConvocado, cargarNotasFinales } from '../Services/MesaExamenService.js';
+import { crearMesa, listarMesasPorCurso, eliminarMesa, finalizarMesa } from '../Services/MesaExamenService.js';
 import { obtenerActaPorMesa, generarActa, actualizarActa, eliminarActa } from '../Services/ActaExamenService.js';
 import { Container, Row, Col, Card, Form, Button, Table, Spinner, Alert, Badge, Modal } from 'react-bootstrap';
 import Paginacion from '../Components/Botones/Paginacion.jsx';
@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs.jsx';
 import BackButton from '../Components/Botones/BackButton.jsx';
 import { toast } from 'react-toastify';
-import { listarDocentesDisponibles, listarDocentesAsignados, asignarDocentes } from '../Services/MesaExamenDocenteService.js';
 import { useCicloIdOrWarn } from '../Context/useCicloIdOrWarn.js';
 
 export default function Mesas() {
@@ -55,16 +54,8 @@ export default function Mesas() {
   const [crearMesaLoading, setCrearMesaLoading] = useState(false);
   const [crearMesaError, setCrearMesaError] = useState('');
 
-  // Estado para modales
-  const [showConv, setShowConv] = useState(false);
-  const [showNotas, setShowNotas] = useState(false);
+  // Estado para modales que aún se usan
   const [mesaSel, setMesaSel] = useState(null);
-  // Eliminado flujo de convocatoria en esta vista (se gestiona en página dedicada)
-  const [alumnosCurso] = useState([]);
-  const [seleccionConvocados, setSeleccionConvocados] = useState(new Set());
-  const [notasEdit, setNotasEdit] = useState({});
-  const [showEditMesa, setShowEditMesa] = useState(false);
-  const [editMesaForm, setEditMesaForm] = useState({ id: null, materiaCursoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
   const [showActa, setShowActa] = useState(false);
   const [acta, setActa] = useState(null);
   const [actaForm, setActaForm] = useState({ id: null, numeroActa: '', observaciones: '' });
@@ -72,11 +63,6 @@ export default function Mesas() {
   const [delMesa, setDelMesa] = useState(null);
   const [delMesaLoading, setDelMesaLoading] = useState(false);
   const [delMesaError, setDelMesaError] = useState('');
-  // Docentes modal
-  const [showDocentes, setShowDocentes] = useState(false);
-  const [docentesAsignados, setDocentesAsignados] = useState([]);
-  const [docentesDisponibles, setDocentesDisponibles] = useState([]);
-  const [docentesSeleccionados, setDocentesSeleccionados] = useState(new Set());
 
   // Helpers de rol (tolera prefijo ROLE_)
   // hasRole ya no requerido en esta vista (permisos manejados vía rutas y página de gestión)
@@ -100,8 +86,6 @@ export default function Mesas() {
       }
     })();
   }, [token, cicloYear]);
-
-  // Ya no existe cursoId global; materias se cargan on-demand según el curso seleccionado en el modal o el curso de la mesa editada.
 
   const buscarMesas = async () => {
     setLoading(true);
@@ -408,7 +392,7 @@ export default function Mesas() {
                       </td>
                       <td>{Array.isArray(m.alumnos) ? m.alumnos.length : 0}</td>
                       <td className="text-end">
-                        <Button size="sm" variant="outline-primary" className="me-2" onClick={()=> navigate(`/mesa-de-examen/${m.id}/gestionar`)}>Gestionar</Button>
+                        <Button size="sm" variant="outline-primary" className="me-2" onClick={()=> window.open(`/mesa-de-examen/${m.id}/gestionar`, '_blank')}>Gestionar</Button>
                         <Button size="sm" variant="outline-dark" className="me-2" title={hint} onClick={async ()=>{
                           if (!puedeActa) {
                             toast.warn(hint || 'No es posible generar/ver el acta aún');
@@ -451,154 +435,6 @@ export default function Mesas() {
           ))}
         </Card.Body>
       </Card>
-      {/* Modal Docentes */}
-      <Modal show={showDocentes} onHide={()=>setShowDocentes(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Docentes de la mesa</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {!mesaSel ? (
-            <Spinner animation="border" />
-          ) : (
-            <>
-              <div className="mb-3">
-                <strong>Asignados</strong>
-                <ul className="mb-0">
-                  {docentesAsignados.length ? docentesAsignados.map(d => (
-                    <li key={d.id}>{d.apellido} {d.nombre}</li>
-                  )) : (<li className="text-muted">(ninguno)</li>)}
-                </ul>
-              </div>
-              <div>
-                <Form.Label>Disponibles</Form.Label>
-                <div className="border rounded" style={{maxHeight:240, overflowY:'auto'}}>
-                  <Table hover responsive className="mb-0">
-                    <thead><tr><th style={{width:48}}></th><th>Apellido</th><th>Nombre</th></tr></thead>
-                    <tbody>
-                      {docentesDisponibles.map(d => {
-                        const id = Number(d.id);
-                        const checked = docentesSeleccionados.has(id);
-                        return (
-                          <tr key={id}>
-                            <td>
-                              <Form.Check type="checkbox" checked={checked} onChange={(e)=>{
-                                const next = new Set(docentesSeleccionados);
-                                if (e.target.checked) next.add(id); else next.delete(id);
-                                setDocentesSeleccionados(next);
-                              }}/>
-                            </td>
-                            <td>{d.apellido}</td>
-                            <td>{d.nombre}</td>
-                          </tr>
-                        );
-                      })}
-                      {docentesDisponibles.length===0 && (
-                        <tr><td colSpan={3} className="text-center py-3 text-muted">No hay docentes disponibles</td></tr>
-                      )}
-                    </tbody>
-                  </Table>
-                </div>
-              </div>
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={()=>setShowDocentes(false)}>Cerrar</Button>
-          <Button variant="primary" disabled={!mesaSel || docentesSeleccionados.size!==3} onClick={async ()=>{
-            try {
-              const ids = Array.from(docentesSeleccionados);
-              await asignarDocentes(token, mesaSel.id, ids);
-              const [asig, disp] = await Promise.all([
-                listarDocentesAsignados(token, mesaSel.id),
-                listarDocentesDisponibles(token, mesaSel.id),
-              ]);
-              setDocentesAsignados(asig);
-              setDocentesDisponibles(disp);
-              setDocentesSeleccionados(new Set());
-              toast.success('Docentes asignados');
-              // Refrescar listado según búsqueda activa
-              await refreshMesas();
-            } catch (e) { toast.error(e.message); }
-          }}>Asignar</Button>
-        </Modal.Footer>
-      </Modal>
-      {/* Modal Convocados */}
-      <Modal show={showConv} onHide={()=>setShowConv(false)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Convocados {mesaSel? `- ${mesaSel.materiaNombre || ''}`: ''}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {!mesaSel ? <Spinner animation="border"/> : (
-            <>
-              <p className="text-muted mb-2">Seleccioná los alumnos del curso que estarán convocados a esta mesa.</p>
-              <div className="border rounded" style={{ maxHeight: 360, overflowY: 'auto' }}>
-                <Table hover responsive className="mb-0">
-                  <thead>
-                    <tr>
-                      <th style={{width: 48}}></th>
-                      <th>DNI</th>
-                      <th>Apellido</th>
-                      <th>Nombre</th>
-                      <th>Condición</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {alumnosCurso.map(al => {
-                      const id = Number(al.id ?? al.alumnoId);
-                      const checked = seleccionConvocados.has(id);
-                      return (
-                        <tr key={id}>
-                          <td>
-                            <Form.Check type="checkbox" checked={checked} onChange={(e)=>{
-                              const next = new Set(seleccionConvocados);
-                              if (e.target.checked) next.add(id); else next.delete(id);
-                              setSeleccionConvocados(next);
-                            }}/>
-                          </td>
-                          <td>{al.dni}</td>
-                          <td>{al.apellido}</td>
-                          <td>{al.nombre}</td>
-                          <td>{(al.condicion ?? '').toString()}</td>
-                        </tr>
-                      );
-                    })}
-                    {alumnosCurso.length===0 && (
-                      <tr><td colSpan={4} className="text-center py-3 text-muted">No hay alumnos para este curso</td></tr>
-                    )}
-                  </tbody>
-                </Table>
-              </div>
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={()=>setShowConv(false)}>Cerrar</Button>
-          <Button variant="primary" disabled={!mesaSel} onClick={async ()=>{
-            try {
-              // Leer estado actual del servidor antes de calcular difs
-              const mesaActual = await obtenerMesa(token, mesaSel.id);
-              const actuales = new Set((mesaActual?.alumnos||[]).map(a=>Number(a.alumnoId)));
-              const aAgregar = Array.from(seleccionConvocados).filter(id => !actuales.has(id));
-              if (aAgregar.length) await agregarConvocados(token, mesaSel.id, aAgregar);
-              // Calcular a quitar: los que estaban y ya no están seleccionados
-              const aQuitar = Array.from(actuales).filter(id => !seleccionConvocados.has(id));
-              if (aQuitar.length) {
-                for (const id of aQuitar) {
-                  await quitarConvocado(token, mesaSel.id, id);
-                }
-              }
-              // Refrescar mesa y listado para asegurar contador correcto
-              const mesaRefrescada = await obtenerMesa(token, mesaSel.id);
-              setMesaSel(mesaRefrescada);
-              await refreshMesas();
-              setShowConv(false);
-              toast.success('Convocados actualizados');
-            } catch (e) {
-              toast.error(e.message);
-            }
-          }}>Guardar</Button>
-        </Modal.Footer>
-      </Modal>
 
       {/* Modal Eliminar Mesa */}
       <Modal show={showDelMesa} onHide={()=>setShowDelMesa(false)}>
@@ -632,155 +468,6 @@ export default function Mesas() {
             }
             finally { setDelMesaLoading(false); }
           }}>Eliminar</Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Modal Notas */}
-      <Modal show={showNotas} onHide={()=>setShowNotas(false)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Notas finales {mesaSel? `- ${mesaSel.materiaNombre || ''}`: ''}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {!mesaSel ? <Spinner animation="border"/> : (
-            <Table hover responsive>
-              <thead>
-                <tr>
-                  <th>DNI</th>
-                  <th>Apellido</th>
-                  <th>Nombre</th>
-                  <th style={{width:120}}>Nota (0-10)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(mesaSel.alumnos||[]).map(a => (
-                  <tr key={a.alumnoId}>
-                    <td>{a.dni}</td>
-                    <td>{a.apellido}</td>
-                    <td>{a.nombre}</td>
-                    <td>
-                      <Form.Control type="number" min={0} max={10} value={notasEdit[a.alumnoId] ?? ''}
-                        disabled={mesaSel?.estado === 'FINALIZADA'}
-                        onChange={(e)=>{
-                          const val = e.target.value === '' ? '' : Math.max(0, Math.min(10, Number(e.target.value)));
-                          setNotasEdit(v=>({...v, [a.alumnoId]: val}));
-                        }}/>
-                    </td>
-                  </tr>
-                ))}
-                {(!mesaSel.alumnos || mesaSel.alumnos.length===0) && (
-                  <tr><td colSpan={4} className="text-center py-3 text-muted">No hay convocados</td></tr>
-                )}
-              </tbody>
-            </Table>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={()=>setShowNotas(false)}>Cerrar</Button>
-          <Button variant="primary" disabled={!mesaSel || mesaSel?.estado === 'FINALIZADA' || !(mesaSel.alumnos&&mesaSel.alumnos.length)} onClick={async ()=>{
-            try {
-              // Construir mapa alumnoId->nota (solo números válidos o null)
-              const payload = {};
-              (mesaSel.alumnos||[]).forEach(a => {
-                const v = notasEdit[a.alumnoId];
-                if (v === '' || v === undefined) return;
-                payload[a.alumnoId] = Number(v);
-              });
-              await cargarNotasFinales(token, mesaSel.id, payload);
-              await refreshMesas();
-              setShowNotas(false);
-              toast.success('Notas guardadas');
-            } catch (e) {
-              toast.error(e.message);
-            }
-          }}>Guardar</Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Modal Editar Mesa */}
-      <Modal show={showEditMesa} onHide={()=>setShowEditMesa(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Editar mesa</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Row className="g-3">
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Materia</Form.Label>
-                  <Form.Select value={editMesaForm.materiaCursoId} onChange={(e)=>setEditMesaForm(v=>({...v, materiaCursoId: e.target.value}))}>
-                    <option value="">-- Seleccionar --</option>
-                    {materias.map(mt => (
-                      <option key={mt.materiaCursoId} value={mt.materiaCursoId}>{mt.nombreMateria}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={3}>
-                <Form.Group>
-                  <Form.Label>Fecha</Form.Label>
-                  <Form.Control type="date" value={editMesaForm.fecha} onChange={(e)=>setEditMesaForm(v=>({...v, fecha: e.target.value}))} />
-                </Form.Group>
-              </Col>
-              <Col md={3}>
-                <Form.Group>
-                  <Form.Label>Aula</Form.Label>
-                  <Form.Select value={editMesaForm.aulaId} onChange={(e)=>setEditMesaForm(v=>({...v, aulaId: e.target.value}))}>
-                    <option value="">-- Sin aula --</option>
-                    {aulas.map(a => (
-                      <option key={a.id} value={a.id}>{a.nombre || a.id}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label>Tipo de mesa</Form.Label>
-                  <Form.Select 
-                    value={editMesaForm.tipoMesa} 
-                    onChange={(e)=>setEditMesaForm(v=>({...v, tipoMesa: e.target.value}))}
-                    disabled={mesaSel && (mesaSel.alumnos?.length > 0 || mesaSel.docentes?.length > 0)}
-                  >
-                    <option value="EXAMEN">Examen final</option>
-                    <option value="COLOQUIO">Coloquio</option>
-                  </Form.Select>
-                  {mesaSel && (mesaSel.alumnos?.length > 0 || mesaSel.docentes?.length > 0) && (
-                    <Form.Text className="text-warning">
-                      No se puede cambiar el tipo porque ya tiene alumnos o docentes asignados
-                    </Form.Text>
-                  )}
-                  {!(mesaSel && (mesaSel.alumnos?.length > 0 || mesaSel.docentes?.length > 0)) && (
-                    <Form.Text className="text-muted">
-                      {editMesaForm.tipoMesa === 'COLOQUIO' 
-                        ? 'Coloquio: 1 docente (debe ser de la materia)' 
-                        : 'Examen final: 3 docentes (al menos uno de la materia)'}
-                    </Form.Text>
-                  )}
-                </Form.Group>
-              </Col>
-            </Row>
-          </Form>
-          <div className="mt-2 text-muted" style={{fontSize:'.9rem'}}>
-            Nota: no se edita el turno desde aquí. Si cambiás la fecha, debe estar dentro del rango del turno de la mesa.
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={()=>setShowEditMesa(false)}>Cancelar</Button>
-          <Button variant="primary" onClick={async ()=>{
-            try {
-              if (!editMesaForm.id) return;
-              const payload = { id: editMesaForm.id };
-              if (editMesaForm.fecha) payload.fecha = editMesaForm.fecha;
-              if (editMesaForm.materiaCursoId) payload.materiaCursoId = Number(editMesaForm.materiaCursoId);
-              if (editMesaForm.aulaId) payload.aulaId = Number(editMesaForm.aulaId);
-              if (editMesaForm.tipoMesa) payload.tipoMesa = editMesaForm.tipoMesa;
-              await actualizarMesa(token, payload);
-              await refreshMesas();
-              toast.success('Mesa actualizada');
-              setShowEditMesa(false);
-            } catch (e) {
-              toast.error(e.message);
-            }
-          }}>Guardar</Button>
         </Modal.Footer>
       </Modal>
 

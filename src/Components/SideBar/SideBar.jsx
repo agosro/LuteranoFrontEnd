@@ -99,11 +99,9 @@ export default function SidebarLayout() {
           })}
       </div>
 
-      {/* 🔹 Perfil / Logout */}
+      {/* Logout */}
       <div className="mt-auto pt-3 border-top">
-        <Link to="/mi-perfil" className="menu-link d-flex align-items-center mb-2">
-          <FaUserCircle className="me-2" /> Mi Perfil
-        </Link>
+
         <button
           className="menu-link btn-logout w-100 text-start"
           onClick={logout}

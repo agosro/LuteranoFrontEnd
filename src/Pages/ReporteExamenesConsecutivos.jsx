@@ -1,14 +1,173 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Row, Col, Form, Button, Spinner, Alert, Table, Badge, ListGroup } from 'react-bootstrap';
-import { ChevronRight, ChevronDown, FileText } from 'lucide-react';
+import { Card, Row, Col, Form, Button, Spinner, Alert, Table, Badge } from 'react-bootstrap';
+import { FileText, AlertTriangle, Info, BarChart3, PieChart, ChevronDown, ChevronUp } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
 import { listarCursos } from '../Services/CursoService';
 import { listarMaterias } from '../Services/MateriaService';
-import { institucional, porMateria, porCurso, resumen as resumenSvc } from '../Services/ReporteExamenesConsecutivosService';
+import { porMateria, porCurso } from '../Services/ReporteExamenesConsecutivosService';
 import { toast } from 'react-toastify';
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
+
+// Componente para renderizar mini-grilla de notas con consecutivos marcados
+const GrillaNotas = ({ caso }) => {
+  // Intentar usar detalleNotasConsecutivas si existe
+  if (caso?.detalleNotasConsecutivas && caso.detalleNotasConsecutivas.length > 0) {
+    const notas = caso.detalleNotasConsecutivas;
+    const totalConsecutivos = caso.cantidadConsecutivas || 0;
+
+    // Agrupar por etapa para mejor visualización
+    const notasPorEtapa = notas.reduce((acc, nota) => {
+      if (!acc[nota.etapa]) acc[nota.etapa] = [];
+      acc[nota.etapa].push(nota);
+      return acc;
+    }, {});
+
+    return (
+      <div className="d-flex flex-column gap-2">
+        {Object.entries(notasPorEtapa).map(([etapa, notasEtapa]) => (
+          <div key={etapa}>
+            <div className="text-muted fw-bold" style={{ fontSize: '10px', marginBottom: '4px' }}>
+              Etapa {etapa}
+            </div>
+            <div className="d-flex flex-wrap gap-1">
+              {notasEtapa.map((nota, idx) => {
+                const esDesaprobado = nota.nota < 4;
+                const esConsecutivo = nota.esConsecutivo || false;
+                
+                return (
+                  <div 
+                    key={idx}
+                    className={`badge ${esConsecutivo ? 'bg-danger' : esDesaprobado ? 'bg-secondary' : 'bg-success'}`}
+                    style={{ fontSize: '11px', minWidth: '32px', padding: '4px 6px' }}
+                    title={`Etapa ${nota.etapa} - Examen ${nota.numero}: ${nota.nota}${esConsecutivo ? ' (Consecutivo)' : ''}`}
+                  >
+                    Ex{nota.numero}: {nota.nota}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {totalConsecutivos > 0 && (
+          <div className="d-flex align-items-center gap-2 mt-1">
+            <AlertTriangle size={14} className="text-danger" />
+            <span className="text-danger small fw-bold">
+              {totalConsecutivos} consecutivo{totalConsecutivos > 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Parsear desde descripcionConsecutivo o construir desde datos disponibles
+  const totalConsecutivos = caso.cantidadConsecutivas || 0;
+  const notas = [];
+  
+  // Parsear desde descripcionConsecutivo si existe
+  if (caso.descripcionConsecutivo) {
+    // Formato: "Etapa 1: Examen 1 (nota: 2), Examen 2 (nota: 5), ... - X consecutivos"
+    const partes = caso.descripcionConsecutivo.split(' - ')[0]; // Remover "X consecutivos"
+    const etapas = partes.split(/Etapa \d+:/).filter(s => s.trim());
+    
+    etapas.forEach((etapaStr, etapaIdx) => {
+      const etapaNum = etapaIdx + 1;
+      // Buscar todos los "Examen X (nota: Y)"
+      const regex = /Examen (\d+) \(nota: (\d+)\)/g;
+      let match;
+      while ((match = regex.exec(etapaStr)) !== null) {
+        notas.push({
+          etapa: etapaNum,
+          numero: parseInt(match[1]),
+          nota: parseInt(match[2])
+        });
+      }
+    });
+  } else {
+    // Construir desde campos individuales disponibles
+    if (caso.etapaPrimeraNota && caso.numeroPrimeraNota && caso.primeraNota !== undefined) {
+      notas.push({
+        etapa: caso.etapaPrimeraNota,
+        numero: caso.numeroPrimeraNota,
+        nota: caso.primeraNota
+      });
+    }
+    if (caso.etapaSegundaNota && caso.numeroSegundaNota && caso.segundaNota !== undefined) {
+      notas.push({
+        etapa: caso.etapaSegundaNota,
+        numero: caso.numeroSegundaNota,
+        nota: caso.segundaNota
+      });
+    }
+  }
+
+  if (notas.length === 0) {
+    return <span className="text-muted small">{caso.detalleExamenes || 'Sin detalle disponible'}</span>;
+  }
+
+  // Identificar consecutivos: notas desaprobadas (<4) en secuencia
+  const notasOrdenadas = [...notas].sort((a, b) => {
+    if (a.etapa !== b.etapa) return a.etapa - b.etapa;
+    return a.numero - b.numero;
+  });
+
+  // Marcar consecutivos basándonos en la cantidad total
+  let consecutivosContados = 0;
+  for (let i = 0; i < notasOrdenadas.length; i++) {
+    if (notasOrdenadas[i].nota < 4) {
+      if (i > 0 && notasOrdenadas[i - 1].nota < 4) {
+        notasOrdenadas[i].esConsecutivo = true;
+        notasOrdenadas[i - 1].esConsecutivo = true;
+      }
+    }
+  }
+
+  // Agrupar por etapa
+  const notasPorEtapa = notasOrdenadas.reduce((acc, nota) => {
+    if (!acc[nota.etapa]) acc[nota.etapa] = [];
+    acc[nota.etapa].push(nota);
+    return acc;
+  }, {});
+
+  return (
+    <div className="d-flex flex-column gap-2">
+      {Object.entries(notasPorEtapa).map(([etapa, notasEtapa]) => (
+        <div key={etapa}>
+          <div className="text-muted fw-bold" style={{ fontSize: '10px', marginBottom: '4px' }}>
+            Etapa {etapa}
+          </div>
+          <div className="d-flex flex-wrap gap-1">
+            {notasEtapa.map((nota, idx) => {
+              const esDesaprobado = nota.nota < 4;
+              const esConsecutivo = nota.esConsecutivo || false;
+              
+              return (
+                <div 
+                  key={idx}
+                  className={`badge ${esConsecutivo ? 'bg-danger' : esDesaprobado ? 'bg-secondary' : 'bg-success'}`}
+                  style={{ fontSize: '11px', minWidth: '32px', padding: '4px 6px' }}
+                  title={`Etapa ${nota.etapa} - Examen ${nota.numero}: ${nota.nota}${esConsecutivo ? ' (Consecutivo)' : ''}`}
+                >
+                  Ex{nota.numero}: {nota.nota}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {totalConsecutivos > 0 && (
+        <div className="d-flex align-items-center gap-2 mt-1">
+          <AlertTriangle size={14} className="text-danger" />
+          <span className="text-danger small fw-bold">
+            {totalConsecutivos} consecutivo{totalConsecutivos > 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function ReporteExamenesConsecutivos() {
   const { user } = useAuth();
@@ -17,7 +176,7 @@ export default function ReporteExamenesConsecutivos() {
   const { cicloLectivo } = useCicloLectivo();
 
   const [anio, setAnio] = useState(new Date().getFullYear());
-  const [ambito, setAmbito] = useState('institucional'); // institucional | materia | curso | resumen
+  const [ambito, setAmbito] = useState('materia'); // materia | curso
   const [cursos, setCursos] = useState([]);
   const [materias, setMaterias] = useState([]);
   const [cursoId, setCursoId] = useState('');
@@ -28,9 +187,11 @@ export default function ReporteExamenesConsecutivos() {
   const printRef = useRef(null);
   const isInitialMount = useRef(true);
   
-  // Filtros para casos detectados (solo cuando ambito === 'materia')
   const [filtroDivision, setFiltroDivision] = useState('');
   const [ordenAlfabetico, setOrdenAlfabetico] = useState(false);
+  const [showGraficos, setShowGraficos] = useState(false);
+  const [showComparativa, setShowComparativa] = useState(false);
+  const [showResumenMaterias, setShowResumenMaterias] = useState(ambito === 'curso');
 
   // Leer parámetros de URL al cargar y generar reporte automáticamente
   useEffect(() => {
@@ -77,16 +238,14 @@ export default function ReporteExamenesConsecutivos() {
 
   // Ambitos permitidos según rol
   const allowed = useMemo(() => ({
-    institucional: ['ROLE_ADMIN','ROLE_DIRECTOR','ROLE_PRECEPTOR'].includes(rol),
     materia: ['ROLE_ADMIN','ROLE_DIRECTOR','ROLE_PRECEPTOR','ROLE_DOCENTE'].includes(rol),
     curso: ['ROLE_ADMIN','ROLE_DIRECTOR','ROLE_PRECEPTOR'].includes(rol),
-    resumen: ['ROLE_ADMIN','ROLE_DIRECTOR'].includes(rol),
   }), [rol]);
 
   // Asegurar que el ámbito seleccionado sea válido para el rol actual
   useEffect(() => {
     if (!allowed[ambito]) {
-      const order = ['institucional','materia','curso','resumen'];
+      const order = ['materia','curso'];
       const firstAllowed = order.find(a => allowed[a]);
       if (firstAllowed) setAmbito(firstAllowed);
     }
@@ -100,10 +259,8 @@ export default function ReporteExamenesConsecutivos() {
     try {
       setLoading(true);
       let res;
-      if (ambito === 'institucional') res = await institucional(token, Number(anio));
-      else if (ambito === 'materia') res = await porMateria(token, Number(materiaId), Number(anio));
+      if (ambito === 'materia') res = await porMateria(token, Number(materiaId), Number(anio));
       else if (ambito === 'curso') res = await porCurso(token, Number(cursoId), Number(anio));
-      else res = await resumenSvc(token, Number(anio));
       setData(res);
     } catch (e) {
       setError(e?.message || 'Error al generar el reporte');
@@ -111,52 +268,53 @@ export default function ReporteExamenesConsecutivos() {
   };
 
   const casos = useMemo(() => Array.isArray(data?.casosDetectados) ? data.casosDetectados : [], [data]);
-  const [expanded, setExpanded] = useState(new Set());
   
-  // Aplicar filtros a los casos cuando el ámbito es 'materia'
-  const casosFiltrados = useMemo(() => {
-    if (ambito !== 'materia') return casos;
-    
-    return casos.filter(c => {
-      if (filtroDivision && c.division !== filtroDivision) return false;
-      return true;
-    });
-  }, [casos, ambito, filtroDivision]);
-  
-  const groupedCasos = useMemo(() => {
-    const map = new Map();
+  // Preparar casos para tabla - incluir información de alumno en cada fila
+  const casosParaTabla = useMemo(() => {
     const rank = (r) => (r === 'EMERGENCIA' ? 4 : r === 'CRÍTICO' ? 3 : r === 'ALTO' ? 2 : r === 'MEDIO' ? 1 : 0);
-    casosFiltrados.forEach((c) => {
-      const nombre = c?.nombreCompleto || `${c?.alumnoApellido || ''}, ${c?.alumnoNombre || ''}`.trim();
-      const key = c?.alumnoId ?? nombre;
-      let g = map.get(key);
-      if (!g) {
-        g = { key, nombre, casos: [], materias: new Set(), cursos: new Set(), maxR: 0 };
-        map.set(key, g);
-      }
-      g.casos.push(c);
-      if (c?.materiaNombre) g.materias.add(c.materiaNombre);
-  const cursoBasic = `${c?.anio ? c.anio + '°' : ''} ${c?.division ?? ''}`.trim();
-  const cursoStr = cursoBasic || c?.cursoNombre || '';
-      if (cursoStr) g.cursos.add(cursoStr);
-      g.maxR = Math.max(g.maxR, rank(c?.estadoRiesgo));
-    });
-    const label = (n) => (n === 4 ? 'EMERGENCIA' : n === 3 ? 'CRÍTICO' : n === 2 ? 'ALTO' : n === 1 ? 'MEDIO' : null);
-    const grupos = Array.from(map.values()).map(g => ({
-      ...g,
-      materias: Array.from(g.materias),
-      cursos: Array.from(g.cursos),
-      maxRiesgoLabel: label(g.maxR)
-    }));
     
-    // Ordenar alfabéticamente si está activado
-    if (ordenAlfabetico) {
-      return grupos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+    // Aplicar filtro de división si existe
+    let filtered = casos;
+    if (ambito === 'materia' && filtroDivision) {
+      filtered = casos.filter(c => c.division === filtroDivision);
     }
     
-    return grupos;
-  }, [casosFiltrados, ordenAlfabetico]);
-  const toggleGroup = (key) => setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+    const mapped = filtered.map(c => {
+      const nombre = c?.nombreCompleto || `${c?.alumnoApellido || ''}, ${c?.alumnoNombre || ''}`.trim();
+      const curso = `${c?.anio ? c.anio + '°' : ''} ${c?.division ?? ''}`.trim() || c?.cursoNombre || '-';
+      
+      // Construir descripción de exámenes
+      const detalleExamenes = c.descripcionConsecutivo || (() => {
+        const etapa1 = c.etapaPrimeraNota;
+        const num1 = c.numeroPrimeraNota;
+        const nota1 = c.primeraNota;
+        const etapa2 = c.etapaSegundaNota;
+        const num2 = c.numeroSegundaNota;
+        const nota2 = c.segundaNota;
+        
+        return etapa1 === etapa2 
+          ? `Etapa ${etapa1}: Examen ${num1} (nota: ${nota1}) y Examen ${num2} (nota: ${nota2})`
+          : `Etapa ${etapa1} Ex.${num1} (${nota1}) | Etapa ${etapa2} Ex.${num2} (${nota2})`;
+      })();
+      
+      return {
+        ...c,
+        alumnoNombre: nombre,
+        cursoStr: curso,
+        detalleExamenes,
+        riesgoRank: rank(c?.estadoRiesgo)
+      };
+    });
+    
+    // Ordenar: primero por nivel de riesgo (mayor a menor), luego alfabéticamente por alumno
+    return mapped.sort((a, b) => {
+      if (ordenAlfabetico) {
+        return a.alumnoNombre.localeCompare(b.alumnoNombre, 'es', { sensitivity: 'base' });
+      }
+      if (b.riesgoRank !== a.riesgoRank) return b.riesgoRank - a.riesgoRank;
+      return a.alumnoNombre.localeCompare(b.alumnoNombre, 'es', { sensitivity: 'base' });
+    });
+  }, [casos, ambito, filtroDivision, ordenAlfabetico]);
   
   // Obtener opciones únicas de división para los filtros (solo cuando ambito === 'materia')
   const opcionesDivision = useMemo(() => {
@@ -191,8 +349,7 @@ export default function ReporteExamenesConsecutivos() {
           division: c.division,
           instancias: 0,
           alumnos: new Set(),
-          // TODO: Backend debe agregar docenteNombre y docenteId en el DTO
-          docente: c.docenteNombre || 'Sin asignar' 
+          docente: c.docenteNombreCompleto || 'Sin asignar' 
         });
       }
       const grupo = map.get(cursoKey);
@@ -204,6 +361,13 @@ export default function ReporteExamenesConsecutivos() {
       .map(g => ({ ...g, alumnosUnicos: g.alumnos.size }))
       .sort((a, b) => b.instancias - a.instancias);
   }, [ambito, casos]);
+  
+  // Detectar si hay múltiples docentes diferentes
+  const tieneMultiplesDocentes = useMemo(() => {
+    if (ambito !== 'materia' || instanciasPorCurso.length === 0) return false;
+    const docentesUnicos = new Set(instanciasPorCurso.map(g => g.docente).filter(d => d !== 'Sin asignar'));
+    return docentesUnicos.size > 1;
+  }, [ambito, instanciasPorCurso]);
   
   // Recalcular resumen por materia desde los casos detectados (frontend)
   const resumenPorMateriaCalculado = useMemo(() => {
@@ -299,31 +463,29 @@ export default function ReporteExamenesConsecutivos() {
         lines.push([]);
       }
 
-      // Detalle de casos (usar groupedCasos para exportar agrupados por alumno)
-      lines.push(['Casos detectados - Por alumno']);
-      lines.push(['Alumno','Materia','Curso','Exámenes consecutivos desaprobados']);
-      groupedCasos.forEach(g => {
-        g.casos.forEach((c, idx) => {
-          const alumno = idx === 0 ? g.nombre : ''; // Solo mostrar nombre en la primera fila
-          const mat = c.materiaNombre || '-';
-          const curso = `${c.anio ? c.anio + '°' : ''} ${c.division ?? ''}`.trim() || c.cursoNombre || '';
-          // Usar la descripción del backend si está disponible, sino construir como antes
-          const detalleExamenes = c.descripcionConsecutivo || (() => {
-            const etapa1 = c.etapaPrimeraNota;
-            const num1 = c.numeroPrimeraNota;
-            const nota1 = c.primeraNota;
-            const etapa2 = c.etapaSegundaNota;
-            const num2 = c.numeroSegundaNota;
-            const nota2 = c.segundaNota;
-            const cantidad = c.cantidadConsecutivas || 2;
-            
-            return etapa1 === etapa2 
-              ? `Etapa ${etapa1}: Examen ${num1} (nota: ${nota1}) y Examen ${num2} (nota: ${nota2}) - ${cantidad} consecutivos`
-              : `Etapa ${etapa1} - Examen ${num1} (nota: ${nota1}) | Etapa ${etapa2} - Examen ${num2} (nota: ${nota2}) - ${cantidad} consecutivos`;
-          })();
-          
-          lines.push([alumno, mat, curso, detalleExamenes]);
-        });
+      // Detalle de casos
+      lines.push(['Casos detectados']);
+      lines.push(['Alumno','Nivel Riesgo','Materia','Curso','Docente','Notas de exámenes','Consecutivos']);
+      casosParaTabla.forEach(c => {
+        // Construir string de notas para CSV
+        let notasStr = '';
+        if (c.detalleNotasConsecutivas && c.detalleNotasConsecutivas.length > 0) {
+          notasStr = c.detalleNotasConsecutivas.map(n => 
+            `E${n.etapa}Ex${n.numero}:${n.nota}${n.esConsecutivo ? '*' : ''}`
+          ).join(' | ');
+        } else {
+          notasStr = c.detalleExamenes || '-';
+        }
+        
+        lines.push([
+          c.alumnoNombre,
+          c.estadoRiesgo || '-',
+          c.materiaNombre || '-',
+          c.cursoStr,
+          c.docenteNombreCompleto || 'Sin asignar',
+          notasStr,
+          c.cantidadConsecutivas || '-'
+        ]);
       });
 
       const csv = lines.map(cols => (Array.isArray(cols) ? cols : [cols]).map(v => '"'+String(v ?? '').replace(/"/g,'""')+'"').join(',')).join('\n');
@@ -359,7 +521,7 @@ export default function ReporteExamenesConsecutivos() {
       .shadow-sm { box-shadow: none !important; }
       .d-none-print { display: none !important; }
     `;
-    const amb = ambito === 'institucional' ? 'Institucional' : ambito === 'materia' ? `Materia: ${materiaNombreActual || materias.find(m=>String(m.value)===String(materiaId))?.label || materiaId}` : ambito === 'curso' ? `Curso: ${cursos.find(c=>String(c.value)===String(cursoId))?.label || cursoId}` : 'Resumen ejecutivo';
+    const amb = ambito === 'materia' ? `Materia: ${materiaNombreActual || materias.find(m=>String(m.value)===String(materiaId))?.label || materiaId}` : `Curso: ${cursos.find(c=>String(c.value)===String(cursoId))?.label || cursoId}`;
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Exámenes consecutivos desaprobados</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>Exámenes consecutivos desaprobados</h3>`);
     win.document.write(`<div class="sub">Año: ${anio} · Ámbito: ${amb}</div>`);
@@ -385,8 +547,8 @@ export default function ReporteExamenesConsecutivos() {
 
       {/* Explicación del Sistema de Clasificación */}
       <Alert variant="info" className="mb-3">
-        <Alert.Heading className="h6 mb-3">
-          <i className="fas fa-info-circle me-2"></i>
+        <Alert.Heading className="h6 mb-3 d-flex align-items-center gap-2">
+          <Info size={20} />
           ¿Cómo se Determina el Nivel de Riesgo?
         </Alert.Heading>
         <p className="mb-2 small">
@@ -399,7 +561,7 @@ export default function ReporteExamenesConsecutivos() {
               <ul className="mt-1 mb-2 ps-3">
                 <li><strong>Secuencia más larga:</strong> 5+ consecutivos (+50 pts), 4 consecutivos (+40 pts), 3 consecutivos (+25 pts), 2 consecutivos (+15 pts)</li>
                 <li><strong>Persistencia:</strong> 3+ secuencias (+30 pts), 2 secuencias (+20 pts)</li>
-                <li><strong>Gravedad notas:</strong> Promedio ≤2.5 (+20 pts), ≤3.5 (+15 pts), ≤4.5 (+10 pts), >4.5 (+5 pts)</li>
+                <li><strong>Gravedad notas:</strong> Promedio ≤2.5 (+20 pts), ≤3.5 (+15 pts), ≤4.5 (+10 pts), {'>'} 4.5 (+5 pts)</li>
                 <li><strong>Patrón entre etapas:</strong> Dificultades en múltiples etapas (+15 pts)</li>
               </ul>
             </div>
@@ -434,10 +596,8 @@ export default function ReporteExamenesConsecutivos() {
             <Col md={3} sm={6} xs={12}>
               <Form.Label>Ámbito</Form.Label>
               <Form.Select value={ambito} onChange={(e)=>setAmbito(e.target.value)}>
-                {allowed.institucional && <option value="institucional">Institucional</option>}
                 {allowed.materia && <option value="materia">Por materia</option>}
                 {allowed.curso && <option value="curso">Por curso</option>}
-                {allowed.resumen && <option value="resumen">Resumen ejecutivo</option>}
               </Form.Select>
             </Col>
             <Col md={2} sm={6} xs={12}>
@@ -479,32 +639,45 @@ export default function ReporteExamenesConsecutivos() {
           </div>
 
           <div ref={printRef}>
-            {/* Explicación del nuevo sistema de scoring */}
+            {/* Sistema de Clasificación - Colapsable */}
             <Card className="mb-3">
-              <Card.Body className="py-3">
-                <div className="fw-semibold mb-3 text-primary">📊 Sistema de Clasificación Inteligente por Materia</div>
-                <div className="d-flex align-items-center gap-4 flex-wrap mb-3">
-                  <div className="d-flex align-items-center gap-2">
-                    <Badge bg="dark" className="px-3">EMERGENCIA</Badge>
-                    <span className="text-muted">80+ puntos</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <Badge bg="danger" className="px-3">CRÍTICO</Badge>
-                    <span className="text-muted">60-79 puntos</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <Badge bg="warning" text="dark" className="px-3">ALTO</Badge>
-                    <span className="text-muted">40-59 puntos</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <Badge bg="info" text="dark" className="px-3">MEDIO</Badge>
-                    <span className="text-muted">&lt;40 puntos</span>
-                  </div>
+              <Card.Header 
+                className="d-flex justify-content-between align-items-center" 
+                style={{ cursor: 'pointer' }}
+                onClick={() => setShowGraficos(!showGraficos)}
+              >
+                <div className="d-flex align-items-center gap-2">
+                  <BarChart3 size={20} className="text-primary" />
+                  <strong>Sistema de Clasificación Inteligente por Materia</strong>
                 </div>
-                <div className="text-muted small">
-                  ℹ️ La clasificación considera múltiples factores por materia: cantidad de secuencias, persistencia temporal, gravedad de notas y patrones entre etapas.
-                </div>
-              </Card.Body>
+                {showGraficos ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </Card.Header>
+              {showGraficos && (
+                <Card.Body className="py-3">
+                  <div className="d-flex align-items-center gap-4 flex-wrap mb-3">
+                    <div className="d-flex align-items-center gap-2">
+                      <Badge bg="dark" className="px-3">EMERGENCIA</Badge>
+                      <span className="text-muted">80+ puntos</span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <Badge bg="danger" className="px-3">CRÍTICO</Badge>
+                      <span className="text-muted">60-79 puntos</span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <Badge bg="warning" text="dark" className="px-3">ALTO</Badge>
+                      <span className="text-muted">40-59 puntos</span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <Badge bg="info" text="dark" className="px-3">MEDIO</Badge>
+                      <span className="text-muted">&lt;40 puntos</span>
+                    </div>
+                  </div>
+                  <div className="text-muted small d-flex align-items-start gap-2">
+                    <Info size={16} className="mt-1 flex-shrink-0" />
+                    <span>La clasificación considera múltiples factores por materia: cantidad de secuencias, persistencia temporal, gravedad de notas y patrones entre etapas.</span>
+                  </div>
+                </Card.Body>
+              )}
             </Card>
 
             {/* Título de la materia cuando ambito === 'materia' */}
@@ -517,48 +690,102 @@ export default function ReporteExamenesConsecutivos() {
               </Card>
             )}
 
-            {/* Banner de distribución por curso/docente cuando ambito === 'materia' */}
+            {/* Análisis comparativo - Solo cuando hay más de un curso */}
             {ambito === 'materia' && instanciasPorCurso.length > 1 && (
               <Card className="mb-3 border-warning">
-                <Card.Header className="bg-warning bg-opacity-10">
-                  <strong>Distribución por curso y profesor</strong>
-                  <div className="small text-muted">Analizar si hay diferencias significativas entre divisiones</div>
+                <Card.Header 
+                  className="bg-warning bg-opacity-10 d-flex justify-content-between align-items-center"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setShowComparativa(!showComparativa)}
+                >
+                  <div>
+                    <div className="d-flex align-items-center gap-2">
+                      <PieChart size={20} />
+                      <strong>Análisis Comparativo {tieneMultiplesDocentes ? 'por División y Docente' : 'por División'}</strong>
+                    </div>
+                    <div className="small text-muted">
+                      {tieneMultiplesDocentes 
+                        ? 'Identificar diferencias significativas entre cursos y docentes para la misma materia'
+                        : 'Identificar diferencias significativas entre divisiones'
+                      }
+                    </div>
+                  </div>
+                  {showComparativa ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </Card.Header>
-                <Card.Body>
-                  <Table striped bordered hover responsive size="sm" className="mb-0">
-                    <thead>
-                      <tr>
-                        <th>Curso</th>
-                        <th>Profesor a cargo</th>
-                        <th className="text-center">Alumnos afectados</th>
-                        <th className="text-center">Instancias detectadas</th>
-                        <th className="text-center">Promedio por alumno</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {instanciasPorCurso.map((g, idx) => (
-                        <tr key={idx} className={g.instancias > (instanciasPorCurso[0]?.instancias * 0.7) ? 'table-warning' : ''}>
-                          <td><strong>{g.curso}</strong></td>
-                          <td>
-                            {g.docente === 'Sin asignar' ? (
-                              <span className="text-muted fst-italic">{g.docente}</span>
-                            ) : (
-                              g.docente
-                            )}
-                          </td>
-                          <td className="text-center">{g.alumnosUnicos}</td>
-                          <td className="text-center"><Badge bg="secondary">{g.instancias}</Badge></td>
-                          <td className="text-center">{(g.instancias / g.alumnosUnicos).toFixed(1)}</td>
+                {showComparativa && (
+                  <Card.Body>
+                    <Table striped bordered hover responsive size="sm" className="mb-3">
+                      <thead>
+                        <tr>
+                          <th>Curso</th>
+                          {tieneMultiplesDocentes && <th>Docente a cargo</th>}
+                          <th className="text-center">Alumnos afectados</th>
+                          <th className="text-center">Total casos</th>
+                          <th className="text-center">Casos/Alumno</th>
+                          <th className="text-center">Análisis</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                  {instanciasPorCurso.some(g => g.docente === 'Sin asignar') && (
-                    <Alert variant="info" className="mt-3 mb-0 py-2 small">
-                      <strong>Nota:</strong> La información de docentes debe ser agregada por el backend. Contactar al equipo técnico.
-                    </Alert>
-                  )}
-                </Card.Body>
+                      </thead>
+                      <tbody>
+                        {instanciasPorCurso.map((g, idx) => {
+                          const promedioGeneral = instanciasPorCurso.reduce((sum, item) => sum + (item.instancias / item.alumnosUnicos), 0) / instanciasPorCurso.length;
+                          const promedioCurso = g.instancias / g.alumnosUnicos;
+                          const desviacion = ((promedioCurso - promedioGeneral) / promedioGeneral) * 100;
+                          const esAlto = promedioCurso > promedioGeneral * 1.3;
+                          const esBajo = promedioCurso < promedioGeneral * 0.7;
+                          
+                          return (
+                            <tr key={idx} className={esAlto ? 'table-danger' : esBajo ? 'table-success' : ''}>
+                              <td><strong>{g.curso}</strong></td>
+                              {tieneMultiplesDocentes && (
+                                <td>
+                                  {g.docente === 'Sin asignar' ? (
+                                    <span className="text-danger fst-italic">{g.docente}</span>
+                                  ) : (
+                                    g.docente
+                                  )}
+                                </td>
+                              )}
+                              <td className="text-center">{g.alumnosUnicos}</td>
+                              <td className="text-center"><Badge bg={esAlto ? 'danger' : 'secondary'}>{g.instancias}</Badge></td>
+                              <td className="text-center"><strong>{promedioCurso.toFixed(1)}</strong></td>
+                              <td className="text-center">
+                                {esAlto && <Badge bg="danger">+{Math.abs(desviacion).toFixed(0)}% sobre promedio</Badge>}
+                                {esBajo && <Badge bg="success">{Math.abs(desviacion).toFixed(0)}% bajo promedio</Badge>}
+                                {!esAlto && !esBajo && <span className="text-muted">Normal</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="table-light">
+                          <td colSpan={tieneMultiplesDocentes ? "2" : "1"}><strong>Promedio general</strong></td>
+                          <td className="text-center"><strong>{(instanciasPorCurso.reduce((sum, g) => sum + g.alumnosUnicos, 0) / instanciasPorCurso.length).toFixed(1)}</strong></td>
+                          <td className="text-center"><strong>{(instanciasPorCurso.reduce((sum, g) => sum + g.instancias, 0) / instanciasPorCurso.length).toFixed(1)}</strong></td>
+                          <td className="text-center"><strong>{(instanciasPorCurso.reduce((sum, g) => sum + (g.instancias / g.alumnosUnicos), 0) / instanciasPorCurso.length).toFixed(1)}</strong></td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </Table>
+                    
+                    {/* Alerta cuando hay diferencias significativas */}
+                    {instanciasPorCurso.some(g => (g.instancias / g.alumnosUnicos) > (instanciasPorCurso.reduce((sum, item) => sum + (item.instancias / item.alumnosUnicos), 0) / instanciasPorCurso.length) * 1.3) && (
+                      <Alert variant="danger" className="mb-2 py-2 small d-flex align-items-start gap-2">
+                        <AlertTriangle size={18} className="flex-shrink-0 mt-1" />
+                        <div>
+                          <strong>Diferencias significativas detectadas:</strong> Algunos cursos tienen tasas de desaprobación considerablemente más altas que el promedio. Se recomienda revisar las metodologías de evaluación y estrategias didácticas.
+                        </div>
+                      </Alert>
+                    )}
+                    
+                    {instanciasPorCurso.some(g => g.docente === 'Sin asignar') && (
+                      <Alert variant="warning" className="mb-0 py-2 small d-flex align-items-start gap-2">
+                        <Info size={18} className="flex-shrink-0 mt-1" />
+                        <div><strong>Nota:</strong> Algunos cursos no tienen docente asignado para esta materia.</div>
+                      </Alert>
+                    )}
+                  </Card.Body>
+                )}
               </Card>
             )}
 
@@ -586,61 +813,78 @@ export default function ReporteExamenesConsecutivos() {
               )}
             </Row>
 
-            {/* Resumen por materia */}
-            {resumenPorMateria.length > 0 && (
+            {/* Resumen por materia - Colapsable cuando es por curso */}
+            {resumenPorMateria.length > 0 && ambito === 'curso' && (
               <Card className="mb-3">
-                <Card.Header><strong>Resumen por materia</strong> <span className="text-muted small">(hacé clic en la materia para ver el detalle en nueva pestaña)</span></Card.Header>
-                <Card.Body className="p-0">
-                  <Table striped hover responsive size="sm" className="mb-0">
-                    <thead>
-                      <tr>
-                        <th>Materia</th>
-                        <th className="text-end">Alumnos</th>
-                        <th className="text-end">Instancias</th>
-                        <th className="text-end">Emerg.</th>
-                        <th className="text-end">Críticos</th>
-                        <th className="text-end">Altos</th>
-                        <th className="text-end">Medios</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {resumenPorMateria.map((r, idx) => (
-                        <tr key={idx} style={{ cursor: r.materiaId ? 'pointer' : 'default' }}>
-                          <td>
-                            {r.materiaId ? (
-                              <Button 
-                                variant="link" 
-                                className="p-0 text-start text-decoration-none"
-                                onClick={() => {
-                                  const url = `${window.location.pathname}?ambito=materia&materiaId=${r.materiaId}&anio=${anio}&autoGenerate=true`;
-                                  window.open(url, '_blank');
-                                }}
-                              >
-                                {r.materiaNombre || '-'}
-                              </Button>
-                            ) : (
-                              r.materiaNombre || '-'
-                            )}
-                          </td>
-                          <td className="text-end">{r.totalAlumnos ?? r.totalCasos ?? '-'}</td>
-                          <td className="text-end">{r.totalInstancias ?? r.totalCasos ?? '-'}</td>
-                          <td className="text-end">{r.alumnosEmergencia ?? r.casosEmergencia ?? '-'}</td>
-                          <td className="text-end">{r.alumnosCriticos ?? r.casosCriticos ?? '-'}</td>
-                          <td className="text-end">{r.alumnosAltos ?? r.casosAltos ?? '-'}</td>
-                          <td className="text-end">{r.alumnosMedios ?? r.casosMedios ?? '-'}</td>
+                <Card.Header 
+                  className="d-flex justify-content-between align-items-center"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setShowResumenMaterias(!showResumenMaterias)}
+                >
+                  <div>
+                    <strong>Resumen por materia</strong> 
+                    <span className="text-muted small ms-2">(hacé clic en la materia para ver el detalle en nueva pestaña)</span>
+                  </div>
+                  {showResumenMaterias ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </Card.Header>
+                {showResumenMaterias && (
+                  <Card.Body className="p-0">
+                    <Table striped hover responsive size="sm" className="mb-0">
+                      <thead>
+                        <tr>
+                          <th>Materia</th>
+                          <th className="text-end">Alumnos</th>
+                          <th className="text-end">Instancias</th>
+                          <th className="text-end">Emerg.</th>
+                          <th className="text-end">Críticos</th>
+                          <th className="text-end">Altos</th>
+                          <th className="text-end">Medios</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Card.Body>
+                      </thead>
+                      <tbody>
+                        {resumenPorMateria.map((r, idx) => (
+                          <tr key={idx} style={{ cursor: r.materiaId ? 'pointer' : 'default' }}>
+                            <td>
+                              {r.materiaId ? (
+                                <Button 
+                                  variant="link" 
+                                  className="p-0 text-start text-decoration-none"
+                                  onClick={() => {
+                                    const url = `${window.location.pathname}?ambito=materia&materiaId=${r.materiaId}&anio=${anio}&autoGenerate=true`;
+                                    window.open(url, '_blank');
+                                  }}
+                                >
+                                  {r.materiaNombre || '-'}
+                                </Button>
+                              ) : (
+                                r.materiaNombre || '-'
+                              )}
+                            </td>
+                            <td className="text-end">{r.totalAlumnos ?? r.totalCasos ?? '-'}</td>
+                            <td className="text-end">{r.totalInstancias ?? r.totalCasos ?? '-'}</td>
+                            <td className="text-end">{r.alumnosEmergencia ?? r.casosEmergencia ?? '-'}</td>
+                            <td className="text-end">{r.alumnosCriticos ?? r.casosCriticos ?? '-'}</td>
+                            <td className="text-end">{r.alumnosAltos ?? r.casosAltos ?? '-'}</td>
+                            <td className="text-end">{r.alumnosMedios ?? r.casosMedios ?? '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </Card.Body>
+                )}
               </Card>
             )}
 
-            {/* Casos detectados */}
+            {/* Tabla directa de casos detectados */}
             <Card className="mb-3">
               <Card.Header className="d-flex justify-content-between align-items-center flex-wrap">
                 <div>
-                  <strong>Casos detectados</strong> <span className="text-muted small">({groupedCasos.length} {groupedCasos.length === 1 ? 'alumno' : 'alumnos'})</span>
+                  <strong>Casos detectados</strong> <span className="text-muted small">({casosParaTabla.length} {casosParaTabla.length === 1 ? 'caso' : 'casos'})</span>
+                  <div className="mt-1 d-flex gap-3 small text-muted">
+                    <span><Badge bg="danger" className="me-1">4</Badge>Consecutivo desaprobado</span>
+                    <span><Badge bg="secondary" className="me-1">4</Badge>Desaprobado</span>
+                    <span><Badge bg="success" className="me-1">7</Badge>Aprobado</span>
+                  </div>
                 </div>
                 <div className="d-flex gap-2 align-items-center mt-2 mt-md-0 flex-wrap">
                   {ambito === 'materia' && casos.length > 0 && opcionesDivision.length > 0 && (
@@ -668,93 +912,68 @@ export default function ReporteExamenesConsecutivos() {
                   />
                 </div>
               </Card.Header>
-              <Card.Body>
-                {groupedCasos.length === 0 && (
-                  <div className="text-center text-muted py-3">Sin resultados</div>
+              <Card.Body className="p-0">
+                {casosParaTabla.length === 0 ? (
+                  <div className="text-center text-muted py-4">Sin casos detectados</div>
+                ) : (
+                  <div className="table-responsive">
+                    <Table striped hover className="mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th style={{ width: '20%' }}>Alumno</th>
+                          <th style={{ width: '10%' }} className="text-center">Riesgo</th>
+                          {ambito === 'curso' && <th style={{ width: '15%' }}>Materia</th>}
+                          {ambito === 'materia' && <th style={{ width: '10%' }} className="text-center">Curso</th>}
+                          {ambito === 'materia' && <th style={{ width: '15%' }}>Docente</th>}
+                          <th>Detalle de exámenes desaprobados</th>
+                          <th style={{ width: '10%' }} className="text-center">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {casosParaTabla.map((c, idx) => (
+                          <tr key={idx}>
+                            <td><strong>{c.alumnoNombre}</strong></td>
+                            <td className="text-center">
+                              <Badge 
+                                bg={c.estadoRiesgo === 'EMERGENCIA' ? 'dark' : c.estadoRiesgo === 'CRÍTICO' ? 'danger' : c.estadoRiesgo === 'ALTO' ? 'warning' : 'info'}
+                                text={c.estadoRiesgo === 'ALTO' || c.estadoRiesgo === 'MEDIO' ? 'dark' : 'white'}
+                              >
+                                {c.estadoRiesgo || 'N/A'}
+                              </Badge>
+                            </td>
+                            {ambito === 'curso' && <td>{c.materiaNombre || '-'}</td>}
+                            {ambito === 'materia' && <td className="text-center">{c.cursoStr}</td>}
+                            {ambito === 'materia' && (
+                              <td>
+                                {c.docenteNombreCompleto === 'Sin asignar' ? (
+                                  <span className="text-muted fst-italic">{c.docenteNombreCompleto}</span>
+                                ) : (
+                                  c.docenteNombreCompleto || '-'
+                                )}
+                              </td>
+                            )}
+                            <td><GrillaNotas caso={c} /></td>
+                            <td className="text-center">
+                              <Button 
+                                size="sm" 
+                                variant="outline-primary"
+                                onClick={() => {
+                                  if (c.alumnoId) {
+                                    const url = `/reportes/notas-alumnos?alumnoId=${c.alumnoId}&anio=${anio}&autoGenerate=true`;
+                                    window.open(url, '_blank');
+                                  }
+                                }}
+                                title="Ver reporte completo de notas"
+                              >
+                                <FileText size={14} />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
                 )}
-                {groupedCasos.map((g, gi) => (
-                  <Card key={g.key ?? gi} className="mb-3 shadow-sm">
-                    <Card.Header className="d-flex justify-content-between align-items-center" style={{ cursor: 'pointer' }}>
-                      <div onClick={() => toggleGroup(g.key)} style={{ flex: 1 }}>
-                        <strong>{g.nombre}</strong>
-                        {g.maxRiesgoLabel && (
-                          <Badge 
-                            bg={g.maxRiesgoLabel === 'EMERGENCIA' ? 'dark' : g.maxRiesgoLabel === 'CRÍTICO' ? 'danger' : g.maxRiesgoLabel === 'ALTO' ? 'warning' : 'info'} 
-                            text={g.maxRiesgoLabel === 'ALTO' || g.maxRiesgoLabel === 'MEDIO' ? 'dark' : undefined} 
-                            className="ms-2"
-                          >
-                            {g.maxRiesgoLabel}
-                          </Badge>
-                        )}
-                        <div className="text-muted small mt-1">
-                          {g.casos.length} {g.casos.length === 1 ? 'instancia' : 'instancias'} · {g.materias.length} {g.materias.length === 1 ? 'materia' : 'materias'} · {g.cursos.length} {g.cursos.length === 1 ? 'curso' : 'cursos'}
-                        </div>
-                      </div>
-                      <div className="d-flex gap-2 align-items-center">
-                        <Button 
-                          size="sm" 
-                          variant="outline-primary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Obtener alumnoId del primer caso
-                            const alumnoIdValue = g.casos[0]?.alumnoId;
-                            if (alumnoIdValue) {
-                              // Abrir en nueva pestaña pasando parámetros por URL
-                              const url = `/reportes/notas-alumnos?alumnoId=${alumnoIdValue}&anio=${anio}&autoGenerate=true`;
-                              window.open(url, '_blank');
-                            }
-                          }}
-                          title="Ver reporte de notas del alumno"
-                        >
-                          <FileText size={16} className="me-1" />
-                          Ver notas
-                        </Button>
-                        <div onClick={() => toggleGroup(g.key)}>
-                          {expanded.has(g.key) ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-                        </div>
-                      </div>
-                    </Card.Header>
-                    {expanded.has(g.key) && (
-                      <Card.Body>
-                        <Table striped hover responsive size="sm" className="mb-0">
-                          <thead>
-                            <tr>
-                              <th>Materia</th>
-                              <th>Curso</th>
-                              <th>Exámenes consecutivos desaprobados</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {g.casos.map((c, ci) => {
-                              // Usar la descripción del backend si está disponible, sino construir como antes
-                              const detalleExamenes = c.descripcionConsecutivo || (() => {
-                                const etapa1 = c.etapaPrimeraNota;
-                                const num1 = c.numeroPrimeraNota;
-                                const nota1 = c.primeraNota;
-                                const etapa2 = c.etapaSegundaNota;
-                                const num2 = c.numeroSegundaNota;
-                                const nota2 = c.segundaNota;
-                                const cantidad = c.cantidadConsecutivas || 2;
-                                
-                                return etapa1 === etapa2 
-                                  ? `Etapa ${etapa1}: Examen ${num1} (nota: ${nota1}) y Examen ${num2} (nota: ${nota2}) - ${cantidad} consecutivos`
-                                  : `Etapa ${etapa1} - Examen ${num1} (nota: ${nota1}) | Etapa ${etapa2} - Examen ${num2} (nota: ${nota2}) - ${cantidad} consecutivos`;
-                              })();
-                              
-                              return (
-                                <tr key={ci}>
-                                  <td>{c.materiaNombre || '-'}</td>
-                                  <td>{`${c.anio ? c.anio + '°' : ''} ${c.division ?? ''}`.trim() || c.cursoNombre || '-'}</td>
-                                  <td className="small">{detalleExamenes}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </Table>
-                      </Card.Body>
-                    )}
-                  </Card>
-                ))}
               </Card.Body>
             </Card>
           </div>

@@ -196,6 +196,9 @@ export default function ImportarCalificaciones() {
 			<Card className="shadow-sm">
 				<Card.Body>
 					<h3 className="mb-4">Importar Calificaciones (CSV)</h3>
+					<p className="text-muted mb-4">
+						Subí un archivo CSV para importar o actualizar calificaciones de los alumnos. Usá la plantilla para el formato correcto.
+					</p>
 
 					<Row className="align-items-end g-3 mb-2">
 						<Col md={7} lg={6}>

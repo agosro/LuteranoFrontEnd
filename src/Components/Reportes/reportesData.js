@@ -9,6 +9,14 @@ const reportes = [
     roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteHistorialAlumnoController
   },
   {
+    id: 18,
+    titulo: "Historial Académico Completo",
+    descripcion: "Visualizá la trayectoria completa de un alumno: evolución de promedios, materias aprobadas/desaprobadas, tendencia académica y análisis por ciclo lectivo.",
+    categoria: "Alumnos",
+    ruta: "/reportes/historial-alumno",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteHistorialAlumnoController
+  },
+  {
     id: 17,
     titulo: "Exámenes Consecutivos",
     descripcion: "Lista de alumnos que desaprobaron dos instancias de evaluación consecutivas, con filtros por curso y materia.",

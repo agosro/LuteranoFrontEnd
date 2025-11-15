@@ -5,7 +5,7 @@ import { BarChart3 } from 'lucide-react';
 import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
 import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
@@ -17,7 +17,9 @@ export default function ReporteAnualAlumno() {
   const { user } = useAuth();
   const token = user?.token;
   const location = useLocation();
-  const preselectedAlumnoId = location.state?.preselectedAlumnoId;
+  const [searchParams] = useSearchParams();
+  const preselectedAlumnoId = location.state?.preselectedAlumnoId || searchParams.get('alumnoId');
+  const autoGenerar = searchParams.get('auto') === 'true';
 
   // Filtros y selección
   const [anio, setAnio] = useState(new Date().getFullYear());
@@ -103,7 +105,7 @@ export default function ReporteAnualAlumno() {
     }
   }, [cursoId, preselectedAlumnoId]);
 
-  // Cargar alumno preseleccionado si viene del state
+  // Cargar alumno preseleccionado si viene del state o URL
   useEffect(() => {
     if (!preselectedAlumnoId || !token) return;
     let active = true;
@@ -197,6 +199,16 @@ export default function ReporteAnualAlumno() {
       setLoading(false);
     }
   };
+
+  // Auto-generar si viene de URL con auto=true
+  useEffect(() => {
+    if (autoGenerar && alumnoId && !data && !loading) {
+      setTimeout(() => {
+        onSubmit({ preventDefault: () => {} });
+      }, 500);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGenerar, alumnoId]);
 
   const dto = data?.data; // ReporteAnualAlumnoDto
   const materias = useMemo(() => dto?.materias || [], [dto]);

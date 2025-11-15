@@ -113,6 +113,9 @@ export default function PromocionMasiva() {
       <Card className="shadow-sm">
         <Card.Body>
           <h3 className="mb-4">Promoción masiva de alumnos</h3>
+           <p className="text-muted mb-4">
+             Ejecutá la promoción o simulación de todos los alumnos del ciclo lectivo seleccionado según las reglas académicas vigentes.
+           </p>
 
           <Row className="g-3 align-items-end">
             <Col md={2} sm={6} xs={12}>

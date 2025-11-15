@@ -14,6 +14,7 @@ import { toast } from 'react-toastify';
 import FiltrosAsistencia from '../Components/Asistencia/FiltrosAsistencia';
 import TablaAsistencia from '../Components/Asistencia/TablaAsistencia';
 import ModalEditarAsistencia from '../Components/Asistencia/ModalEditarAsistencia';
+import ConfirmarAccion from '../Components/Modals/ConfirmarAccion';
 
 
 export default function AsistenciaAlumnos() {
@@ -33,6 +34,7 @@ export default function AsistenciaAlumnos() {
 	const [presentes, setPresentes] = useState(new Set()); // ids marcados como presente para el guardado masivo
 	const [modalEdit, setModalEdit] = useState({ open: false, alumno: null, estado: 'TARDE', observacion: '' });
 	const [cargando, setCargando] = useState(false);
+	const [confirmarGuardar, setConfirmarGuardar] = useState({ open: false, mensaje: '' });
 
 	// Cargar cursos
 	useEffect(() => {
@@ -165,30 +167,34 @@ export default function AsistenciaAlumnos() {
 	// Guardado masivo usando el endpoint /asistencia/alumnos/curso
 	const handleGuardarMasivo = async () => {
 		if (!token || !cursoId || !fecha) return;
-			try {
-			setCargando(true);
 
-			// Política: solo se marcan PRESENTES; el resto queda AUSENTE automáticamente
-			const presentesIds = Array.from(presentes);
-			// Preservar estados puntuales TARDE y JUSTIFICADO como overrides
-			const overrides = {};
-			for (const al of alumnos) {
-				const est = asistencia[al.id]?.estado;
-				if (est === 'TARDE' || est === 'JUSTIFICADO') {
-					overrides[al.id] = est;
-				}
+		// Política: solo se marcan PRESENTES; el resto queda AUSENTE automáticamente
+		const presentesIds = Array.from(presentes);
+		// Preservar estados puntuales TARDE y JUSTIFICADO como overrides
+		const overrides = {};
+		for (const al of alumnos) {
+			const est = asistencia[al.id]?.estado;
+			if (est === 'TARDE' || est === 'JUSTIFICADO') {
+				overrides[al.id] = est;
 			}
+		}
 
-				// Confirmación: si no hay ningún estado seleccionado, se marcarán todos AUSENTES
-				const totalSeleccionados = presentesIds.length + Object.keys(overrides).length;
-				if (totalSeleccionados === 0) {
-					const confirmar = window.confirm('No seleccionaste ningún estado. Se marcarán todos como AUSENTE. ¿Deseás continuar?');
-					if (!confirmar) {
-						setCargando(false);
-						return;
-					}
-				}
+		// Confirmación: si no hay ningún estado seleccionado, se marcarán todos AUSENTES
+		const totalSeleccionados = presentesIds.length + Object.keys(overrides).length;
+		if (totalSeleccionados === 0) {
+			setConfirmarGuardar({
+				open: true,
+				mensaje: 'No seleccionaste ningún estado. Se marcarán todos los alumnos como AUSENTE. ¿Deseás continuar?',
+			});
+			return;
+		}
 
+		await ejecutarGuardoMasivo(presentesIds, overrides);
+	};
+
+	const ejecutarGuardoMasivo = async (presentesIds, overrides) => {
+		try {
+			setCargando(true);
 			const payload = {
 				cursoId: Number(cursoId),
 				fecha,
@@ -255,6 +261,9 @@ export default function AsistenciaAlumnos() {
 				<div className="d-flex align-items-center justify-content-center mb-3">
 					<h2 className="m-0 text-center">Asistencia de Alumnos</h2>
 				</div>
+				<p className="text-center text-muted mb-4">
+					Registrá la asistencia diaria de los alumnos del curso seleccionado. Los presentes, ausentes, tarde y justificados se guardarán para la fecha elegida.
+				</p>
 
 				{/* Filtros */}
 				<FiltrosAsistencia
@@ -318,10 +327,33 @@ export default function AsistenciaAlumnos() {
 					cargando={cargando}
 				/>
 
-						{/* Aclaración */}
-						<div className="mt-2 text-muted">
-							⚠️ Los alumnos sin estado se guardarán como Ausentes.
-						</div>
-			</div>
+				<ConfirmarAccion
+					show={confirmarGuardar.open}
+					title="Confirmar guardado sin asistencias"
+					message={confirmarGuardar.mensaje}
+					confirmText="Guardar de todas formas"
+					cancelText="Cancelar"
+					confirmBtnClass="btn-warning"
+					onConfirm={async () => {
+						const presentesIds = Array.from(presentes);
+						const overrides = {};
+						for (const al of alumnos) {
+							const est = asistencia[al.id]?.estado;
+							if (est === 'TARDE' || est === 'JUSTIFICADO') {
+								overrides[al.id] = est;
+							}
+						}
+						setConfirmarGuardar({ open: false, mensaje: '' });
+						await ejecutarGuardoMasivo(presentesIds, overrides);
+					}}
+					onClose={() => setConfirmarGuardar({ open: false, mensaje: '' })}
+					loading={cargando}
+				/>
+
+				{/* Aclaración */}
+				<div className="mt-2 text-muted">
+					⚠️ Los alumnos sin estado se guardarán como Ausentes.
+				</div>
+		</div>
 	);
 }

@@ -27,7 +27,6 @@ import GestionarReservas from '../Pages/GestionarReservas.jsx';
 import EspaciosAulicosGestion from '../Pages/EspaciosAulicosGestion.jsx';
 import DashboardLayout from '../Layout/DashboardLayout.jsx';
 import PrivateRoute from './PrivateRoute';
-import MiPerfil from '../Pages/MiPerfil.jsx';
 import AlumnoDetalle from '../Pages/AlumnoDetalle.jsx';
 import DocenteDetalle from '../Pages/DocenteDetalle.jsx';
 import PreceptorDetalle from '../Pages/PreceptorDetalle.jsx';
@@ -42,6 +41,7 @@ import ReporteNotasAlumnos from '../Pages/ReporteNotasAlumnos.jsx';
 import ReporteNotasCursoMateria from '../Pages/ReporteNotasCursoMateria.jsx';
 import ReporteLegajoAlumno from '../Pages/ReporteLegajoAlumno.jsx';
 import ReporteAnualAlumno from '../Pages/ReporteAnualAlumno.jsx';
+import ReporteHistorialAlumno from '../Pages/ReporteHistorialAlumno.jsx';
 import ReporteAlumnosLibres from '../Pages/ReporteAlumnosLibres.jsx';
 import AsistenciaAlumnos from '../Pages/AsistenciaAlumnos.jsx';
 import AsistenciaDocentes from '../Pages/AsistenciaDocentes.jsx';
@@ -148,6 +148,7 @@ function AppRoutes() {
           <Route path="reportes/alumnos-libres" element={<ReporteAlumnosLibres />} />
           <Route path="reportes/asistencia-perfecta" element={<ReporteAsistenciaPerfecta />} />
           <Route path="reportes/disponibilidad-docente" element={<ReporteDisponibilidadDocente />} />
+          <Route path="reportes/historial-alumno" element={<ReporteHistorialAlumno />} />
         </Route>
 
         {/* Desempeño docente -> ADMIN, DIRECTOR, PRECEPTOR (según backend) */}
@@ -217,10 +218,6 @@ function AppRoutes() {
           <Route path="espacios-aulicos/gestionar" element={<GestionarReservas />} />
         </Route>
         
-        {/* Mi perfil-> ADMIN, DOCENTE, PRECEPTOR, AUXILIAR */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR', 'ROLE_AUXILIAR']} />}>
-          <Route path="mi-perfil" element={<MiPerfil />} />
-        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/inicio" />} />

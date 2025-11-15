@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Container, Card, Row, Col, Form, Button, Spinner, Table, Badge, Alert, Accordion } from 'react-bootstrap';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
@@ -9,6 +9,7 @@ import { useAuth } from '../Context/AuthContext';
 import AsyncDocenteSelect from '../Components/Controls/AsyncDocenteSelect';
 import { listarCursos } from '../Services/CursoService';
 import { listarMaterias } from '../Services/MateriaService';
+import { listarMateriasDeCurso } from '../Services/MateriaCursoService';
 import { reporteCompleto, reportePorDocente, reportePorCurso, reportePorMateria } from '../Services/ReporteDesempenoDocenteService';
 import { toast } from 'react-toastify';
 // Exportación a PDF: este reporte usará ventana de impresión, igual que otros reportes del sistema
@@ -16,7 +17,9 @@ import { toast } from 'react-toastify';
 export default function ReporteDesempenoDocente() {
   const { user } = useAuth();
   const token = user?.token;
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const autoGenerar = searchParams.get('auto') === 'true';
+  const docenteIdFromUrl = searchParams.get('docenteId');
 
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [cursos, setCursos] = useState([]);
@@ -24,10 +27,9 @@ export default function ReporteDesempenoDocente() {
   const [cursoId, setCursoId] = useState('');
   const [materiaId, setMateriaId] = useState('');
   const [docenteOpt, setDocenteOpt] = useState(null);
-  const [docenteId, setDocenteId] = useState('');
+  const [docenteId, setDocenteId] = useState(docenteIdFromUrl || '');
   const [cargando, setCargando] = useState(false);
   const [data, setData] = useState(null);
-  const [showKpis, setShowKpis] = useState(false);
   const printRef = useRef(null);
 
   useEffect(() => {
@@ -46,20 +48,51 @@ export default function ReporteDesempenoDocente() {
     })();
   }, [token]);
 
+  // Filtrar materias y docentes cuando cambia el curso
+  useEffect(() => {
+    if (!cursoId) {
+      // Si no hay curso seleccionado, mostrar todas las materias
+      // setMaterias(todasLasMaterias); // Eliminado: todasLasMaterias ya no se usa
+      setMateriaId('');
+      setDocenteOpt(null);
+      setDocenteId('');
+      return;
+    }
+
+    // Cargar materias del curso seleccionado
+    (async () => {
+      try {
+        const materiasCurso = await listarMateriasDeCurso(token, cursoId);
+        setMaterias(materiasCurso || []);
+        // Limpiar la materia seleccionada si ya no está en el curso
+        if (materiaId) {
+          const materiaExiste = materiasCurso?.some(m => String(m.materiaId) === String(materiaId));
+          if (!materiaExiste) {
+            setMateriaId('');
+          }
+        }
+        // Limpiar docente
+        setDocenteOpt(null);
+        setDocenteId('');
+      } catch (e) {
+        console.error('Error al cargar materias del curso:', e);
+        setMaterias([]);
+      }
+    })();
+  }, [cursoId, token, materiaId]);
+
   const generar = async () => {
     if (!anio || anio < 2000 || anio > 2100) {
       toast.error('Año inválido');
-      return;
-    }
-    if (cursoId) {
-      toast.error('El reporte por curso aún no está implementado en el backend. Pedí que agreguen el endpoint: GET /reportes/desempeno-docente/{anio}/curso/{cursoId}');
       return;
     }
     setCargando(true);
     setData(null);
     try {
       let resp;
-      if (materiaId) {
+      if (cursoId) {
+        resp = await reportePorCurso(token, anio, Number(cursoId));
+      } else if (materiaId) {
         resp = await reportePorMateria(token, anio, Number(materiaId));
       } else if (docenteId) {
         resp = await reportePorDocente(token, anio, Number(docenteId));
@@ -73,6 +106,14 @@ export default function ReporteDesempenoDocente() {
     } finally { setCargando(false); }
   };
 
+  // Auto-generar cuando viene de URL
+  useEffect(() => {
+    if (autoGenerar && docenteIdFromUrl && token && !data && !cargando) {
+      generar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGenerar, docenteIdFromUrl, token]);
+
   const materiasOpts = useMemo(() => {
     const arr = Array.isArray(materias) ? materias : [];
     return arr.map((m) => ({
@@ -80,6 +121,20 @@ export default function ReporteDesempenoDocente() {
       label: m.nombre ?? m.nombreMateria ?? `Materia ${m.id ?? ''}`,
     })).filter(o => o.value !== '');
   }, [materias]);
+
+  // Extraer docentes únicos de las materias filtradas por curso
+  const docentesDeCurso = useMemo(() => {
+    if (!cursoId || !materias.length) return null;
+    
+    const docentesMap = new Map();
+    materias.forEach(m => {
+      if (m.docente && m.docente.id) {
+        docentesMap.set(m.docente.id, m.docente);
+      }
+    });
+    
+    return Array.from(docentesMap.values());
+  }, [cursoId, materias]);
 
   const resultadosMateria = useMemo(() => {
     return Array.isArray(data?.resultadosPorMateria) ? data.resultadosPorMateria : [];
@@ -503,6 +558,24 @@ export default function ReporteDesempenoDocente() {
       `Docente: ${docenteId ? findDocenteLabel() : 'Todos'}`,
     ].join(' • ');
     
+    // Información del docente si es único
+    let docenteInfoHtml = '';
+    if (chartsData?.esDocenteUnico && resultadosDocente.length > 0) {
+      const d = resultadosDocente[0];
+      const nombreCompleto = d.nombreCompletoDocente || `${d.apellidoDocente || ''}, ${d.nombreDocente || ''}`;
+      const dni = d.dniDocente ? `DNI: ${d.dniDocente}` : '';
+      const email = d.emailDocente ? `Email: ${d.emailDocente}` : '';
+      docenteInfoHtml = `
+        <div style="margin: 16px 0; padding: 12px; background: #e7f3ff; border: 1px solid #0066cc; border-radius: 4px;">
+          <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #0066cc;">${nombreCompleto}</h3>
+          <div style="font-size: 12px; color: #333;">
+            ${dni ? `<span style="margin-right: 16px;">${dni}</span>` : ''}
+            ${email ? `<span>${email}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+    
     // Construir HTML de KPIs como texto simple
     let kpisHtml = '';
     if (kpis) {
@@ -530,6 +603,7 @@ export default function ReporteDesempenoDocente() {
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Desempeño Docente - ${anio}</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>Reporte de Desempeño Docente - Año ${anio}</h3>`);
     win.document.write(`<div class="filtros">📋 Filtros aplicados: ${filtros}</div>`);
+    win.document.write(docenteInfoHtml);
     win.document.write(kpisHtml);
     win.document.write(`<div>${printRef.current.innerHTML}</div>`);
     win.document.write('</body></html>');
@@ -599,6 +673,7 @@ export default function ReporteDesempenoDocente() {
                   value={docenteOpt}
                   onChange={(opt) => { setDocenteOpt(opt); setDocenteId(opt?.value || ''); }}
                   placeholder="Seleccioná un docente"
+                  docentesList={docentesDeCurso}
                 />
               </Form.Group>
             </Col>
@@ -620,6 +695,23 @@ export default function ReporteDesempenoDocente() {
       {data && (
         <div ref={printRef}>
           <hr />
+
+          {/* Información del docente cuando se filtra por un único docente */}
+          {chartsData?.esDocenteUnico && resultadosDocente.length > 0 && (
+            <Card className="mb-4">
+              <Card.Body>
+                <Row>
+                  <Col>
+                    <h4 className="mb-2">{resultadosDocente[0]?.nombreCompletoDocente || `${resultadosDocente[0]?.apellidoDocente || ''}, ${resultadosDocente[0]?.nombreDocente || ''}`}</h4>
+                    <div className="text-muted">
+                      {resultadosDocente[0]?.dniDocente && <span className="me-3"><strong>DNI:</strong> {resultadosDocente[0].dniDocente}</span>}
+                      {resultadosDocente[0]?.emailDocente && <span><strong>Email:</strong> {resultadosDocente[0].emailDocente}</span>}
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          )}
 
           {/* KPIs visuales */}
           {kpis && (

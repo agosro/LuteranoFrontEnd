@@ -194,17 +194,6 @@ const handleCreate = async (datos) => {
     { key: 'dni', label: 'DNI' },
     { key: 'email', label: 'Email' },
     { key: 'telefono', label: 'Teléfono' },
-    {
-  key: 'dictados',
-  label: 'Materias asignadas',
-  render: d => {
-    if (!d.dictados || d.dictados.length === 0) return 'Sin materias asignadas';
-
-    return d.dictados
-      .map(m => `${m.materiaNombre} (${m.cursoNombre})`)
-      .join(', ');
-  }
-}
   ];
 
   // En vista usamos el formateo centralizado (VistaEntidad/RenderCampos -> isoToDisplay)
@@ -216,14 +205,6 @@ const handleCreate = async (datos) => {
     { name: 'apellido', label: 'Apellido', type: 'text' },
     { name: 'email', label: 'Email', type: 'email' },
     { name: 'telefono', label: 'Teléfono', type: 'text' },
-    {
-      name: 'dictados',
-      label: 'Materias asignadas',
-      render: (d) => {
-        if (!d?.dictados || d.dictados.length === 0) return 'Sin materias asignadas';
-        return d.dictados.map(m => `${m.materiaNombre} (${m.cursoNombre})`).join(', ');
-      },
-    },
   ];
 
   return (

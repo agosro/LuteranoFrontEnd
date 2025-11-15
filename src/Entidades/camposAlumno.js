@@ -14,6 +14,13 @@ export const camposAlumno = (modoVista = false, esCreacion = false) => {
         { value: "DNI", label: "DNI" },
       ], required: true, readOnly: modoVista },
     { name: "dni", label: "DNI", type: "text", required: true, readOnly: modoVista },
+    { name: "estado", label: "Estado del Alumno", type: "select", opciones: [
+        { value: "REGULAR", label: "Regular" },
+        { value: "LIBRE", label: "Libre" },
+        { value: "EGRESADO", label: "Egresado" },
+        { value: "BORRADO", label: "Borrado" },
+        { value: "EXCLUIDO_POR_REPETICION", label: "Excluido por repetición" }
+      ], required: false, readOnly: true, skip: !modoVista },
     { name: "email", label: "Email", type: "email", required: true, readOnly: modoVista },
     { name: "direccion", label: "Dirección", type: "text", required: true, readOnly: modoVista },
     { name: "telefono", label: "Teléfono", type: "text", required: true, readOnly: modoVista },

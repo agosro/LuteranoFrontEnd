@@ -113,6 +113,9 @@ export default function ConfiguracionCicloLectivo() {
       <Row>
         <Col md={12}>
           <h3 className="mb-3">Ciclo lectivo</h3>
+           <p className="text-muted mb-4">
+             Gestioná los ciclos lectivos activos y creá nuevos años escolares para la institución.
+           </p>
         </Col>
       </Row>
 
