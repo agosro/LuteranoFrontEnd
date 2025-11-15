@@ -212,53 +212,59 @@ export default function ReservarEspacio() {
           </Form>
 
           {/* Tabla de módulos del día seleccionado */}
-          <div className="mt-3">
-            <div className="d-flex align-items-center mb-2">
-              <h5 className="mb-0">Módulos para {fecha || "(seleccioná fecha)"}</h5>
-              {cargandoModulos && <Spinner size="sm" className="ms-2" />}
-            </div>
-            <Table bordered hover size="sm">
-              <thead>
-                <tr>
-                  <th>Módulo</th>
-                  <th>Desde</th>
-                  <th>Hasta</th>
-                  <th>Estado</th>
-                  <th>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {modulos.length === 0 ? (
+          {fecha && espacioId && cursoId ? (
+            <div className="mt-3">
+              <div className="d-flex align-items-center mb-2">
+                <h5 className="mb-0">Módulos para {fecha}</h5>
+                {cargandoModulos && <Spinner size="sm" className="ms-2" />}
+              </div>
+              <Table bordered hover size="sm">
+                <thead>
                   <tr>
-                    <td colSpan={5} className="text-center text-muted">Sin datos</td>
+                    <th>Módulo</th>
+                    <th>Desde</th>
+                    <th>Hasta</th>
+                    <th>Estado</th>
+                    <th>Acción</th>
                   </tr>
-                ) : (
-                  modulos.map((m) => {
-                    // Usar estado de reserva provisto por el backend
-                    const libre = !m.ocupado;
-                    return (
-                      <tr key={m.modulo.id} className={libre ? "" : "table-danger"}>
-                        <td>{m.modulo.orden}</td>
-                        <td>{m.modulo.desde}</td>
-                        <td>{m.modulo.hasta}</td>
-                        <td>{libre ? "Libre" : (m.motivoOcupacion ? `Ocupado - ${m.motivoOcupacion}` : "Ocupado")}</td>
-                        <td>
-                          <Button
-                            size="sm"
-                            variant={libre ? "success" : "secondary"}
-                            disabled={!libre || !espacioId || !cursoId || !fecha}
-                            onClick={() => abrirReserva(m)}
-                          >
-                            Reservar
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </Table>
-          </div>
+                </thead>
+                <tbody>
+                  {modulos.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center text-muted">Sin datos</td>
+                    </tr>
+                  ) : (
+                    modulos.map((m) => {
+                      // Usar estado de reserva provisto por el backend
+                      const libre = !m.ocupado;
+                      return (
+                        <tr key={m.modulo.id} className={libre ? "" : "table-danger"}>
+                          <td>{m.modulo.orden}</td>
+                          <td>{m.modulo.desde}</td>
+                          <td>{m.modulo.hasta}</td>
+                          <td>{libre ? "Libre" : (m.motivoOcupacion ? `Ocupado - ${m.motivoOcupacion}` : "Ocupado")}</td>
+                          <td>
+                            <Button
+                              size="sm"
+                              variant={libre ? "success" : "secondary"}
+                              disabled={!libre || !espacioId || !cursoId || !fecha}
+                              onClick={() => abrirReserva(m)}
+                            >
+                              Reservar
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </Table>
+            </div>
+          ) : (
+            <div className="mt-3 text-center text-muted">
+              <p>Seleccioná un curso, fecha y espacio áulico para ver los módulos disponibles.</p>
+            </div>
+          )}
 
           {/* Modal de confirmación */}
           <Modal show={show} onHide={cerrarReserva} centered>

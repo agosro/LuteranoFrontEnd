@@ -27,7 +27,6 @@ import GestionarReservas from '../Pages/GestionarReservas.jsx';
 import EspaciosAulicosGestion from '../Pages/EspaciosAulicosGestion.jsx';
 import DashboardLayout from '../Layout/DashboardLayout.jsx';
 import PrivateRoute from './PrivateRoute';
-import MiPerfil from '../Pages/MiPerfil.jsx';
 import AlumnoDetalle from '../Pages/AlumnoDetalle.jsx';
 import DocenteDetalle from '../Pages/DocenteDetalle.jsx';
 import PreceptorDetalle from '../Pages/PreceptorDetalle.jsx';
@@ -219,10 +218,6 @@ function AppRoutes() {
           <Route path="espacios-aulicos/gestionar" element={<GestionarReservas />} />
         </Route>
         
-        {/* Mi perfil-> ADMIN, DOCENTE, PRECEPTOR, AUXILIAR */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR', 'ROLE_AUXILIAR']} />}>
-          <Route path="mi-perfil" element={<MiPerfil />} />
-        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/inicio" />} />

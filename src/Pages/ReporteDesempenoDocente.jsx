@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Container, Card, Row, Col, Form, Button, Spinner, Table, Badge, Alert, Accordion } from 'react-bootstrap';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
@@ -17,7 +17,6 @@ import { toast } from 'react-toastify';
 export default function ReporteDesempenoDocente() {
   const { user } = useAuth();
   const token = user?.token;
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const autoGenerar = searchParams.get('auto') === 'true';
   const docenteIdFromUrl = searchParams.get('docenteId');
@@ -25,14 +24,12 @@ export default function ReporteDesempenoDocente() {
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [cursos, setCursos] = useState([]);
   const [materias, setMaterias] = useState([]);
-  const [todasLasMaterias, setTodasLasMaterias] = useState([]); // Todas las materias sin filtrar
   const [cursoId, setCursoId] = useState('');
   const [materiaId, setMateriaId] = useState('');
   const [docenteOpt, setDocenteOpt] = useState(null);
   const [docenteId, setDocenteId] = useState(docenteIdFromUrl || '');
   const [cargando, setCargando] = useState(false);
   const [data, setData] = useState(null);
-  const [showKpis, setShowKpis] = useState(false);
   const printRef = useRef(null);
 
   useEffect(() => {
@@ -44,7 +41,6 @@ export default function ReporteDesempenoDocente() {
           listarMaterias(token).catch(() => [])
         ]);
         setCursos(Array.isArray(cursosList) ? cursosList : []);
-        setTodasLasMaterias(Array.isArray(materiasList) ? materiasList : []);
         setMaterias(Array.isArray(materiasList) ? materiasList : []);
       } catch {
         // silencioso
@@ -56,7 +52,7 @@ export default function ReporteDesempenoDocente() {
   useEffect(() => {
     if (!cursoId) {
       // Si no hay curso seleccionado, mostrar todas las materias
-      setMaterias(todasLasMaterias);
+      // setMaterias(todasLasMaterias); // Eliminado: todasLasMaterias ya no se usa
       setMateriaId('');
       setDocenteOpt(null);
       setDocenteId('');
@@ -83,7 +79,7 @@ export default function ReporteDesempenoDocente() {
         setMaterias([]);
       }
     })();
-  }, [cursoId, token, materiaId, todasLasMaterias]);
+  }, [cursoId, token, materiaId]);
 
   const generar = async () => {
     if (!anio || anio < 2000 || anio > 2100) {
