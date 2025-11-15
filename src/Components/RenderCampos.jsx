@@ -48,14 +48,17 @@ export default function RenderCampos({ campos, data }) {
   return (
     <div className="card p-3 shadow-sm">
       <div className="row">
-        {campos.map((campo) => (
-          <div className="col-md-6 mb-3" key={campo.name}>
-            <label className="form-label fw-bold">{campo.label}:</label>
-            <p className="form-control bg-light">
-              {formatValue(campo, data[campo.name])}
-            </p>
-          </div>
-        ))}
+        {campos.map((campo) => {
+          // No saltamos nada en modo vista, mostramos todo incluyendo skip
+          return (
+            <div className="col-md-6 mb-3" key={campo.name}>
+              <label className="form-label fw-bold">{campo.label}:</label>
+              <p className="form-control bg-light">
+                {formatValue(campo, data[campo.name])}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
