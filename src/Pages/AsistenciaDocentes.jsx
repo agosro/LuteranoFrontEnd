@@ -11,6 +11,7 @@ import { toast } from 'react-toastify';
 import FiltrosAsistencia from '../Components/Asistencia/FiltrosAsistencia';
 import TablaAsistencia from '../Components/Asistencia/TablaAsistencia';
 import ModalEditarAsistencia from '../Components/Asistencia/ModalEditarAsistencia';
+import ConfirmarAccion from '../Components/Modals/ConfirmarAccion';
 
 export default function AsistenciaDocentes() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export default function AsistenciaDocentes() {
   const [presentes, setPresentes] = useState(new Set());
   const [modalEdit, setModalEdit] = useState({ open: false, docente: null, estado: 'TARDE', observacion: '' });
   const [cargando, setCargando] = useState(false);
+  const [confirmarGuardar, setConfirmarGuardar] = useState({ open: false, tipo: '', mensaje: '' });
 
   // Cargar docentes
   useEffect(() => {
@@ -127,19 +129,32 @@ export default function AsistenciaDocentes() {
   // Guardado masivo: recorrer todos los docentes y aplicar upsert según selección rápida
   const handleGuardarMasivo = async () => {
     if (!token || !fecha || docentes.length === 0) return;
+    const presentesIds = Array.from(presentes);
+
+    // Confirmaciones amigables
+    if (presentesIds.length === 0) {
+      setConfirmarGuardar({
+        open: true,
+        tipo: 'sin-presentes',
+        mensaje: 'No seleccionaste ningún docente como presente. Se marcarán todos como AUSENTE. ¿Deseás continuar?',
+      });
+      return;
+    }
+    if (presentesIds.length === docentes.length) {
+      setConfirmarGuardar({
+        open: true,
+        tipo: 'todos-presentes',
+        mensaje: 'Seleccionaste a todos como PRESENTES. ¿Confirmás guardar así?',
+      });
+      return;
+    }
+
+    await ejecutarGuardoDocentesMasivo(presentesIds);
+  };
+
+  const ejecutarGuardoDocentesMasivo = async (presentesIds) => {
     try {
       setCargando(true);
-      const presentesIds = Array.from(presentes);
-
-      // Confirmaciones amigables
-      if (presentesIds.length === 0) {
-        const confirmar = window.confirm('No seleccionaste ningún docente como presente. Se marcarán todos como AUSENTE. ¿Deseás continuar?');
-        if (!confirmar) { setCargando(false); return; }
-      }
-      if (presentesIds.length === docentes.length) {
-        const confirmar = window.confirm('Seleccionaste a todos como PRESENTES. ¿Confirmás guardar así?');
-        if (!confirmar) { setCargando(false); return; }
-      }
 
       // Ejecutar upserts: presentes => PRESENTE; no seleccionados => AUSENTE;
       // Respetar estado puntual existente TARDE/JUSTIFICADO/CON_LICENCIA
@@ -208,6 +223,9 @@ export default function AsistenciaDocentes() {
       <div className="d-flex align-items-center justify-content-center mb-3">
         <h2 className="m-0 text-center">Asistencia de Docentes</h2>
       </div>
+  	  <p className="text-center text-muted mb-4">
+  		Registrá la asistencia diaria de los docentes. Los presentes, ausentes, tarde, justificados y con licencia se guardarán para la fecha seleccionada.
+  	  </p>
 
       <FiltrosAsistencia
         cursos={[]}
@@ -266,6 +284,22 @@ export default function AsistenciaDocentes() {
       />
 
       <div className="mt-2 text-muted">⚠️ Los docentes no seleccionados se guardarán como Ausentes, salvo que estén Justificados.</div>
+
+      <ConfirmarAccion
+        show={confirmarGuardar.open}
+        title={confirmarGuardar.tipo === 'sin-presentes' ? 'Confirmar guardado sin presentes' : 'Confirmar guardado'}
+        message={confirmarGuardar.mensaje}
+        confirmText="Guardar de todas formas"
+        cancelText="Cancelar"
+        confirmBtnClass={confirmarGuardar.tipo === 'todos-presentes' ? 'btn-warning' : 'btn-warning'}
+        onConfirm={async () => {
+          const presentesIds = Array.from(presentes);
+          setConfirmarGuardar({ open: false, tipo: '', mensaje: '' });
+          await ejecutarGuardoDocentesMasivo(presentesIds);
+        }}
+        onClose={() => setConfirmarGuardar({ open: false, tipo: '', mensaje: '' })}
+        loading={cargando}
+      />
     </div>
   );
 }

@@ -136,7 +136,7 @@ export default function MisReservas() {
             <Table striped bordered hover className="mt-3">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>Reserva</th>
                   <th>Curso</th>
                   <th>Espacio</th>
                   <th>Fecha</th>
