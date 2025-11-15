@@ -240,7 +240,7 @@ export default function Actas() {
           <td>${i + 1}</td>
           <td>${nombre || '-'}</td>
           <td>${r.dni ?? '-'}</td>
-          <td>${r.condicion ?? '-'}</td>
+          <td>${r.condicionRinde ?? '-'}</td>
           <td>${r.nota ?? r.notaFinal ?? r.pf ?? '-'}</td>
           <td>${obs || '-'}</td>
         </tr>`);
@@ -418,7 +418,7 @@ export default function Actas() {
                           <td>{i+1}</td>
                           <td>{r.apellidoNombre || `${r.apellido || ''} ${r.nombre || ''}`.trim()}</td>
                           <td>{r.dni ?? '-'}</td>
-                          <td>{r.condicion ?? '-'}</td>
+                          <td>{r.condicionRinde ?? '-'}</td>
                           <td>{r.nota ?? r.notaFinal ?? r.pf ?? '-'}</td>
                           <td>{r.observacion || r.estado || r.estadoFinal || '-'}</td>
                         </tr>

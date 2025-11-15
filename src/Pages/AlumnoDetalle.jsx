@@ -15,6 +15,7 @@ import { listarCursos } from "../Services/CursoService";
 import ModalAsignarTutores from "../Components/Modals/ModalAsignarTutores";
 import { getTituloCurso } from "../utils/cursos";
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
+import { FileText, FileSpreadsheet, BookOpen, Clock } from "lucide-react";
 
 function AlumnoDetalle() {
   const location = useLocation();
@@ -253,37 +254,57 @@ function AlumnoDetalle() {
             content: () => (
               <div>
                 <div className="mb-3">
-                  <h6 className="mb-3">📊 Generar reportes del alumno</h6>
+                  <h6 className="mb-3 d-flex align-items-center gap-2">
+                    <FileText size={20} />
+                    Generar reportes del alumno
+                  </h6>
                   <p className="text-muted small mb-3">
-                    Hacé clic en cualquiera de los botones para ir directamente al reporte con los datos de este alumno ya pre-cargados.
+                    Los reportes se generan automáticamente al hacer clic en el botón.
                   </p>
                   <div className="d-flex gap-3 flex-wrap">
                     <button
                       type="button"
-                      className="btn btn-outline-primary"
-                      onClick={() => navigate('/reportes/legajo-alumno', { 
-                        state: { preselectedAlumnoId: alumno.id } 
-                      })}
+                      className="btn btn-outline-primary d-flex align-items-center gap-2"
+                      onClick={() => {
+                        const url = `/reportes/legajo-alumno?alumnoId=${alumno.id}&auto=true`;
+                        window.open(url, '_blank');
+                      }}
                     >
-                      📄 Generar Legajo del Alumno
+                      <FileText size={18} />
+                      Legajo del Alumno
                     </button>
                     <button
                       type="button"
-                      className="btn btn-outline-success"
-                      onClick={() => navigate('/reportes/notas-alumnos', { 
-                        state: { preselectedAlumnoId: alumno.id } 
-                      })}
+                      className="btn btn-outline-success d-flex align-items-center gap-2"
+                      onClick={() => {
+                        const url = `/reportes/notas-alumnos?alumnoId=${alumno.id}&auto=true`;
+                        window.open(url, '_blank');
+                      }}
                     >
-                      📝 Ver Reporte de Notas
+                      <FileSpreadsheet size={18} />
+                      Reporte de Notas
                     </button>
                     <button
                       type="button"
-                      className="btn btn-outline-secondary"
-                      onClick={() => navigate('/reportes/reporte-anual-alumno', {
-                        state: { preselectedAlumnoId: alumno.id }
-                      })}
+                      className="btn btn-outline-info d-flex align-items-center gap-2"
+                      onClick={() => {
+                        const url = `/reportes/reporte-anual-alumno?alumnoId=${alumno.id}&auto=true`;
+                        window.open(url, '_blank');
+                      }}
                     >
-                      📘 Informe Anual del Alumno
+                      <BookOpen size={18} />
+                      Informe Anual
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary d-flex align-items-center gap-2"
+                      onClick={() => {
+                        const url = `/reportes/historial-alumno?alumnoId=${alumno.id}&auto=true`;
+                        window.open(url, '_blank');
+                      }}
+                    >
+                      <Clock size={18} />
+                      Historial Académico
                     </button>
                   </div>
                 </div>
@@ -291,7 +312,7 @@ function AlumnoDetalle() {
                 <hr className="my-4" />
                 
                 <div className="alert alert-info">
-                  <strong>💡 Tip:</strong> Estos reportes se abrirán en una nueva vista con la información de <strong>{alumno.nombre} {alumno.apellido}</strong> ya seleccionada. Solo tendrás que hacer clic en "Generar" para obtener el reporte.
+                  <strong>💡 Tip:</strong> Los reportes se abrirán en una nueva pestaña y se generarán automáticamente con la información de <strong>{alumno.nombre} {alumno.apellido}</strong>.
                 </div>
               </div>
             ),

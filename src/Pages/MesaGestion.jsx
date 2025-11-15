@@ -42,6 +42,7 @@ export default function MesaGestion() {
   const [convSeleccionados, setConvSeleccionados] = useState(new Set());
   const [convSaving, setConvSaving] = useState(false);
   const [mostrarTodos, setMostrarTodos] = useState(false); // Toggle para mostrar todos vs solo elegibles
+  const [filtroCondicion, setFiltroCondicion] = useState(''); // '' | 'COLOQUIO' | 'EXAMEN'
 
   // Notas
   const [notasEdit, setNotasEdit] = useState({});
@@ -445,7 +446,7 @@ export default function MesaGestion() {
                 </p>
                 <div className="border rounded" style={{maxHeight:300, overflowY:'auto'}}>
                   <Table hover responsive className="mb-0">
-                    <thead><tr><th style={{width:48}}></th><th>Apellido</th><th>Nombre</th><th>Origen</th></tr></thead>
+                    <thead><tr><th style={{width:48}}></th><th>Apellido</th><th>Nombre</th><th>Materia</th><th>Estado</th></tr></thead>
                     <tbody>
                       {docentesTabla.map(d => {
                         const id = Number(d.id);
@@ -453,7 +454,7 @@ export default function MesaGestion() {
                         return (
                           <tr key={id}>
                             <td>
-                              <Form.Check type="checkbox" checked={checked} onChange={(e)=>{
+                              <Form.Check type="checkbox" checked={checked} disabled={mesa?.estado==='FINALIZADA'} onChange={(e)=>{
                                 const next = new Set(docSeleccionados);
                                 if (e.target.checked) next.add(id); else next.delete(id);
                                 setDocSeleccionados(next);
@@ -461,12 +462,17 @@ export default function MesaGestion() {
                             </td>
                             <td>{d.apellido}</td>
                             <td>{d.nombre}</td>
-                            <td>{d.origen}</td>
+                            <td>{d.nombreMateria || '-'}</td>
+                            <td>
+                              <Badge bg={d.origen === 'ASIGNADO' ? 'success' : 'secondary'}>
+                                {d.origen === 'ASIGNADO' ? 'Asignado' : 'Disponible'}
+                              </Badge>
+                            </td>
                           </tr>
                         );
                       })}
                       {docentesTabla.length===0 && (
-                        <tr><td colSpan={4} className="text-center py-3 text-muted">No hay docentes disponibles</td></tr>
+                        <tr><td colSpan={5} className="text-center py-3 text-muted">No hay docentes disponibles</td></tr>
                       )}
                     </tbody>
                   </Table>
@@ -476,6 +482,7 @@ export default function MesaGestion() {
                     variant="primary" 
                     onClick={guardarDocentes} 
                     disabled={
+                      mesa?.estado==='FINALIZADA' ||
                       docSaving || 
                       ((datosForm.tipoMesa || mesa?.tipoMesa || 'EXAMEN') === 'COLOQUIO' ? docSeleccionados.size !== 1 : docSeleccionados.size !== 3)
                     }
@@ -486,14 +493,69 @@ export default function MesaGestion() {
               </Tab>
 
               <Tab eventKey="convocados" title="Convocados">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <p className="text-muted mb-0">Marcá los alumnos a convocar para esta mesa.</p>
-                  <Form.Check 
-                    type="switch"
-                    label="Mostrar todos los alumnos (incluye aprobados)"
-                    checked={mostrarTodos}
-                    onChange={(e) => setMostrarTodos(e.target.checked)}
-                  />
+                <div className="mb-3">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <p className="text-muted mb-0">Marcá los alumnos a convocar para esta mesa.</p>
+                    <Form.Check 
+                      type="switch"
+                      label="Mostrar todos los alumnos (incluye aprobados)"
+                      checked={mostrarTodos}
+                      disabled={mesa?.estado==='FINALIZADA'}
+                      onChange={(e) => setMostrarTodos(e.target.checked)}
+                    />
+                  </div>
+                  <Row className="g-2 align-items-end">
+                    <Col md={4}>
+                      <Form.Group>
+                        <Form.Label>Filtrar por condición</Form.Label>
+                        <Form.Select 
+                          value={filtroCondicion} 
+                          onChange={(e)=> setFiltroCondicion(e.target.value)}
+                          disabled={mesa?.estado==='FINALIZADA'}
+                        >
+                          <option value="">Todos</option>
+                          <option value="COLOQUIO">Coloquio</option>
+                          <option value="EXAMEN">Examen</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={8} className="d-flex gap-2 justify-content-end">
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm"
+                        disabled={mesa?.estado==='FINALIZADA'}
+                        onClick={()=>{
+                          const filtrados = elegibles.filter(al => al.condicion === 'EXAMEN');
+                          const next = new Set(convSeleccionados);
+                          filtrados.forEach(al => next.add(Number(al.id)));
+                          setConvSeleccionados(next);
+                        }}
+                      >
+                        Seleccionar todos Examen
+                      </Button>
+                      <Button 
+                        variant="outline-info" 
+                        size="sm"
+                        disabled={mesa?.estado==='FINALIZADA'}
+                        onClick={()=>{
+                          const filtrados = elegibles.filter(al => al.condicion === 'COLOQUIO');
+                          const next = new Set(convSeleccionados);
+                          filtrados.forEach(al => next.add(Number(al.id)));
+                          setConvSeleccionados(next);
+                        }}
+                      >
+                        Seleccionar todos Coloquio
+                      </Button>
+                      <Button 
+                        variant="outline-secondary" 
+                        size="sm"
+                        disabled={mesa?.estado==='FINALIZADA'}
+                        onClick={()=> setConvSeleccionados(new Set())}
+                      >
+                        Deseleccionar todos
+                      </Button>
+                    </Col>
+                  </Row>
                 </div>
                 <div className="border rounded" style={{maxHeight:360, overflowY:'auto'}}>
                   <Table hover responsive className="mb-0">
@@ -508,7 +570,7 @@ export default function MesaGestion() {
                       </tr>
                     </thead>
                     <tbody>
-                      {elegibles.map(al => {
+                      {elegibles.filter(al => !filtroCondicion || al.condicion === filtroCondicion).map(al => {
                         const id = Number(al.id ?? al.alumnoId);
                         const checked = convSeleccionados.has(id);
                         const estaAprobado = al.estadoAcademico === 'PROMOCIONADO' || al.estadoAcademico === 'APROBADO_MESA';
@@ -518,7 +580,7 @@ export default function MesaGestion() {
                               <Form.Check 
                                 type="checkbox" 
                                 checked={checked} 
-                                disabled={estaAprobado} // Deshabilitar si ya está aprobado
+                                disabled={mesa?.estado==='FINALIZADA' || estaAprobado} // Deshabilitar si ya está aprobado o mesa finalizada
                                 onChange={(e)=>{
                                   const next = new Set(convSeleccionados);
                                   if (e.target.checked) next.add(id); else next.delete(id);
@@ -546,14 +608,16 @@ export default function MesaGestion() {
                           </tr>
                         );
                       })}
-                      {elegibles.length===0 && (
-                        <tr><td colSpan={mostrarTodos ? 6 : 5} className="text-center py-3 text-muted">No hay alumnos {mostrarTodos ? 'registrados' : 'elegibles'}</td></tr>
+                      {elegibles.filter(al => !filtroCondicion || al.condicion === filtroCondicion).length===0 && (
+                        <tr><td colSpan={mostrarTodos ? 6 : 5} className="text-center py-3 text-muted">
+                          No hay alumnos {filtroCondicion ? `con condición ${filtroCondicion}` : (mostrarTodos ? 'registrados' : 'elegibles')}
+                        </td></tr>
                       )}
                     </tbody>
                   </Table>
                 </div>
                 <div className="mt-3">
-                  <Button variant="primary" onClick={guardarConvocados} disabled={convSaving}>Guardar convocados</Button>
+                  <Button variant="primary" onClick={guardarConvocados} disabled={mesa?.estado==='FINALIZADA' || convSaving}>Guardar convocados</Button>
                 </div>
               </Tab>
 

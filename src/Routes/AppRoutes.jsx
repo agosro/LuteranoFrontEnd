@@ -42,6 +42,7 @@ import ReporteNotasAlumnos from '../Pages/ReporteNotasAlumnos.jsx';
 import ReporteNotasCursoMateria from '../Pages/ReporteNotasCursoMateria.jsx';
 import ReporteLegajoAlumno from '../Pages/ReporteLegajoAlumno.jsx';
 import ReporteAnualAlumno from '../Pages/ReporteAnualAlumno.jsx';
+import ReporteHistorialAlumno from '../Pages/ReporteHistorialAlumno.jsx';
 import ReporteAlumnosLibres from '../Pages/ReporteAlumnosLibres.jsx';
 import AsistenciaAlumnos from '../Pages/AsistenciaAlumnos.jsx';
 import AsistenciaDocentes from '../Pages/AsistenciaDocentes.jsx';
@@ -148,6 +149,7 @@ function AppRoutes() {
           <Route path="reportes/alumnos-libres" element={<ReporteAlumnosLibres />} />
           <Route path="reportes/asistencia-perfecta" element={<ReporteAsistenciaPerfecta />} />
           <Route path="reportes/disponibilidad-docente" element={<ReporteDisponibilidadDocente />} />
+          <Route path="reportes/historial-alumno" element={<ReporteHistorialAlumno />} />
         </Route>
 
         {/* Desempeño docente -> ADMIN, DIRECTOR, PRECEPTOR (según backend) */}

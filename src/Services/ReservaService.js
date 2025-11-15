@@ -30,20 +30,17 @@ export async function listarReservas(token) {
 export async function obtenerReservas(token, filtros = {}) {
   void token
   
-  // Construir query params desde el objeto filtros
-  const params = new URLSearchParams();
+  // Construir body con solo los filtros que tienen valor
+  const body = {};
   
-  if (filtros.usuarioId) params.append('usuarioId', filtros.usuarioId);
-  if (filtros.cursoId) params.append('cursoId', filtros.cursoId);
-  if (filtros.espacioAulicoId) params.append('espacioAulicoId', filtros.espacioAulicoId);
-  if (filtros.estado) params.append('estado', filtros.estado);
-  if (filtros.fecha) params.append('fecha', filtros.fecha);
-  if (filtros.moduloId) params.append('moduloId', filtros.moduloId);
+  if (filtros.usuarioId) body.usuarioId = filtros.usuarioId;
+  if (filtros.cursoId) body.cursoId = filtros.cursoId;
+  if (filtros.espacioAulicoId) body.espacioAulicoId = filtros.espacioAulicoId;
+  if (filtros.estado) body.estado = filtros.estado;
+  if (filtros.fecha) body.fecha = filtros.fecha;
+  if (filtros.moduloId) body.moduloId = filtros.moduloId;
   
-  const queryString = params.toString();
-  const url = queryString ? `/reservas/filtros?${queryString}` : '/reservas/filtros';
-  
-  const data = await httpClient.get(url);
+  const data = await httpClient.post('/reservas/filtros', body);
   if (data.code < 0) throw new Error(data.mensaje || 'Error al obtener reservas');
   return data;
 }

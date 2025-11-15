@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useMemo } from "react";
+import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { Card, Button, Form, Row, Col, Spinner, Alert, Table, Accordion } from "react-bootstrap";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { BarChart3 } from 'lucide-react';
@@ -6,14 +6,18 @@ import AsyncDocenteSelect from "../Components/Controls/AsyncDocenteSelect";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
+import { useSearchParams } from "react-router-dom";
 import { obtenerDisponibilidadDocente } from "../Services/ReporteDisponibilidadService";
 
 export default function ReporteDisponibilidadDocente() {
   const { user } = useAuth();
   const token = user?.token;
+  const [searchParams] = useSearchParams();
+  const autoGenerar = searchParams.get('auto') === 'true';
+  const docenteIdFromUrl = searchParams.get('docenteId');
 
   const [docenteOpt, setDocenteOpt] = useState(null);
-  const [docenteId, setDocenteId] = useState("");
+  const [docenteId, setDocenteId] = useState(docenteIdFromUrl || "");
   const [data, setData] = useState(null); // DocenteDisponibilidadDto
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -44,6 +48,27 @@ export default function ReporteDisponibilidadDocente() {
       setLoading(false);
     }
   };
+
+  // Auto-generar cuando viene de URL
+  useEffect(() => {
+    if (autoGenerar && docenteIdFromUrl && token && !data && !loading) {
+      const generarAuto = async () => {
+        setError("");
+        setData(null);
+        try {
+          setLoading(true);
+          const res = await obtenerDisponibilidadDocente(token, docenteIdFromUrl);
+          if (res?.code && res.code < 0) setError(res.mensaje || "Error en el reporte");
+          setData(res?.data || null);
+        } catch (err) {
+          setError(err.message || "Error al generar reporte");
+        } finally {
+          setLoading(false);
+        }
+      };
+      generarAuto();
+    }
+  }, [autoGenerar, docenteIdFromUrl, token, data, loading]);
 
   // Construir filas de horario a partir de agenda (union de bloques por (desde,hasta))
   const timeRows = useMemo(() => {

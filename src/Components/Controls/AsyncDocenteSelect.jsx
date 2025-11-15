@@ -8,14 +8,25 @@ export default function AsyncDocenteSelect({
   onChange,
   placeholder = "Seleccioná un docente",
   disabled = false,
+  docentesList = null, // Optional: filtered list of docentes
 }) {
   const [docentes, setDocentes] = useState([]);
   const [filteredDocentes, setFilteredDocentes] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Cargar todos los docentes al inicio
+  // Cargar todos los docentes al inicio o usar lista filtrada
   useEffect(() => {
+    // Si se proporciona una lista filtrada, usarla directamente
+    if (docentesList !== null) {
+      const lista = Array.isArray(docentesList) ? docentesList : [];
+      setDocentes(lista);
+      setFilteredDocentes(lista.slice(0, 20));
+      setLoading(false);
+      return;
+    }
+
+    // De lo contrario, cargar todos los docentes
     let active = true;
     async function loadDocentes() {
       try {
@@ -41,7 +52,7 @@ export default function AsyncDocenteSelect({
     }
 
     return () => { active = false; };
-  }, [token]);
+  }, [token, docentesList]);
 
   // Función para normalizar texto (quitar tildes)
   const normalizeText = (text) => {
