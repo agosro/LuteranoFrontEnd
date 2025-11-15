@@ -32,6 +32,7 @@ export const listarDocentesAsignados = async (token, mesaId) => {
     apellido: d.apellidoDocente,
     nombre: d.nombreDocente,
     nombreCompleto: d.nombreCompleto,
+    nombreMateria: d.nombreMateria,
     esDocenteMateria: !!d.esDocenteMateria,
   }))
 };

@@ -326,8 +326,19 @@ export default function MesaGestion() {
 
   const docentesTabla = useMemo(() => {
     const asignadosIds = new Set(docAsignados.map(d => Number(d.id)));
+    // Crear mapa de docentes disponibles para obtener nombreMateria
+    const disponiblesMap = new Map(docDisponibles.map(d => [Number(d.id), d]));
+    
     const combinados = [
-      ...docAsignados.map(d => ({ ...d, origen: 'ASIGNADO' })),
+      ...docAsignados.map(d => {
+        // Si el docente asignado no tiene nombreMateria, intenta obtenerlo del disponibles
+        const docDisp = disponiblesMap.get(Number(d.id));
+        return { 
+          ...d, 
+          nombreMateria: d.nombreMateria || docDisp?.nombreMateria || '-',
+          origen: 'ASIGNADO' 
+        };
+      }),
       ...docDisponibles.filter(d => !asignadosIds.has(Number(d.id))).map(d => ({ ...d, origen: 'DISPONIBLE' })),
     ];
     return combinados;

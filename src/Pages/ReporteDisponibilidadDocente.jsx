@@ -96,6 +96,8 @@ export default function ReporteDisponibilidadDocente() {
     const dia = (data?.agenda || []).find(x => String(x?.dia) === String(diaKey));
     if (!dia) return null;
     const bloque = (dia?.bloques || []).find(b => String(b?.horaDesde) === String(desde) && String(b?.horaHasta) === String(hasta));
+    // Si el bloque existe pero está marcado como libre (estaLibre: true), retornar null
+    if (bloque && bloque.estaLibre === true) return null;
     return bloque || null;
   }, [data]);
 
@@ -195,6 +197,8 @@ export default function ReporteDisponibilidadDocente() {
     const map = new Map();
     (data?.agenda || []).forEach(dia => {
       (dia?.bloques || []).forEach(b => {
+        // Ignorar bloques libres
+        if (b?.estaLibre === true) return;
         const materia = b?.materiaNombre;
         const cursoLbl = `${b?.cursoAnio ?? ''} ${b?.cursoDivision ?? ''}`.trim();
         if (materia) {
@@ -503,6 +507,8 @@ export default function ReporteDisponibilidadDocente() {
                   const map = new Map();
                   (data?.agenda || []).forEach(dia => {
                     (dia?.bloques || []).forEach(b => {
+                      // Ignorar bloques libres
+                      if (b?.estaLibre === true) return;
                       const materia = b?.materiaNombre;
                       const cursoLbl = `${b?.cursoAnio ?? ''} ${b?.cursoDivision ?? ''}`.trim();
                       if (materia) {
