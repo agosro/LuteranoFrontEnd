@@ -9,14 +9,16 @@ export default function ModalVerEntidad({ show, onClose, datos, campos, titulo, 
   if (!show || !datos) return null;
 
   const handleVerDetalle = (e) => {
+    e.preventDefault();
     const url = `/${detallePathBase}/${datos.id}`;
     
-    // Click con rueda del mouse (button === 1) o Ctrl+Click
+    // Click con rueda del mouse (button === 1) o Ctrl+Click o click derecho "abrir en nueva pestaña"
     if (e.button === 1 || e.ctrlKey || e.metaKey) {
+      e.stopPropagation();
       window.open(url, '_blank');
     } else {
-      // Click normal (button === 0)
-      navigate(url);
+      // Click normal (button === 0) - pasar datos completos en el state
+      navigate(url, { state: datos });
       onClose();
     }
   };
@@ -35,9 +37,10 @@ export default function ModalVerEntidad({ show, onClose, datos, campos, titulo, 
             type="button"
             className="btn btn-link"
             onClick={handleVerDetalle}
-            onMouseUp={handleVerDetalle}
+            onMouseDown={handleVerDetalle}
+            onAuxClick={handleVerDetalle}
             style={{ cursor: 'pointer' }}
-            title="Click normal: abre aquí | Rueda del mouse: abre en nueva pestaña"
+            title="Click normal: abre aquí | Rueda del mouse o Ctrl+Click: abre en nueva pestaña"
           >
             Ver detalle completo →
           </button>

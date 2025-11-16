@@ -355,7 +355,13 @@ export default function ListaCursos() {
       <ModalEditarEntidad
         show={modalEditarShow}
         onClose={cerrarModalEditar}
-        campos={camposCurso(false, aulasOptions, materiasOptions, true)}
+        campos={(() => {
+          // Remover el campo 'materias' del array de campos para el modal de edición
+          const campos = camposCurso(false, aulasOptions, materiasOptions, true);
+          return Array.isArray(campos)
+            ? campos.filter(c => c.name !== "materias")
+            : campos;
+        })()}
         formData={formData}
         onInputChange={handleInputChange}
         onSubmit={handleUpdate}

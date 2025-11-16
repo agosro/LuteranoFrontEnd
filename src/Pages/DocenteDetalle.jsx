@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import TablaDetalle from "../Components/TablaDetalles";
 import RenderCampos from "../Components/RenderCampos";
 import RenderCamposEditable from "../Components/RenderCamposEditables";
 import { camposDocente } from "../Entidades/camposDocente";
-import { editarDocente } from "../Services/DocenteService"; // 👈 tu service
+import { editarDocente, listarDocentes } from "../Services/DocenteService";
 import { useAuth } from "../Context/AuthContext";
 import { toast } from "react-toastify";
 import { inputLocalToBackendISO } from "../utils/fechas";
@@ -12,12 +12,49 @@ import { Calendar, BarChart3 } from "lucide-react";
 
 export default function DocenteDetalle() {
   const location = useLocation();
-  const docente = location.state;
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const docenteState = location.state;
   const { user } = useAuth();
 
-  const [formData, setFormData] = useState(docente || {});
+  const [docente, setDocente] = useState(docenteState || null);
+  const [formData, setFormData] = useState(docenteState || {});
+  const [loadingDocente, setLoadingDocente] = useState(true);
 
-  if (!docente) return <p>Cargando...</p>;
+  // Cargar docente si no viene en el state
+  useEffect(() => {
+    const fetchDocente = async () => {
+      if (!user?.token) return;
+      try {
+        setLoadingDocente(true);
+        const lista = await listarDocentes(user.token);
+        const d = (lista || []).find(x => String(x.id) === String(id)) || null;
+        if (d) {
+          setDocente(d);
+          setFormData(d);
+        } else if (docenteState) {
+          setDocente(docenteState);
+          setFormData(docenteState);
+        } else {
+          toast.error("Docente no encontrado");
+          navigate("/docentes");
+        }
+      } catch (e) {
+        console.error(e);
+        toast.error(e.message || "Error cargando docente");
+        if (docenteState) {
+          setDocente(docenteState);
+          setFormData(docenteState);
+        }
+      } finally {
+        setLoadingDocente(false);
+      }
+    };
+    fetchDocente();
+  }, [user?.token, id, docenteState, navigate]);
+
+  if (loadingDocente) return <p>Cargando...</p>;
+  if (!docente) return <p>Docente no encontrado</p>;
 
   const handleSave = async () => {
     try {
