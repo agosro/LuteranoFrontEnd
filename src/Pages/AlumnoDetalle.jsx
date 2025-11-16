@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TablaDetalle from "../Components/TablaDetalles";
 import RenderCampos from "../Components/RenderCampos";
 import { camposAlumno } from "../Entidades/camposAlumno";
-import { editarAlumno } from "../Services/AlumnoService";
+import { editarAlumno, listarAlumnos } from "../Services/AlumnoService";
 import { useAuth } from "../Context/AuthContext";
 import { toast } from "react-toastify";
 import RenderCamposEditable from "../Components/RenderCamposEditables";
@@ -20,11 +20,14 @@ import { FileText, FileSpreadsheet, BookOpen, Clock } from "lucide-react";
 function AlumnoDetalle() {
   const location = useLocation();
   const navigate = useNavigate();
-  const alumno = location.state;
+  const { id } = useParams();
+  const alumnoState = location.state;
   const { user } = useAuth();
   const { cicloLectivo } = useCicloLectivo();
 
-  const [formData, setFormData] = useState(alumno || {});
+  const [alumno, setAlumno] = useState(alumnoState || null);
+  const [formData, setFormData] = useState(alumnoState || {});
+  const [loadingAlumno, setLoadingAlumno] = useState(true);
   const [historial, setHistorial] = useState([]);
   const [histLoading, setHistLoading] = useState(true);
   const [histError, setHistError] = useState("");
@@ -37,6 +40,39 @@ function AlumnoDetalle() {
   const [showAsignarCurso, setShowAsignarCurso] = useState(false);
   // Tutores: modal y gestión multi
   const [showTutoresModal, setShowTutoresModal] = useState(false);
+
+  // Cargar alumno si no viene en el state (cuando se abre en nueva pestaña)
+  useEffect(() => {
+    const fetchAlumno = async () => {
+      if (!user?.token) return;
+      try {
+        setLoadingAlumno(true);
+        const lista = await listarAlumnos(user.token);
+        const a = (lista || []).find(x => String(x.id) === String(id)) || null;
+        if (a) {
+          setAlumno(a);
+          setFormData(a);
+        } else if (alumnoState) {
+          // fallback al state si no se encontró en el listado
+          setAlumno(alumnoState);
+          setFormData(alumnoState);
+        } else {
+          toast.error("Alumno no encontrado");
+          navigate("/alumnos/filtro");
+        }
+      } catch (e) {
+        console.error(e);
+        toast.error(e.message || "Error cargando alumno");
+        if (alumnoState) {
+          setAlumno(alumnoState);
+          setFormData(alumnoState);
+        }
+      } finally {
+        setLoadingAlumno(false);
+      }
+    };
+    fetchAlumno();
+  }, [user?.token, id, alumnoState, navigate]);
 
   // Historial completo
   useEffect(() => {
@@ -101,7 +137,8 @@ function AlumnoDetalle() {
 
   // ya no se cargan todos los tutores; se buscan desde el modal con debounce
 
-  if (!alumno) return <p>Cargando...</p>;
+  if (loadingAlumno) return <p>Cargando...</p>;
+  if (!alumno) return <p>Alumno no encontrado</p>;
 
   const handleSave = async () => {
     try {

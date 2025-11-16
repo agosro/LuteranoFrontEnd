@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useParams, Link } from "react-router-dom";
+import { useLocation, useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
 import TablaDetalle from "../Components/TablaDetalles";
 import RenderCampos from "../Components/RenderCampos";
@@ -20,12 +20,14 @@ const DIAS_SEMANA = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
 export default function CursoDetalle() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const cursoState = location.state;
   const { user } = useAuth();
   const token = user?.token;
 
   const [curso, setCurso] = useState(cursoState || null);
   const [formData, setFormData] = useState(cursoState || {});
+  const [loadingCurso, setLoadingCurso] = useState(true);
   const [aulasOptions, setAulasOptions] = useState([]);
   const [aulasLibresOptions, setAulasLibresOptions] = useState([]);
   const [preceptor, setPreceptor] = useState(cursoState?.preceptor || null);
@@ -50,6 +52,7 @@ export default function CursoDetalle() {
 
     const cargarDatos = async () => {
       try {
+        setLoadingCurso(true);
         // Aulas para selects (todas y libres)
         const aulas = await listarAulas(token);
         const opcionesTodas = (aulas || []).map(a => ({ value: a.id, label: a.nombre }));
@@ -66,34 +69,53 @@ export default function CursoDetalle() {
         // Si no vino por state, obtener por id
         if (!cursoState && id) {
           const data = await obtenerCursoPorId(token, id);
-          const c = data?.cursoDto || data; // tolerar distintos formatos
-          setCurso(c);
-          setFormData({
-            id: c?.id,
-            anio: c?.anio,
-            division: c?.division,
-            nivel: c?.nivel,
-            aulaId: (() => {
-              const raw = c?.aula?.id ?? c?.aulaId;
-              const num = Number(raw);
-              return Number.isFinite(num) ? num : "";
-            })(),
-          });
-          // Resolver preceptor si viene el id
-          try {
-            setPreceptorLoading(true);
-            const preceptorId = c?.preceptorId || c?.preceptor?.id;
-            if (preceptorId) {
-              const lista = await listarPreceptores(token);
-              const p = (lista || []).find(x => x.id === preceptorId) || c?.preceptor || null;
-              setPreceptor(p);
-            } else {
-              setPreceptor(c?.preceptor || null);
+          const rawCurso = data?.cursoDto || data?.curso || data;
+          
+          if (rawCurso && rawCurso.id) {
+            // Normalizar el objeto curso para que tenga la estructura esperada
+            const cursoNormalizado = {
+              id: rawCurso.id,
+              anio: rawCurso.anio,
+              division: rawCurso.division,
+              nivel: rawCurso.nivel,
+              aula: rawCurso.aula || null,
+              aulaId: rawCurso.aula?.id || rawCurso.aulaId || null,
+              aulaNombre: rawCurso.aula?.nombre || rawCurso.aulaNombre || "",
+              preceptorId: rawCurso.preceptorId || rawCurso.preceptor?.id || null,
+              preceptor: rawCurso.preceptor || null,
+            };
+            
+            setCurso(cursoNormalizado);
+            setFormData({
+              id: cursoNormalizado.id,
+              anio: cursoNormalizado.anio,
+              division: cursoNormalizado.division,
+              nivel: cursoNormalizado.nivel,
+              aulaId: (() => {
+                const raw = cursoNormalizado.aula?.id ?? cursoNormalizado.aulaId;
+                const num = Number(raw);
+                return Number.isFinite(num) ? num : "";
+              })(),
+            });
+            // Resolver preceptor si viene el id
+            try {
+              setPreceptorLoading(true);
+              const preceptorId = cursoNormalizado.preceptorId;
+              if (preceptorId) {
+                const lista = await listarPreceptores(token);
+                const p = (lista || []).find(x => x.id === preceptorId) || cursoNormalizado.preceptor || null;
+                setPreceptor(p);
+              } else {
+                setPreceptor(cursoNormalizado.preceptor || null);
+              }
+            } catch {
+              // silencioso
+            } finally {
+              setPreceptorLoading(false);
             }
-          } catch {
-            // silencioso
-          } finally {
-            setPreceptorLoading(false);
+          } else {
+            toast.error("Curso no encontrado");
+            navigate("/cursos");
           }
         } else if (cursoState) {
           setCurso(cursoState);
@@ -145,12 +167,17 @@ export default function CursoDetalle() {
       } catch (e) {
         console.error(e);
         toast.error(e.message || "Error cargando curso");
+        if (!cursoState) {
+          navigate("/cursos");
+        }
+      } finally {
+        setLoadingCurso(false);
       }
     };
 
     cargarDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, id]);
+  }, [token, id, navigate]);
 
   // Cargar alumnos del curso (ciclo lectivo activo 1 por ahora)
   useEffect(() => {
@@ -246,6 +273,9 @@ export default function CursoDetalle() {
 
   const titulo = curso ? `Curso ${getTituloCurso(curso)}` : "Curso";
 
+  if (loadingCurso) return <p>Cargando...</p>;
+  if (!curso) return <p>Curso no encontrado</p>;
+
   return (
     <TablaDetalle
       titulo={titulo}
@@ -259,10 +289,7 @@ export default function CursoDetalle() {
           content: (modoEditar) =>
             !modoEditar ? (
               <>
-                {!curso ? (
-                  <p>Cargando datos del curso...</p>
-                ) : (
-                  <RenderCampos
+                <RenderCampos
                   campos={camposCurso(true, aulasOptions, [], false)}
                   data={{
                     anio: curso?.anio,
@@ -276,7 +303,6 @@ export default function CursoDetalle() {
                     })(),
                   }}
                 />
-                )}
 
                 {/* Preceptor a cargo */}
                 <div className="card p-3 shadow-sm mt-3">

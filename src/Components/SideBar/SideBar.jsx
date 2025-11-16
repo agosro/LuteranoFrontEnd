@@ -30,8 +30,7 @@ export default function SidebarLayout() {
   };
 
   return (
-    <div className="sidebar d-flex flex-column bg-dark text-white p-3">
-      
+    <div className="sidebar d-flex flex-column bg-dark text-white p-3" style={{height: '100vh', overflowY: 'auto'}}>
       {/* 🔹 Header de usuario */}
       <div className="user-header text-center mb-4 pt-4">
         <img
@@ -101,7 +100,6 @@ export default function SidebarLayout() {
 
       {/* Logout */}
       <div className="mt-auto pt-3 border-top">
-
         <button
           className="menu-link btn-logout w-100 text-start"
           onClick={logout}
