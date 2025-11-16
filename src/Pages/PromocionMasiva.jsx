@@ -13,11 +13,12 @@ export default function PromocionMasiva() {
   const token = user?.token;
   const rol = user?.rol;
   const { cicloLectivo } = useCicloLectivo();
+  const anioActual = new Date().getFullYear();
 
   const [form, setForm] = useState({
-    anio: new Date().getFullYear(),
+    anio: anioActual,
     cicloLectivoId: 0,
-    procesarEgresados: true,
+    cicloLectivoNombre: '',
     maxRepeticiones: 2,
     dryRun: false,
   });
@@ -25,9 +26,13 @@ export default function PromocionMasiva() {
   // Sincronizar ciclo desde contexto
   useEffect(() => {
     if (cicloLectivo?.id) {
-      setForm((v) => ({ ...v, cicloLectivoId: Number(cicloLectivo.id) }));
+      setForm((v) => ({
+        ...v,
+        cicloLectivoId: Number(cicloLectivo.id),
+        cicloLectivoNombre: cicloLectivo.nombre || '',
+      }));
     }
-  }, [cicloLectivo?.id]);
+  }, [cicloLectivo?.id, cicloLectivo?.nombre]);
 
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -47,11 +52,6 @@ export default function PromocionMasiva() {
     try {
       // Validaciones mínimas
       const anio = Number(form.anio);
-      if (!anio || anio < 2020 || anio > 2030) {
-        toast.error('El año debe estar entre 2020 y 2030');
-        setCargando(false);
-        return;
-      }
       const cicloId = Number(form.cicloLectivoId);
       if (!cicloId) {
         toast.error('Debe indicar un ciclo lectivo');
@@ -61,7 +61,6 @@ export default function PromocionMasiva() {
       const payload = {
         anio: anio,
         cicloLectivoId: cicloId,
-        procesarEgresados: !!form.procesarEgresados,
         maxRepeticiones: Math.min(5, Math.max(1, Number(form.maxRepeticiones) || 2)),
         dryRun: !!form.dryRun,
       };
@@ -121,13 +120,13 @@ export default function PromocionMasiva() {
             <Col md={2} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Año</Form.Label>
-                <Form.Control type="number" min={2020} max={2030} value={form.anio} onChange={handleChange('anio')} />
+                <Form.Control type="number" value={form.anio} disabled />
               </Form.Group>
             </Col>
             <Col md={3} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Ciclo lectivo</Form.Label>
-                <Form.Control type="number" value={form.cicloLectivoId} onChange={handleChange('cicloLectivoId')} disabled />
+                <Form.Control type="text" value={form.cicloLectivoNombre} disabled />
               </Form.Group>
             </Col>
             <Col md={3} sm={6} xs={12}>
@@ -146,18 +145,7 @@ export default function PromocionMasiva() {
                 />
               </Form.Group>
             </Col>
-            <Col md={2} sm={6} xs={12}>
-              <Form.Group className="mt-2">
-                <Form.Label className="invisible">Espaciador</Form.Label>
-                <Form.Check
-                  type="switch"
-                  id="procesarEgresados"
-                  label="Incluir egresados"
-                  checked={form.procesarEgresados}
-                  onChange={handleChange('procesarEgresados')}
-                />
-              </Form.Group>
-            </Col>
+
             <Col md={2} sm={6} xs={12}>
               <Form.Group className="mt-2">
                 <Form.Label className="invisible">Espaciador</Form.Label>
@@ -275,14 +263,13 @@ export default function PromocionMasiva() {
         message={(
           <div>
             <p className="mb-2">
-              Estás a punto de ejecutar la promoción masiva de alumnos para el año {String(form.anio)} en el ciclo lectivo {String(form.cicloLectivoId)}.
+              Estás a punto de ejecutar la promoción masiva de alumnos para el año {String(form.anio)} en el ciclo lectivo {String(form.cicloLectivoNombre)}.
             </p>
             <div className="mb-2 small text-muted">
               <div><strong>Parámetros:</strong></div>
               <ul className="mb-0">
                 <li>Año: {String(form.anio)}</li>
-                <li>Ciclo lectivo ID: {String(form.cicloLectivoId)}</li>
-                <li>Incluir egresados: {form.procesarEgresados ? 'Sí' : 'No'}</li>
+                <li>Ciclo lectivo: {String(form.cicloLectivoNombre)}</li>
                 <li>Máx. repeticiones: {String(form.maxRepeticiones)}</li>
                 <li>Modo: Ejecución real (no dry-run)</li>
               </ul>
