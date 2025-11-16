@@ -124,7 +124,7 @@ export default function FiltroAlumnosPage() {
         show={modalCrearShow}
         onClose={cerrarModalCrear}
         campos={[
-          ...camposAlumno(false, true),
+          ...camposAlumno(false, true).filter(c => c.name !== 'estado'),
           { name: "cursoActual", label: "Curso", type: "select", opciones: cursosOptions, required: true },
           {
             name: "tutores",
