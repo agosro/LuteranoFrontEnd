@@ -300,7 +300,7 @@ export default function ReporteAlumnosLibres() {
       <Breadcrumbs />
       <div className="mb-2"><BackButton /></div>
       <div className="d-flex align-items-center justify-content-center mb-3">
-        <h2 className="m-0 text-center">Reporte de Alumnos Libres</h2>
+        <h2 className="m-0 text-center">Reporte de Alumnos Libres por Inasistencias</h2>
       </div>
       <p className="text-muted mb-3 text-center">
         Este reporte lista alumnos que han perdido su condición de regularidad por haber superado el límite de 25 inasistencias. 

@@ -28,8 +28,10 @@ export default function ReporteLegajoAlumno() {
   const [anioEgreso, setAnioEgreso] = useState(new Date().getFullYear());
   // DNI search integrado en AsyncAlumnoSelect
 
-  // Filtro opcional por curso/división
+  // Filtro opcional por curso año/división
   const [cursos, setCursos] = useState([]);
+  const [cursoAnioSel, setCursoAnioSel] = useState("");
+  const [divisionSel, setDivisionSel] = useState("");
   const [cursoId, setCursoId] = useState("");
   const [loadingCursos, setLoadingCursos] = useState(false);
 
@@ -106,6 +108,26 @@ export default function ReporteLegajoAlumno() {
     if (token) loadCursos();
     return () => { active = false; };
   }, [token]);
+
+  // Derivar opciones de año y división a partir de cursos
+  const aniosCursoOptions = useMemo(() => {
+    return [...new Set(cursos.map(c => c.anio).filter(Boolean))].sort();
+  }, [cursos]);
+
+  const divisionesOptions = useMemo(() => {
+    if (!cursoAnioSel) return [];
+    return [...new Set(cursos.filter(c => c.anio === Number(cursoAnioSel)).map(c => c.division).filter(Boolean))].sort();
+  }, [cursos, cursoAnioSel]);
+
+  // Cuando cambian año y división, calcular cursoId
+  useEffect(() => {
+    if (cursoAnioSel && divisionSel) {
+      const curso = cursos.find(c => c.anio === Number(cursoAnioSel) && c.division === divisionSel);
+      setCursoId(curso?.id || "");
+    } else {
+      setCursoId("");
+    }
+  }, [cursos, cursoAnioSel, divisionSel]);
 
   // Al cambiar curso, traer alumnos de ese curso (opcional)
   useEffect(() => {
@@ -274,41 +296,75 @@ export default function ReporteLegajoAlumno() {
                 )}
               </Col>
               {!incluirEgresados && (
-                <Col md={3}>
-                  <Form.Label>Curso (opcional)</Form.Label>
-                  <Form.Select 
-                    value={cursoId} 
-                    onChange={(e)=>setCursoId(e.target.value)} 
-                    disabled={loadingCursos}
-                    style={{ height: '38px', padding: '0.375rem 2.25rem 0.375rem 0.75rem' }}
-                  >
-                    <option value="">Todos</option>
-                    {cursos.map(c => (
-                      <option key={c.id} value={c.id}>{getTituloCurso(c) || c.nombre || `${c.anio||''} ${c.division||''}`}</option>
-                    ))}
-                  </Form.Select>
-                </Col>
+                <>
+                  <Col md={2}>
+                    <Form.Label>Año (opcional)</Form.Label>
+                    <Form.Select 
+                      value={cursoAnioSel} 
+                      onChange={(e)=>setCursoAnioSel(e.target.value)}
+                      disabled={loadingCursos}
+                      style={{ height: '38px', padding: '0.375rem 2.25rem 0.375rem 0.75rem' }}
+                    >
+                      <option value="">Todos</option>
+                      {aniosCursoOptions.map(an => (
+                        <option key={an} value={an}>{an}</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label>División (opcional)</Form.Label>
+                    <Form.Select 
+                      value={divisionSel} 
+                      onChange={(e)=>setDivisionSel(e.target.value)}
+                      disabled={!cursoAnioSel || loadingCursos}
+                      style={{ height: '38px', padding: '0.375rem 2.25rem 0.375rem 0.75rem' }}
+                    >
+                      <option value="">Todas</option>
+                      {divisionesOptions.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                </>
               )}
-              <Col md={incluirEgresados ? 8 : 5}>
+              <Col md={incluirEgresados ? 8 : 4}>
                 <Form.Label>Alumno</Form.Label>
                 <AsyncAlumnoSelect
                   token={token}
                   value={alumnoOption}
                   onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
+                  cursoAnio={incluirEgresados ? "" : cursoAnioSel}
+                  cursoDivision={incluirEgresados ? "" : divisionSel}
                   cursoId={incluirEgresados ? "" : cursoId}
                   alumnosExternos={incluirEgresados ? alumnos : null}
                 />
               </Col>
-              <Col md={2}>
+              <Col md={2} className="d-flex gap-2">
                 <Button 
                   type="submit" 
                   variant="primary" 
                   disabled={loading} 
-                  className="w-100"
+                  className="flex-grow-1"
                   style={{ height: '38px', padding: '0.375rem 0.75rem' }}
                 >
                   {loading ? <><Spinner size="sm" animation="border" className="me-2"/>Generando...</> : "Generar"}
                 </Button>
+                {!incluirEgresados && (cursoAnioSel || divisionSel || alumnoOption) && (
+                  <Button 
+                    variant="outline-secondary" 
+                    size="sm"
+                    onClick={() => {
+                      setCursoAnioSel("");
+                      setDivisionSel("");
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }}
+                    title="Limpiar filtros"
+                    style={{ height: '38px' }}
+                  >
+                    Limpiar
+                  </Button>
+                )}
               </Col>
             </Row>
           </Form>

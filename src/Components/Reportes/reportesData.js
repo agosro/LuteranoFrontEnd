@@ -26,8 +26,8 @@ const reportes = [
   },
   {
     id: 2,
-    titulo: "Alumnos Libres",
-    descripcion: "Identificá qué alumnos perdieron la regularidad por inasistencias o desaprobación, con detalles de cada materia.",
+    titulo: "Alumnos Libres por Inasistencias",
+    descripcion: "Identificá qué alumnos perdieron la regularidad por inasistencias.",
     categoria: "Alumnos",
     ruta: "/reportes/alumnos-libres",
     roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteLibresController
