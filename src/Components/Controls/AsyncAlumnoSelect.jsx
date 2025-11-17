@@ -9,6 +9,8 @@ export default function AsyncAlumnoSelect({
   value,
   onChange,
   cursoId = "",
+  cursoAnio = null,
+  cursoDivision = null,
   placeholder,
   disabled = false,
   alumnosExternos = null, // Lista externa de alumnos (opcional)
@@ -18,7 +20,8 @@ export default function AsyncAlumnoSelect({
   const [filteredAlumnos, setFilteredAlumnos] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState(null);
+  const [lastSearchText, setLastSearchText] = useState(""); // Para evitar búsquedas repetidas
+  const searchTimeoutRef = useRef(null);
 
   const alumnosCursoCache = useRef({});
 
@@ -34,12 +37,11 @@ export default function AsyncAlumnoSelect({
     }
   }, [alumnosExternos]);
 
-  // Buscar alumnos solo cuando el usuario escribe al menos 2 caracteres
+  // Buscar alumnos solo cuando el usuario presiona Enter o hace focus en el select
   useEffect(() => {
     if (alumnosExternos) return;
     if (!token) return;
 
-    // Si hay cursoId, buscar por curso (comportamiento anterior)
     if (cursoId) {
       let active = true;
       async function loadAlumnosCurso() {
@@ -69,42 +71,132 @@ export default function AsyncAlumnoSelect({
       loadAlumnosCurso();
       return () => { active = false; };
     }
+    // No buscar automáticamente por texto
+    setAlumnos([]);
+    setFilteredAlumnos([]);
+    setLoading(false);
+  }, [token, cursoId, cicloLectivo?.id, alumnosExternos]);
 
-    // Si no hay texto suficiente, limpiar lista
-    if (!searchText || searchText.trim().length < 2) {
+  // Handler para buscar alumnos manualmente
+  const buscarAlumnos = useCallback(async () => {
+    if (alumnosExternos || !token) return;
+    const texto = searchText.trim();
+    
+    // Si no hay texto ni filtros de curso, no buscar
+    if (!texto && !cursoAnio) {
       setAlumnos([]);
       setFilteredAlumnos([]);
       setLoading(false);
       return;
     }
-
-    // Debounce la búsqueda
-    if (searchTimeout) clearTimeout(searchTimeout);
+    
+    // Crear clave de caché que incluya todos los filtros
+    const cacheKey = `${cursoAnio || ''}_${cursoDivision || ''}_${texto}`;
+    
+    // No buscar si ya se buscó exactamente esto
+    if (cacheKey === lastSearchText && alumnos.length > 0) {
+      return;
+    }
+    
     setLoading(true);
-    const timeout = setTimeout(async () => {
-      try {
-        const filtros = {
-          nombre: searchText,
-          apellido: searchText,
-          dni: searchText,
-        };
-        const lista = await listarAlumnosConFiltros(token, filtros);
-        setAlumnos(Array.isArray(lista) ? lista : []);
-        setFilteredAlumnos(Array.isArray(lista) ? lista : []);
-      } catch {
-        setAlumnos([]);
-        setFilteredAlumnos([]);
-      } finally {
-        setLoading(false);
+    setLastSearchText(cacheKey);
+    
+    try {
+      let allAlumnos = [];
+      
+      // Filtros comunes (año y división del curso)
+      const filtrosBase = {};
+      if (cursoAnio) {
+        filtrosBase.anio = Number(cursoAnio);
       }
-    }, 400);
-    setSearchTimeout(timeout);
-    return () => clearTimeout(timeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText, token, cursoId, cicloLectivo?.id, alumnosExternos]);
+      if (cursoDivision) {
+        filtrosBase.division = cursoDivision;
+      }
+      
+      if (!texto) {
+        // Solo filtros de año/división, sin texto de búsqueda
+        const lista = await listarAlumnosConFiltros(token, filtrosBase);
+        allAlumnos = Array.isArray(lista) ? lista : [];
+      } else if (/^\d+$/.test(texto)) {
+        // Si es número, filtrar solo por DNI
+        const lista = await listarAlumnosConFiltros(token, { ...filtrosBase, dni: texto });
+        allAlumnos = Array.isArray(lista) ? lista : [];
+      } else {
+        // Si es texto, hacer dos búsquedas: una por nombre y otra por apellido
+        // y combinar los resultados (evitando duplicados)
+        const [listaNombre, listaApellido] = await Promise.all([
+          listarAlumnosConFiltros(token, { ...filtrosBase, nombre: texto }),
+          listarAlumnosConFiltros(token, { ...filtrosBase, apellido: texto })
+        ]);
+        
+        const alumnosNombre = Array.isArray(listaNombre) ? listaNombre : [];
+        const alumnosApellido = Array.isArray(listaApellido) ? listaApellido : [];
+        
+        // Combinar y eliminar duplicados por ID
+        const idsVistos = new Set();
+        allAlumnos = [...alumnosNombre, ...alumnosApellido].filter(a => {
+          if (idsVistos.has(a.id)) return false;
+          idsVistos.add(a.id);
+          return true;
+        });
+      }
+      
+      setAlumnos(allAlumnos);
+      setFilteredAlumnos(allAlumnos);
+    } catch {
+      setAlumnos([]);
+      setFilteredAlumnos([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchText, token, alumnosExternos, cursoAnio, cursoDivision, lastSearchText, alumnos.length]);
 
-
-  // Ya no se filtra en frontend, solo se muestra lo que devuelve el backend
+  // Buscar automáticamente después de escribir (con delay)
+  useEffect(() => {
+    if (alumnosExternos || !token) return;
+    
+    const texto = searchText.trim();
+    
+    // Si hay año seleccionado (con o sin división), buscar aunque no haya texto
+    if (cursoAnio && !texto) {
+      // Limpiar timeout anterior
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      
+      searchTimeoutRef.current = setTimeout(() => {
+        buscarAlumnos();
+      }, 300);
+      
+      return () => {
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
+      };
+    }
+    
+    if (!texto) {
+      setAlumnos([]);
+      setFilteredAlumnos([]);
+      return;
+    }
+    
+    // Limpiar timeout anterior
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Buscar después de 500ms de dejar de escribir
+    searchTimeoutRef.current = setTimeout(() => {
+      buscarAlumnos();
+    }, 500);
+    
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchText, token, alumnosExternos, cursoAnio, cursoDivision, buscarAlumnos]);
 
   const handleSelectChange = useCallback((e) => {
     const selectedId = e.target.value;
@@ -138,6 +230,12 @@ export default function AsyncAlumnoSelect({
           placeholder="Buscar por nombre o DNI..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              buscarAlumnos();
+            }
+          }}
           disabled={disabled || loading}
         />
         <Form.Select

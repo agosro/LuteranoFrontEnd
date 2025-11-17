@@ -522,7 +522,7 @@ export default function ReporteAnualAlumno() {
               {!incluirEgresados && (
                 <>
                   <Col md={2}>
-                    <Form.Label>Curso (Año, opcional)</Form.Label>
+                    <Form.Label>Año (opcional)</Form.Label>
                     <Form.Select value={cursoAnioSel} onChange={(e)=>setCursoAnioSel(e.target.value)}>
                       <option value="">Todos</option>
                       {aniosCursoOptions.map(an => (
@@ -557,6 +557,8 @@ export default function ReporteAnualAlumno() {
                   value={alumnoOption}
                   onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
                   cursoId={incluirEgresados ? "" : cursoId}
+                  cursoAnio={incluirEgresados ? null : cursoAnioSel}
+                  cursoDivision={incluirEgresados ? null : divisionSel}
                   alumnosExternos={incluirEgresados ? alumnos : null}
                 />
               </Col>
@@ -565,6 +567,23 @@ export default function ReporteAnualAlumno() {
                   {loading ? (<><Spinner size="sm" animation="border" className="me-2" /> Generando...</>) : "Generar reporte"}
                 </Button>
               </Col>
+              {!incluirEgresados && (cursoAnioSel || divisionSel || alumnoOption) && (
+                <Col md={2} className="d-flex align-items-end">
+                  <Button 
+                    type="button" 
+                    variant="outline-secondary" 
+                    onClick={() => {
+                      setCursoAnioSel("");
+                      setDivisionSel("");
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }}
+                    className="w-100"
+                  >
+                    Limpiar filtros
+                  </Button>
+                </Col>
+              )}
             </Row>
             <Row className="g-3 mt-2">
               <Col md={12}>
