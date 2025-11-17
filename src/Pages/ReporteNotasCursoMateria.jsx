@@ -69,14 +69,20 @@ export default function ReporteNotasCursoMateria() {
         setMateriasSeleccionadas([]);
         if (!cursoId) return;
         const lista = await listarMateriasDeCurso(token, cursoId);
-        if (active) setMaterias(lista);
+        // Filtrar materias según el rol del usuario
+        let materiasFiltradas = lista;
+        if (user?.rol === "ROLE_DOCENTE" && user?.docenteId) {
+          // Para docentes, mostrar solo las materias asignadas a este docente
+          materiasFiltradas = lista.filter(m => m.docente?.id === user.docenteId);
+        }
+        if (active) setMaterias(materiasFiltradas);
       } catch (e) {
         if (active) setError(e.message || "Error al cargar materias");
       }
     }
     if (token) loadMaterias();
     return () => { active = false; };
-  }, [token, cursoId]);
+  }, [token, cursoId, user?.rol, user?.docenteId]);
 
   // Auto-cargar desde URL params
   useEffect(() => {
@@ -167,22 +173,8 @@ export default function ReporteNotasCursoMateria() {
   // Filas planas alumno-materia y filtros
   const filas = useMemo(() => {
     const list = [];
-    console.log("DEBUG FILAS - alumnos totales:", alumnos.length);
-    console.log("DEBUG FILAS - alumnos completos:", alumnos);
-    
     for (const a of alumnos) {
-      // Log datos de Acosta Gómez
-      if (a.dni === "40000043") {
-        console.log("DEBUG - Acosta Gómez datos completos:", a);
-        console.log("DEBUG - Acosta Gómez materias:", a.materias);
-      }
-      
       for (const m of a.materias || []) {
-        // Log específico para materias de Acosta Gómez
-        if (a.dni === "40000043") {
-          console.log("DEBUG - Acosta Gómez materia:", m.materiaNombre, "| co:", m.co, "| ex:", m.ex, "| pfa:", m.pfa);
-        }
-        
         list.push({
           alumno: a,
           m,
@@ -192,7 +184,6 @@ export default function ReporteNotasCursoMateria() {
         });
       }
     }
-    console.log("DEBUG FILAS - list final:", list.length, "filas");
     return list;
   }, [alumnos]);
 
@@ -235,14 +226,6 @@ export default function ReporteNotasCursoMateria() {
   const filasFiltradas = useMemo(() => {
     let list = filas;
     
-    // Debug: Log filtros aplicados
-    console.log("DEBUG FILTROS - Estado:", estado, "| Busqueda:", busqueda);
-    console.log("DEBUG FILTROS - Total filas antes de filtrar:", list.length);
-    
-    // Debug: Buscar filas de Acosta Gómez
-    const acostaFilas = list.filter(r => r.alumno?.dni === "40000043");
-    console.log("DEBUG FILTROS - Filas de Acosta Gómez antes filtros:", acostaFilas);
-    
     if (estado !== "Todos") {
       list = list.filter(r => {
         const pg = r?.m?.pg;
@@ -263,11 +246,6 @@ export default function ReporteNotasCursoMateria() {
         return nom.includes(q) || dni.includes(q);
       });
     }
-    
-    // Debug: Log resultado final
-    console.log("DEBUG FILTROS - Total filas después de filtrar:", list.length);
-    const acostaFiltradas = list.filter(r => r.alumno?.dni === "40000043");
-    console.log("DEBUG FILTROS - Filas de Acosta Gómez después filtros:", acostaFiltradas);
     
     return list;
   }, [filas, estado, busqueda]);
@@ -850,7 +828,6 @@ export default function ReporteNotasCursoMateria() {
 
             {/* Contenido imprimible por vista */}
             <div ref={printRef}>
-              {console.log("DEBUG VISTA - Vista actual:", vista)}
               {vista === 'plana' && (
                 <Table striped bordered hover responsive size="sm">
                   <thead>
@@ -888,29 +865,10 @@ export default function ReporteNotasCursoMateria() {
                     {filasFiltradas.length === 0 && (
                       <tr><td colSpan={totalCols} className="text-center text-muted">Sin datos</td></tr>
                     )}
-                    {/* Debug log antes del map */}
-                    {console.log("DEBUG MAP - filasFiltradas.length:", filasFiltradas.length)}
-                    {console.log("DEBUG MAP - filasFiltradas:", filasFiltradas)}
                     {filasFiltradas.map((r, idx) => {
-                      console.log("DEBUG MAP ITEM - Procesando fila:", idx, "DNI:", r.alumno?.dni, "Materia:", r.materiaNombre);
-                      
                       const a = r.alumno; const m = r.m;
                       const e1 = Array.isArray(m.e1Notas) ? m.e1Notas : [];
                       const e2 = Array.isArray(m.e2Notas) ? m.e2Notas : [];
-                      
-                      // Debug: Log data for Acosta Gómez in render
-                      if (a.dni === "40000043") {
-                        console.log("DEBUG RENDER - Acosta Gómez:", {
-                          materia: m.materiaNombre,
-                          co: m.co,
-                          ex: m.ex,
-                          pfa: m.pfa,
-                          coDisplay: m.co ?? "-",
-                          exDisplay: m.ex ?? "-",
-                          pfaDisplay: m.pfa ?? "-"
-                        });
-                      }
-                      
                       return (
                         <tr key={`pl-${idx}`}>
                           <td>{a.dni||""}</td>
@@ -925,9 +883,9 @@ export default function ReporteNotasCursoMateria() {
                           </>)}
                           <td><Badge bg={m.pg>=6?"success":"danger"}>{m.pg??"-"}</Badge></td>
                           {showNF && <td><Badge bg="secondary">{nfMap[a.id] ?? '-'}</Badge></td>}
-                          <td>{a.dni === "40000043" ? (console.log("RENDER CO:", m.co), m.co ?? "-") : (m.co ?? "-")}</td>
-                          <td>{a.dni === "40000043" ? (console.log("RENDER EX:", m.ex), m.ex ?? "-") : (m.ex ?? "-")}</td>
-                          <td>{a.dni === "40000043" ? (console.log("RENDER PFA:", m.pfa), m.pfa ?? "-") : (m.pfa ?? "-")}</td>
+                          <td>{m.co ?? "-"}</td>
+                          <td>{m.ex ?? "-"}</td>
+                          <td>{m.pfa ?? "-"}</td>
                           <td>{m.estado??"-"}</td>
                         </tr>
                       );

@@ -57,6 +57,19 @@ import ReporteExamenesConsecutivos from '../Pages/ReporteExamenesConsecutivos.js
 import ConfiguracionCicloLectivo from '../Pages/ConfiguracionCicloLectivo.jsx';
 import ReactivarAlumnos from '../Pages/ReactivarAlumnos.jsx';
 
+// Componente que redirije preceptores directamente a la lista de alumnos
+function AlumnosFiltroOrLista() {
+  const { user } = useAuth();
+  
+  // Si es preceptor, mostrar la lista directamente
+  if (user?.rol === "ROLE_PRECEPTOR") {
+    return <AlumnosLista />;
+  }
+  
+  // Si no es preceptor, mostrar el filtro
+  return <AlumnosFiltro />;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
 
@@ -80,8 +93,8 @@ function AppRoutes() {
         <Route path="inicio" element={<Inicio />} />
 
         {/* Solo ADMIN puede ver lista de alumnos */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
-          <Route path="alumnos" element={<AlumnosFiltro />} />
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
+          <Route path="alumnos" element={<AlumnosFiltroOrLista />} />
           <Route path="alumnos/lista" element={<AlumnosLista />} />
           <Route path="alumnos/:id" element={<AlumnoDetalle />} />
         </Route>
@@ -116,7 +129,7 @@ function AppRoutes() {
         </Route>
 
         {/* Tutores -> SOLO ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
           <Route path="tutores" element={<Tutores />} />
           <Route path="tutores/:id" element={<TutorDetalle />} />
         </Route>

@@ -549,12 +549,14 @@ export default function ReporteNotasAlumnos() {
                   token={token}
                   value={alumnoOption}
                   onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
+                  cursoAnio={incluirEgresados ? "" : cursoAnioSel}
+                  cursoDivision={incluirEgresados ? "" : divisionSel}
                   cursoId={incluirEgresados ? "" : cursoId}
                   alumnosExternos={incluirEgresados ? alumnos : null}
                 />
               </Col>
-              <Col md={2} className="d-flex align-items-end">
-                <Button type="submit" variant="primary" disabled={loading || !alumnoId} className="w-100">
+              <Col md={2} className="d-flex align-items-end gap-2">
+                <Button type="submit" variant="primary" disabled={loading || !alumnoId} className="flex-grow-1">
                   {loading ? (
                     <>
                       <Spinner size="sm" animation="border" className="me-2" /> Generando...
@@ -563,6 +565,21 @@ export default function ReporteNotasAlumnos() {
                     "Generar reporte"
                   )}
                 </Button>
+                {!incluirEgresados && (cursoAnioSel || divisionSel || alumnoOption) && (
+                  <Button 
+                    variant="outline-secondary" 
+                    size="sm"
+                    onClick={() => {
+                      setCursoAnioSel("");
+                      setDivisionSel("");
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }}
+                    title="Limpiar filtros"
+                  >
+                    Limpiar
+                  </Button>
+                )}
               </Col>
             </Row>
             <Row className="g-3 mt-2">

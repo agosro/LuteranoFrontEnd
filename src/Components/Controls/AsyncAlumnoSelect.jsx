@@ -9,6 +9,8 @@ export default function AsyncAlumnoSelect({
   value,
   onChange,
   cursoId = "",
+  cursoAnio = null,
+  cursoDivision = null,
   placeholder,
   disabled = false,
   alumnosExternos = null, // Lista externa de alumnos (opcional)
@@ -18,9 +20,10 @@ export default function AsyncAlumnoSelect({
   const [filteredAlumnos, setFilteredAlumnos] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lastSearchText, setLastSearchText] = useState(""); // Para evitar búsquedas repetidas
+  const searchTimeoutRef = useRef(null);
 
   const alumnosCursoCache = useRef({});
-  const alumnosDefaultCache = useRef(null);
 
   // Si hay lista externa, usarla en lugar de cargar
   useEffect(() => {
@@ -28,22 +31,23 @@ export default function AsyncAlumnoSelect({
       setAlumnos(alumnosExternos);
       setFilteredAlumnos(alumnosExternos.slice(0, 20));
       return;
+    } else {
+      setAlumnos([]);
+      setFilteredAlumnos([]);
     }
   }, [alumnosExternos]);
 
-  // Cargar alumnos según el filtro (curso o todos) solo si no hay lista externa
+  // Buscar alumnos solo cuando el usuario presiona Enter o hace focus en el select
   useEffect(() => {
-    // Si hay lista externa, no cargar
     if (alumnosExternos) return;
-    
-    let active = true;
-    async function loadAlumnos() {
-      try {
-        setLoading(true);
-        let lista = [];
-        
-        if (cursoId) {
-          // Si hay curso seleccionado, buscar por curso
+    if (!token) return;
+
+    if (cursoId) {
+      let active = true;
+      async function loadAlumnosCurso() {
+        try {
+          setLoading(true);
+          let lista = [];
           if (alumnosCursoCache.current[cursoId]) {
             lista = alumnosCursoCache.current[cursoId];
           } else {
@@ -51,64 +55,148 @@ export default function AsyncAlumnoSelect({
             lista = await listarAlumnosPorCurso(token, Number(cursoId), cicloId);
             alumnosCursoCache.current[cursoId] = Array.isArray(lista) ? lista : [];
           }
-        } else {
-          // Cargar todos los alumnos
-          if (!alumnosDefaultCache.current) {
-            lista = await listarAlumnosConFiltros(token, {});
-            alumnosDefaultCache.current = Array.isArray(lista) ? lista : [];
-          } else {
-            lista = alumnosDefaultCache.current;
+          if (active) {
+            setAlumnos(Array.isArray(lista) ? lista : []);
+            setFilteredAlumnos(Array.isArray(lista) ? lista : []);
           }
+        } catch {
+          if (active) {
+            setAlumnos([]);
+            setFilteredAlumnos([]);
+          }
+        } finally {
+          if (active) setLoading(false);
         }
-        
-        if (active) {
-          setAlumnos(Array.isArray(lista) ? lista : []);
-          setFilteredAlumnos(Array.isArray(lista) ? lista : []);
-        }
-      } catch (error) {
-        console.error("Error cargando alumnos:", error);
-        if (active) {
-          setAlumnos([]);
-          setFilteredAlumnos([]);
-        }
-      } finally {
-        if (active) setLoading(false);
       }
+      loadAlumnosCurso();
+      return () => { active = false; };
     }
-
-    if (token) {
-      loadAlumnos();
-    }
-
-    return () => { active = false; };
+    // No buscar automáticamente por texto
+    setAlumnos([]);
+    setFilteredAlumnos([]);
+    setLoading(false);
   }, [token, cursoId, cicloLectivo?.id, alumnosExternos]);
 
-  // Función para normalizar texto (quitar tildes)
-  const normalizeText = (text) => {
-    return text
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-  };
-
-  // Filtrar alumnos por texto de búsqueda
-  useEffect(() => {
-    const search = normalizeText(searchText.trim());
+  // Handler para buscar alumnos manualmente
+  const buscarAlumnos = useCallback(async () => {
+    if (alumnosExternos || !token) return;
+    const texto = searchText.trim();
     
-    if (!search) {
-      // Si no hay búsqueda, mostrar solo los primeros 20
-      setFilteredAlumnos(alumnos.slice(0, 20));
+    // Si no hay texto ni filtros de curso, no buscar
+    if (!texto && !cursoAnio) {
+      setAlumnos([]);
+      setFilteredAlumnos([]);
+      setLoading(false);
       return;
     }
+    
+    // Crear clave de caché que incluya todos los filtros
+    const cacheKey = `${cursoAnio || ''}_${cursoDivision || ''}_${texto}`;
+    
+    // No buscar si ya se buscó exactamente esto
+    if (cacheKey === lastSearchText && alumnos.length > 0) {
+      return;
+    }
+    
+    setLoading(true);
+    setLastSearchText(cacheKey);
+    
+    try {
+      let allAlumnos = [];
+      
+      // Filtros comunes (año y división del curso)
+      const filtrosBase = {};
+      if (cursoAnio) {
+        filtrosBase.anio = Number(cursoAnio);
+      }
+      if (cursoDivision) {
+        filtrosBase.division = cursoDivision;
+      }
+      
+      if (!texto) {
+        // Solo filtros de año/división, sin texto de búsqueda
+        const lista = await listarAlumnosConFiltros(token, filtrosBase);
+        allAlumnos = Array.isArray(lista) ? lista : [];
+      } else if (/^\d+$/.test(texto)) {
+        // Si es número, filtrar solo por DNI
+        const lista = await listarAlumnosConFiltros(token, { ...filtrosBase, dni: texto });
+        allAlumnos = Array.isArray(lista) ? lista : [];
+      } else {
+        // Si es texto, hacer dos búsquedas: una por nombre y otra por apellido
+        // y combinar los resultados (evitando duplicados)
+        const [listaNombre, listaApellido] = await Promise.all([
+          listarAlumnosConFiltros(token, { ...filtrosBase, nombre: texto }),
+          listarAlumnosConFiltros(token, { ...filtrosBase, apellido: texto })
+        ]);
+        
+        const alumnosNombre = Array.isArray(listaNombre) ? listaNombre : [];
+        const alumnosApellido = Array.isArray(listaApellido) ? listaApellido : [];
+        
+        // Combinar y eliminar duplicados por ID
+        const idsVistos = new Set();
+        allAlumnos = [...alumnosNombre, ...alumnosApellido].filter(a => {
+          if (idsVistos.has(a.id)) return false;
+          idsVistos.add(a.id);
+          return true;
+        });
+      }
+      
+      setAlumnos(allAlumnos);
+      setFilteredAlumnos(allAlumnos);
+    } catch {
+      setAlumnos([]);
+      setFilteredAlumnos([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchText, token, alumnosExternos, cursoAnio, cursoDivision, lastSearchText, alumnos.length]);
 
-    const filtered = alumnos.filter((a) => {
-      const nombre = normalizeText(`${a.apellido || ""} ${a.nombre || ""}`);
-      const dniStr = (a.dni || "").toString();
-      return nombre.includes(search) || dniStr.includes(search);
-    });
-
-    setFilteredAlumnos(filtered);
-  }, [searchText, alumnos]);
+  // Buscar automáticamente después de escribir (con delay)
+  useEffect(() => {
+    if (alumnosExternos || !token) return;
+    
+    const texto = searchText.trim();
+    
+    // Si hay año seleccionado (con o sin división), buscar aunque no haya texto
+    if (cursoAnio && !texto) {
+      // Limpiar timeout anterior
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      
+      searchTimeoutRef.current = setTimeout(() => {
+        buscarAlumnos();
+      }, 300);
+      
+      return () => {
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
+      };
+    }
+    
+    if (!texto) {
+      setAlumnos([]);
+      setFilteredAlumnos([]);
+      return;
+    }
+    
+    // Limpiar timeout anterior
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Buscar después de 500ms de dejar de escribir
+    searchTimeoutRef.current = setTimeout(() => {
+      buscarAlumnos();
+    }, 500);
+    
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchText, token, alumnosExternos, cursoAnio, cursoDivision, buscarAlumnos]);
 
   const handleSelectChange = useCallback((e) => {
     const selectedId = e.target.value;
@@ -142,6 +230,12 @@ export default function AsyncAlumnoSelect({
           placeholder="Buscar por nombre o DNI..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              buscarAlumnos();
+            }
+          }}
           disabled={disabled || loading}
         />
         <Form.Select

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Table, Button, Badge, Spinner, Form } from "react-bootstrap";
+import { Table, Button, Badge, Spinner, Form, Modal } from "react-bootstrap";
 import { isoToDisplay } from "../utils/fechas";
 import { useAuth } from "../Context/AuthContext";
 import { listarReservas, aprobarReserva, denegarReserva } from "../Services/ReservaService";
@@ -18,6 +18,9 @@ export default function GestionarReservas() {
   const [espaciosMap, setEspaciosMap] = useState({});
   const [cursosMap, setCursosMap] = useState({});
   const [filtroEstado, setFiltroEstado] = useState("TODOS");
+  const [showModalDenegar, setShowModalDenegar] = useState(false);
+  const [motivoDenegacion, setMotivoDenegacion] = useState("");
+  const [reservaSeleccionada, setReservaSeleccionada] = useState(null);
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -71,17 +74,24 @@ export default function GestionarReservas() {
     }
   };
 
-  const handleDenegar = async (id) => {
-    const motivo = window.prompt("Motivo de la denegación:");
-    if (motivo === null) return; // cancelado
-    if (!motivo.trim()) {
+  const handleDenegarClick = (id) => {
+    setReservaSeleccionada(id);
+    setMotivoDenegacion("");
+    setShowModalDenegar(true);
+  };
+
+  const handleConfirmarDenegacion = async () => {
+    if (!motivoDenegacion.trim()) {
       toast.info("Debés ingresar un motivo");
       return;
     }
     try {
-      await denegarReserva(id, motivo.trim(), token);
+      await denegarReserva(reservaSeleccionada, motivoDenegacion.trim(), token);
       toast.success("Reserva denegada");
-      setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: "DENEGADA", motivoDenegacion: motivo.trim() } : r));
+      setReservas(prev => prev.map(r => r.id === reservaSeleccionada ? { ...r, estado: "DENEGADA", motivoDenegacion: motivoDenegacion.trim() } : r));
+      setShowModalDenegar(false);
+      setReservaSeleccionada(null);
+      setMotivoDenegacion("");
     } catch (e) {
       toast.error(e?.message || "No se pudo denegar");
     }
@@ -144,7 +154,7 @@ export default function GestionarReservas() {
                         {String(r.estado) === "PENDIENTE" ? (
                           <div className="d-flex gap-2">
                             <Button variant="success" size="sm" onClick={() => handleAprobar(r.id)}>Aprobar</Button>
-                            <Button variant="danger" size="sm" onClick={() => handleDenegar(r.id)}>Denegar</Button>
+                            <Button variant="danger" size="sm" onClick={() => handleDenegarClick(r.id)}>Denegar</Button>
                           </div>
                         ) : (
                           <span className="text-muted">Sin acciones</span>
@@ -158,6 +168,32 @@ export default function GestionarReservas() {
           )}
         </div>
       </div>
+
+      <Modal show={showModalDenegar} onHide={() => setShowModalDenegar(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Denegar Reserva</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group>
+            <Form.Label>Motivo de la denegación</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              placeholder="Ingresá el motivo por el cual deniega esta reserva..."
+              value={motivoDenegacion}
+              onChange={(e) => setMotivoDenegacion(e.target.value)}
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowModalDenegar(false)}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleConfirmarDenegacion} disabled={!motivoDenegacion.trim()}>
+            Denegar
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

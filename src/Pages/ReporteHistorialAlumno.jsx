@@ -20,6 +20,8 @@ export default function ReporteHistorialAlumno() {
 
   const [alumnoId, setAlumnoId] = useState(alumnoIdFromUrl || "");
   const [alumnoOption, setAlumnoOption] = useState(null);
+  const [cursoAnioSel, setCursoAnioSel] = useState("");
+  const [divisionSel, setDivisionSel] = useState("");
   const [tipoReporte, setTipoReporte] = useState("completo"); // "completo" o "ciclo"
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -317,25 +319,60 @@ export default function ReporteHistorialAlumno() {
         <Card.Body>
           <Form onSubmit={onSubmit}>
             <Row className="g-3">
-              <Col md={6}>
+              <Col md={2}>
+                <Form.Label>Año (opcional)</Form.Label>
+                <Form.Select value={cursoAnioSel} onChange={(e)=>setCursoAnioSel(e.target.value)}>
+                  <option value="">Todos</option>
+                  {[1, 2, 3, 4, 5, 6].map(an => (
+                    <option key={an} value={an}>{an}</option>
+                  ))}
+                </Form.Select>
+              </Col>
+              <Col md={2}>
+                <Form.Label>División (opcional)</Form.Label>
+                <Form.Select value={divisionSel} onChange={(e)=>setDivisionSel(e.target.value)} disabled={!cursoAnioSel}>
+                  <option value="">Todas</option>
+                  {['A', 'B', 'C', 'D'].map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </Form.Select>
+              </Col>
+              <Col md={4}>
                 <Form.Label>Alumno</Form.Label>
                 <AsyncAlumnoSelect
                   token={token}
                   value={alumnoOption}
                   onChange={(opt) => { setAlumnoOption(opt); setAlumnoId(opt?.value || ""); }}
+                  cursoAnio={cursoAnioSel}
+                  cursoDivision={divisionSel}
                 />
               </Col>
-              <Col md={3}>
+              <Col md={2}>
                 <Form.Label>Tipo de Reporte</Form.Label>
                 <Form.Select value={tipoReporte} onChange={(e) => setTipoReporte(e.target.value)}>
                   <option value="completo">Historial Completo</option>
                   <option value="ciclo">Ciclo Actual ({cicloLectivo?.anio || '-'})</option>
                 </Form.Select>
               </Col>
-              <Col md={3} className="d-flex align-items-end">
-                <Button type="submit" variant="primary" disabled={loading || !alumnoId} className="w-100">
-                  {loading ? (<><Spinner size="sm" animation="border" className="me-2" /> Generando...</>) : "Generar reporte"}
+              <Col md={2} className="d-flex align-items-end gap-2">
+                <Button type="submit" variant="primary" disabled={loading || !alumnoId} className="flex-grow-1">
+                  {loading ? (<><Spinner size="sm" animation="border" className="me-2" /> Generando...</>) : "Generar"}
                 </Button>
+                {(cursoAnioSel || divisionSel || alumnoOption) && (
+                  <Button 
+                    variant="outline-secondary" 
+                    size="sm"
+                    onClick={() => {
+                      setCursoAnioSel("");
+                      setDivisionSel("");
+                      setAlumnoOption(null);
+                      setAlumnoId("");
+                    }}
+                    title="Limpiar filtros"
+                  >
+                    Limpiar
+                  </Button>
+                )}
               </Col>
             </Row>
           </Form>
