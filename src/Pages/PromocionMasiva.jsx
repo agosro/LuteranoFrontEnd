@@ -37,6 +37,8 @@ export default function PromocionMasiva() {
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [tiempoTranscurrido, setTiempoTranscurrido] = useState(0);
+  const [modoEjecucion, setModoEjecucion] = useState(''); // 'simular' | 'ejecutar'
 
   const puedeEjecutarReal = rol === 'ROLE_ADMIN' || rol === 'ROLE_DIRECTOR';
 
@@ -49,6 +51,15 @@ export default function PromocionMasiva() {
     // modo: 'simular' | 'ejecutar'
     setCargando(true);
     setResultado(null);
+    setTiempoTranscurrido(0);
+    setModoEjecucion(modo);
+    
+    // Iniciar contador de tiempo
+    const startTime = Date.now();
+    const intervalo = setInterval(() => {
+      setTiempoTranscurrido(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    
     try {
       // Validaciones mínimas
       const anio = Number(form.anio);
@@ -82,7 +93,9 @@ export default function PromocionMasiva() {
     } catch (e) {
       toast.error(e?.message || 'Error al procesar promoción');
     } finally {
+      clearInterval(intervalo);
       setCargando(false);
+      setModoEjecucion('');
     }
   };
 
@@ -137,6 +150,7 @@ export default function PromocionMasiva() {
                   min={1}
                   max={5}
                   value={form.maxRepeticiones}
+                  disabled={cargando}
                   onChange={(e) => {
                     const n = Number(e.target.value);
                     const clamped = Number.isNaN(n) ? 1 : Math.min(5, Math.max(1, Math.floor(n)));
@@ -154,6 +168,7 @@ export default function PromocionMasiva() {
                   id="dryRun"
                   label="Dry run"
                   checked={form.dryRun}
+                  disabled={cargando}
                   onChange={handleChange('dryRun')}
                 />
               </Form.Group>
@@ -181,6 +196,34 @@ export default function PromocionMasiva() {
               )}
             </Col>
           </Row>
+
+          {cargando && (
+            <Alert variant="info" className="mt-4">
+              <div className="d-flex align-items-center">
+                <Spinner animation="border" size="sm" className="me-3" />
+                <div className="flex-grow-1">
+                  <h5 className="mb-2">
+                    {modoEjecucion === 'simular' ? 'Ejecutando simulación...' : 'Ejecutando promoción masiva...'}
+                  </h5>
+                  <div className="mb-2">
+                    <strong>Tiempo transcurrido:</strong> {Math.floor(tiempoTranscurrido / 60)}:{String(tiempoTranscurrido % 60).padStart(2, '0')}
+                  </div>
+                  <div className="small text-muted">
+                    <div>• Procesando alumnos del ciclo lectivo...</div>
+                    <div>• Evaluando condiciones académicas...</div>
+                    <div>• Aplicando reglas de promoción...</div>
+                    {tiempoTranscurrido > 30 && (
+                      <div className="mt-2 fw-bold">Tiempo estimado restante: {Math.max(0, Math.ceil((180 - tiempoTranscurrido) / 60))} minuto(s)</div>
+                    )}
+                  </div>
+                  <div className="mt-3 small">
+                    <strong>Nota:</strong> Este proceso puede tardar varios minutos dependiendo de la cantidad de alumnos.
+                    Por favor, no cierres esta ventana ni recargues la página.
+                  </div>
+                </div>
+              </div>
+            </Alert>
+          )}
 
           {resultado && (
             <>
