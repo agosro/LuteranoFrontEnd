@@ -32,7 +32,7 @@ export default function ReservarEspacio() {
 
   const [espacioId, setEspacioId] = useState("");
   const [motivo, setMotivo] = useState("");
-  const [moduloSeleccionado, setModuloSeleccionado] = useState(null); // objeto ModuloEstadoDto
+  const [modulosSeleccionados, setModulosSeleccionados] = useState([]); // array de IDs de módulos
   const [show, setShow] = useState(false);
 
   // Carga inicial: cursos del docente/preceptor y espacios
@@ -110,29 +110,55 @@ export default function ReservarEspacio() {
     return () => { active = false; };
   }, [fecha, espacioId, token]);
 
-  const abrirReserva = (mod) => {
-    setModuloSeleccionado(mod);
+  const toggleModuloSeleccionado = (modId) => {
+    setModulosSeleccionados(prev => {
+      if (prev.includes(modId)) {
+        return prev.filter(id => id !== modId);
+      } else {
+        return [...prev, modId].sort((a, b) => {
+          const modA = modulos.find(m => m.modulo.id === a);
+          const modB = modulos.find(m => m.modulo.id === b);
+          return (modA?.modulo.orden || 0) - (modB?.modulo.orden || 0);
+        });
+      }
+    });
+  };
+
+  const abrirReserva = () => {
+    if (modulosSeleccionados.length === 0) return;
     setShow(true);
   };
-  const cerrarReserva = () => setShow(false);
+  const cerrarReserva = () => {
+    setShow(false);
+    setModulosSeleccionados([]);
+  };
 
   const confirmarReserva = async () => {
     try {
-      if (!cursoId || !espacioId || !moduloSeleccionado?.modulo?.id || !fecha) {
-        setError("Completá curso, fecha, espacio y módulo antes de confirmar.");
+      if (!cursoId || !espacioId || modulosSeleccionados.length === 0 || !fecha) {
+        toast.error("Completá curso, fecha, espacio y seleccioná al menos un módulo.");
         return;
       }
-      const payload = {
+      
+      // Crear payload para cada módulo seleccionado
+      const payloads = modulosSeleccionados.map(moduloId => ({
         cursoId: Number(cursoId),
         espacioAulicoId: Number(espacioId),
-        moduloId: Number(moduloSeleccionado.modulo.id),
-        fecha, // LocalDate en backend (YYYY-MM-DD)
+        moduloId: Number(moduloId),
+        fecha,
         motivoSolicitud: motivo || undefined,
-      };
-      const resp = await solicitarReserva(token, payload);
-      toast.success(resp?.mensaje || "Reserva solicitada");
+      }));
+
+      // Enviar todas las reservas en paralelo
+      const resultados = await Promise.all(
+        payloads.map(payload => solicitarReserva(token, payload))
+      );
+      
+      toast.success(`${resultados.length} reserva${resultados.length > 1 ? 's' : ''} solicitada${resultados.length > 1 ? 's' : ''}`);
       setShow(false);
       setMotivo("");
+      setModulosSeleccionados([]);
+      
       // Refrescar ocupación desde backend
       try {
         const data = await getModulosReservaEstado(token, Number(espacioId), fecha);
@@ -143,7 +169,7 @@ export default function ReservarEspacio() {
           motivoOcupacion: d.motivoOcupacion || null,
         }));
         setModulos(mapeado);
-  } catch { /* ignore */ }
+      } catch { /* ignore */ }
     } catch (e) {
       toast.error(e?.message || "No se pudo crear la reserva");
       // Si el error es que el espacio ya está reservado, refrescar ocupación y cerrar modal
@@ -157,7 +183,7 @@ export default function ReservarEspacio() {
             motivoOcupacion: d.motivoOcupacion || null,
           }));
           setModulos(mapeado);
-  } catch { /* ignore */ }
+        } catch { /* ignore */ }
         setShow(false);
       }
     }
@@ -221,11 +247,11 @@ export default function ReservarEspacio() {
               <Table bordered hover size="sm">
                 <thead>
                   <tr>
+                    <th style={{ width: '40px' }}></th>
                     <th>Módulo</th>
                     <th>Desde</th>
                     <th>Hasta</th>
                     <th>Estado</th>
-                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -235,24 +261,22 @@ export default function ReservarEspacio() {
                     </tr>
                   ) : (
                     modulos.map((m) => {
-                      // Usar estado de reserva provisto por el backend
                       const libre = !m.ocupado;
+                      const isSelected = modulosSeleccionados.includes(m.modulo.id);
                       return (
-                        <tr key={m.modulo.id} className={libre ? "" : "table-danger"}>
+                        <tr key={m.modulo.id} className={isSelected ? "table-info" : libre ? "" : "table-danger"}>
+                          <td className="text-center">
+                            <Form.Check
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleModuloSeleccionado(m.modulo.id)}
+                              disabled={!libre}
+                            />
+                          </td>
                           <td>{m.modulo.orden}</td>
                           <td>{m.modulo.desde}</td>
                           <td>{m.modulo.hasta}</td>
                           <td>{libre ? "Libre" : (m.motivoOcupacion ? `Ocupado - ${m.motivoOcupacion}` : "Ocupado")}</td>
-                          <td>
-                            <Button
-                              size="sm"
-                              variant={libre ? "success" : "secondary"}
-                              disabled={!libre || !espacioId || !cursoId || !fecha}
-                              onClick={() => abrirReserva(m)}
-                            >
-                              Reservar
-                            </Button>
-                          </td>
                         </tr>
                       );
                     })
@@ -266,17 +290,39 @@ export default function ReservarEspacio() {
             </div>
           )}
 
+          {/* Botón para abrir modal si hay módulos seleccionados */}
+          {fecha && espacioId && cursoId && modulosSeleccionados.length > 0 && (
+            <div className="mt-3 d-flex gap-2">
+              <Button variant="success" onClick={abrirReserva}>
+                Confirmar {modulosSeleccionados.length} módulo{modulosSeleccionados.length > 1 ? 's' : ''}
+              </Button>
+              <Button variant="outline-secondary" onClick={() => setModulosSeleccionados([])}>
+                Limpiar selección
+              </Button>
+            </div>
+          )}
+
           {/* Modal de confirmación */}
           <Modal show={show} onHide={cerrarReserva} centered>
             <Modal.Header closeButton>
-              <Modal.Title>Confirmar Reserva</Modal.Title>
+              <Modal.Title>Confirmar Reserva{modulosSeleccionados.length > 1 ? 's' : ''}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
-              {moduloSeleccionado && (
+              {modulosSeleccionados.length > 0 && (
                 <>
                   <p className="mb-2"><strong>Fecha:</strong> {fecha}</p>
-                  <p className="mb-2"><strong>Módulo:</strong> {moduloSeleccionado.modulo.orden} ({moduloSeleccionado.modulo.desde} - {moduloSeleccionado.modulo.hasta})</p>
                   <p className="mb-2"><strong>Espacio:</strong> {espacios.find(e => String(e.id) === String(espacioId))?.nombre || ""}</p>
+                  <p className="mb-3"><strong>Módulos seleccionados ({modulosSeleccionados.length}):</strong></p>
+                  <div className="mb-3 p-2 bg-light rounded">
+                    {modulosSeleccionados.map(modId => {
+                      const mod = modulos.find(m => m.modulo.id === modId);
+                      return (
+                        <div key={modId} className="mb-1">
+                          Módulo {mod?.modulo.orden} ({mod?.modulo.desde} - {mod?.modulo.hasta})
+                        </div>
+                      );
+                    })}
+                  </div>
                   <Form.Group>
                     <Form.Label>Motivo / Curso</Form.Label>
                     <Form.Control
@@ -291,7 +337,7 @@ export default function ReservarEspacio() {
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onClick={cerrarReserva}>Cancelar</Button>
-              <Button variant="success" onClick={confirmarReserva}>Confirmar</Button>
+              <Button variant="success" onClick={confirmarReserva}>Confirmar {modulosSeleccionados.length > 1 ? modulosSeleccionados.length + ' reservas' : 'reserva'}</Button>
             </Modal.Footer>
           </Modal>
         </div>

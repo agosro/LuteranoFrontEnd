@@ -121,7 +121,7 @@ export default function DocenteDetalle() {
             <ul className="list-group">
                 {docente.dictados.map((d) => (
                 <li key={d.id} className="list-group-item">
-                    {d.materiaNombre} ({d.cursoNombre})
+                    {d.materiaNombre}{d.cursoNombre ? ` (${d.cursoNombre})` : ''}
                 </li>
                 ))}
             </ul>
