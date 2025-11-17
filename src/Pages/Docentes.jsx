@@ -156,14 +156,20 @@ const handleCreate = async (datos) => {
       materias: [],
     };
 
-
     const creadoResponse = await crearDocente(token, nuevoDocente);
     toast.success(creadoResponse.mensaje || "Docente creado con éxito");
     cerrarModalCrear();
     const docentesActualizados = await listarDocentes(token);
     setDocentes(docentesActualizados);
   } catch (error) {
+    // Mostrar mensaje general
     toast.error(error.message || "Error creando docente");
+    // Mostrar mensajes de validación de campos si existen
+    if (error.data && error.data.errors) {
+      Object.entries(error.data.errors).forEach(([campo, mensaje]) => {
+        toast.error(`${campo}: ${mensaje}`);
+      });
+    }
     console.error("Error al crear docente:", error);
   }
 };
