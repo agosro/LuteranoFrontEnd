@@ -98,10 +98,16 @@ export default function TutorDetalle() {
       };
 
       await editarTutor(payload, user.token);
-      toast.success("Tutor actualizado con éxito");
+      toast.success("Tutor actualizado con \u00e9xito");
       setTutor(prev => ({ ...prev, ...payload }));
     } catch (e) {
-      toast.error(e.message || "Error actualizando tutor");
+      if (e.data && e.data.errors) {
+        Object.entries(e.data.errors).forEach(([campo, mensaje]) => {
+          toast.error(`${campo}: ${mensaje}`);
+        });
+      } else {
+        toast.error(e.message || "Error actualizando tutor");
+      }
     }
   };
 

@@ -157,9 +157,15 @@ function AlumnoDetalle() {
       };
 
       await editarAlumno(user.token, payload);
-      toast.success("Alumno actualizado con éxito");
+      toast.success("Alumno actualizado con \u00e9xito");
     } catch (error) {
-      toast.error(error.message || "Error actualizando alumno");
+      if (error.data && error.data.errors) {
+        Object.entries(error.data.errors).forEach(([campo, mensaje]) => {
+          toast.error(`${campo}: ${mensaje}`);
+        });
+      } else {
+        toast.error(error.message || "Error actualizando alumno");
+      }
     }
   };
 

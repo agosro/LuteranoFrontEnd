@@ -73,9 +73,15 @@ export default function DocenteDetalle() {
       };
 
       await editarDocente(user.token, payload);
-      toast.success("Docente actualizado con éxito");
+      toast.success("Docente actualizado con \u00e9xito");
     } catch (error) {
-      toast.error(error.message || "Error actualizando docente");
+      if (error.data && error.data.errors) {
+        Object.entries(error.data.errors).forEach(([campo, mensaje]) => {
+          toast.error(`${campo}: ${mensaje}`);
+        });
+      } else {
+        toast.error(error.message || "Error actualizando docente");
+      }
     }
   };
 

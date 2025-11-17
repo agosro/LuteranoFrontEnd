@@ -36,17 +36,9 @@ export default function UsuarioDetalle() {
 			if (usuarioState) return; // ya lo tenemos
 			try {
 				const lista = await obtenerUsuarios(token);
-				const u = (lista || []).find(x => String(x.id) === String(id));
+				const u = (lista || []).find((x) => String(x.id) === String(id));
 				if (u) {
 					setUsuario(u);
-					setFormData({
-						id: u.id || null,
-						name: u.name || "",
-						lastName: u.lastName || "",
-						email: u.email || "",
-						password: "",
-						role: typeof u.role === "string" ? u.role : (u.role?.name || ""),
-					});
 				}
 			} catch (e) {
 				console.error(e);
@@ -55,6 +47,23 @@ export default function UsuarioDetalle() {
 		};
 		cargar();
 	}, [token, id, usuarioState]);
+
+	// Cuando cambia "usuario", sincronizar formData
+	useEffect(() => {
+		if (usuario) {
+			setFormData({
+				id: usuario.id || null,
+				name: usuario.name || "",
+				lastName: usuario.lastName || "",
+				email: usuario.email || "",
+				password: "",
+				role:
+					typeof usuario.role === "string"
+						? usuario.role
+						: usuario.role?.name || "",
+			});
+		}
+	}, [usuario]);
 
 	const handleSave = async () => {
 		try {
@@ -67,13 +76,15 @@ export default function UsuarioDetalle() {
 				name: formData.name,
 				lastName: formData.lastName,
 				email: formData.email,
-				...(formData.password?.trim() ? { password: formData.password } : {}),
+				...(formData.password?.trim()
+					? { password: formData.password }
+					: {}),
 				rol: formData.role,
 			};
 
 			await actualizarUsuario(token, payload);
 			toast.success("Usuario actualizado con éxito");
-			setUsuario(prev => ({
+			setUsuario((prev) => ({
 				...prev,
 				name: payload.name,
 				lastName: payload.lastName,
@@ -81,14 +92,19 @@ export default function UsuarioDetalle() {
 				role: payload.rol || prev?.role,
 			}));
 			// limpiar password del form
-			setFormData(f => ({ ...f, password: "" }));
+			setFormData((f) => ({ ...f, password: "" }));
 		} catch (e) {
-			const msg = e.response?.data?.errors?.password || e.response?.data?.mensaje || e.message || "Error al actualizar usuario";
+			const msg =
+				e.response?.data?.errors?.password ||
+				e.response?.data?.mensaje ||
+				e.message ||
+				"Error al actualizar usuario";
 			toast.error(msg);
 		}
 	};
 
 	const handleCancel = () => {
+		// Volver a los valores originales del usuario
 		if (usuario) {
 			setFormData({
 				id: usuario.id || null,
@@ -96,24 +112,45 @@ export default function UsuarioDetalle() {
 				lastName: usuario.lastName || "",
 				email: usuario.email || "",
 				password: "",
-				role: typeof usuario.role === "string" ? usuario.role : (usuario.role?.name || ""),
+				role:
+					typeof usuario.role === "string"
+						? usuario.role
+						: usuario.role?.name || "",
 			});
 		}
 	};
 
-	const titulo = usuario ? `${usuario.name || ""} ${usuario.lastName || ""}`.trim() || "Usuario" : "Usuario";
+	const titulo =
+		usuario
+			? `${usuario.name || ""} ${usuario.lastName || ""}`.trim() || "Usuario"
+			: "Usuario";
+
 	const subtitulo = (() => {
 		const email = usuario?.email || formData.email;
-		const roleValue = typeof (usuario?.role) === 'string' ? usuario.role : (usuario?.role?.name || formData.role);
+		const roleValue =
+			typeof usuario?.role === "string"
+				? usuario.role
+				: usuario?.role?.name || formData.role;
 		let roleLabel = "";
 		switch (roleValue) {
-			case 'ROLE_ADMIN': roleLabel = 'Admin'; break;
-			case 'ROLE_DIRECTOR': roleLabel = 'Director'; break;
-			case 'ROLE_DOCENTE': roleLabel = 'Docente'; break;
-			case 'ROLE_PRECEPTOR': roleLabel = 'Preceptor'; break;
-			default: roleLabel = '';
+			case "ROLE_ADMIN":
+				roleLabel = "Admin";
+				break;
+			case "ROLE_DIRECTOR":
+				roleLabel = "Director";
+				break;
+			case "ROLE_DOCENTE":
+				roleLabel = "Docente";
+				break;
+			case "ROLE_PRECEPTOR":
+				roleLabel = "Preceptor";
+				break;
+			default:
+				roleLabel = "";
 		}
-		return [email, roleLabel && `Rol: ${roleLabel}`].filter(Boolean).join(' • ');
+		return [email, roleLabel && `Rol: ${roleLabel}`]
+			.filter(Boolean)
+			.join(" • ");
 	})();
 
 	return (
@@ -128,12 +165,15 @@ export default function UsuarioDetalle() {
 					label: "Datos del usuario",
 					content: (modoEditar) =>
 						!modoEditar ? (
-							<RenderCampos campos={camposUsuarioVista} data={{
-								name: usuario?.name ?? formData.name,
-								lastName: usuario?.lastName ?? formData.lastName,
-								email: usuario?.email ?? formData.email,
-								role: usuario?.role ?? formData.role,
-							}} />
+							<RenderCampos
+								campos={camposUsuarioVista}
+								data={{
+									name: usuario?.name ?? formData.name,
+									lastName: usuario?.lastName ?? formData.lastName,
+									email: usuario?.email ?? formData.email,
+									role: usuario?.role ?? formData.role,
+								}}
+							 />
 						) : (
 							<RenderCamposEditable
 								campos={camposUsuario}
@@ -146,4 +186,3 @@ export default function UsuarioDetalle() {
 		/>
 	);
 }
-
