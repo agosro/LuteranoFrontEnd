@@ -18,9 +18,9 @@ export default function AsyncAlumnoSelect({
   const [filteredAlumnos, setFilteredAlumnos] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState(null);
 
   const alumnosCursoCache = useRef({});
-  const alumnosDefaultCache = useRef(null);
 
   // Si hay lista externa, usarla en lugar de cargar
   useEffect(() => {
@@ -28,22 +28,24 @@ export default function AsyncAlumnoSelect({
       setAlumnos(alumnosExternos);
       setFilteredAlumnos(alumnosExternos.slice(0, 20));
       return;
+    } else {
+      setAlumnos([]);
+      setFilteredAlumnos([]);
     }
   }, [alumnosExternos]);
 
-  // Cargar alumnos según el filtro (curso o todos) solo si no hay lista externa
+  // Buscar alumnos solo cuando el usuario escribe al menos 2 caracteres
   useEffect(() => {
-    // Si hay lista externa, no cargar
     if (alumnosExternos) return;
-    
-    let active = true;
-    async function loadAlumnos() {
-      try {
-        setLoading(true);
-        let lista = [];
-        
-        if (cursoId) {
-          // Si hay curso seleccionado, buscar por curso
+    if (!token) return;
+
+    // Si hay cursoId, buscar por curso (comportamiento anterior)
+    if (cursoId) {
+      let active = true;
+      async function loadAlumnosCurso() {
+        try {
+          setLoading(true);
+          let lista = [];
           if (alumnosCursoCache.current[cursoId]) {
             lista = alumnosCursoCache.current[cursoId];
           } else {
@@ -51,64 +53,58 @@ export default function AsyncAlumnoSelect({
             lista = await listarAlumnosPorCurso(token, Number(cursoId), cicloId);
             alumnosCursoCache.current[cursoId] = Array.isArray(lista) ? lista : [];
           }
-        } else {
-          // Cargar todos los alumnos
-          if (!alumnosDefaultCache.current) {
-            lista = await listarAlumnosConFiltros(token, {});
-            alumnosDefaultCache.current = Array.isArray(lista) ? lista : [];
-          } else {
-            lista = alumnosDefaultCache.current;
+          if (active) {
+            setAlumnos(Array.isArray(lista) ? lista : []);
+            setFilteredAlumnos(Array.isArray(lista) ? lista : []);
           }
+        } catch {
+          if (active) {
+            setAlumnos([]);
+            setFilteredAlumnos([]);
+          }
+        } finally {
+          if (active) setLoading(false);
         }
-        
-        if (active) {
-          setAlumnos(Array.isArray(lista) ? lista : []);
-          setFilteredAlumnos(Array.isArray(lista) ? lista : []);
-        }
-      } catch (error) {
-        console.error("Error cargando alumnos:", error);
-        if (active) {
-          setAlumnos([]);
-          setFilteredAlumnos([]);
-        }
-      } finally {
-        if (active) setLoading(false);
       }
+      loadAlumnosCurso();
+      return () => { active = false; };
     }
 
-    if (token) {
-      loadAlumnos();
-    }
-
-    return () => { active = false; };
-  }, [token, cursoId, cicloLectivo?.id, alumnosExternos]);
-
-  // Función para normalizar texto (quitar tildes)
-  const normalizeText = (text) => {
-    return text
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-  };
-
-  // Filtrar alumnos por texto de búsqueda
-  useEffect(() => {
-    const search = normalizeText(searchText.trim());
-    
-    if (!search) {
-      // Si no hay búsqueda, mostrar solo los primeros 20
-      setFilteredAlumnos(alumnos.slice(0, 20));
+    // Si no hay texto suficiente, limpiar lista
+    if (!searchText || searchText.trim().length < 2) {
+      setAlumnos([]);
+      setFilteredAlumnos([]);
+      setLoading(false);
       return;
     }
 
-    const filtered = alumnos.filter((a) => {
-      const nombre = normalizeText(`${a.apellido || ""} ${a.nombre || ""}`);
-      const dniStr = (a.dni || "").toString();
-      return nombre.includes(search) || dniStr.includes(search);
-    });
+    // Debounce la búsqueda
+    if (searchTimeout) clearTimeout(searchTimeout);
+    setLoading(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const filtros = {
+          nombre: searchText,
+          apellido: searchText,
+          dni: searchText,
+        };
+        const lista = await listarAlumnosConFiltros(token, filtros);
+        setAlumnos(Array.isArray(lista) ? lista : []);
+        setFilteredAlumnos(Array.isArray(lista) ? lista : []);
+      } catch {
+        setAlumnos([]);
+        setFilteredAlumnos([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 400);
+    setSearchTimeout(timeout);
+    return () => clearTimeout(timeout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchText, token, cursoId, cicloLectivo?.id, alumnosExternos]);
 
-    setFilteredAlumnos(filtered);
-  }, [searchText, alumnos]);
+
+  // Ya no se filtra en frontend, solo se muestra lo que devuelve el backend
 
   const handleSelectChange = useCallback((e) => {
     const selectedId = e.target.value;
