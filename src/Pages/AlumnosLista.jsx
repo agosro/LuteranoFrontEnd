@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
+import { useCicloLectivo } from "../Context/CicloLectivoContext";
 import { listarAlumnosConFiltros, eliminarAlumno, listarAlumnosEgresados, listarAlumnosExcluidos, reactivarAlumno } from "../Services/AlumnoService";
+import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import TablaGenerica from "../Components/TablaLista";
 import ModalVerEntidad from "../Components/Modals/ModalVerEntidad";
 import ConfirmarEliminar from "../Components/Modals/ConfirmarEliminar";
@@ -13,6 +15,7 @@ import { FaUserFriends } from "react-icons/fa";
 
 export default function ListaAlumnos() {
   const { user } = useAuth();
+  const { cicloLectivo } = useCicloLectivo();
   const location = useLocation();
 
   const filtrosIniciales = location.state?.filtros || {};
@@ -45,9 +48,40 @@ export default function ListaAlumnos() {
   const cargarAlumnos = useCallback(async () => {
     setLoading(true);
     try {
-  let data = [];
+      let data = [];
       if (modo === 'filtros') {
-        data = await listarAlumnosConFiltros(user?.token, filtros);
+        // Si es preceptor, cargar solo alumnos de sus cursos a cargo
+        if (user?.rol === "ROLE_PRECEPTOR" && user?.preceptorId) {
+          // Validar que hay ciclo lectivo
+          if (!cicloLectivo?.id) {
+            toast.warn("Seleccioná un ciclo lectivo en Configuración");
+            data = [];
+          } else {
+            try {
+              const { listarCursosPorPreceptor } = await import("../Services/CursoService");
+              const cursosPreceptor = await listarCursosPorPreceptor(user?.token, user.preceptorId);
+              const cursoIds = (cursosPreceptor || []).map(c => c.id);
+              
+              // Cargar alumnos para cada curso del preceptor
+              const alumnosPromesas = cursoIds.map(cursoId =>
+                listarAlumnosPorCurso(user?.token, cursoId, cicloLectivo.id)
+              );
+              const resultados = await Promise.all(alumnosPromesas);
+              
+              // Combinar resultados y eliminar duplicados por ID
+              const alumnosMap = new Map();
+              resultados.flat().forEach(a => {
+                if (!alumnosMap.has(a.id)) alumnosMap.set(a.id, a);
+              });
+              data = Array.from(alumnosMap.values());
+            } catch (e) {
+              console.error("Error cargando alumnos del preceptor:", e);
+              data = [];
+            }
+          }
+        } else {
+          data = await listarAlumnosConFiltros(user?.token, filtros);
+        }
       } else if (modo === 'egresados') {
         data = await listarAlumnosEgresados(user?.token);
       } else if (modo === 'excluidos') {
@@ -60,7 +94,7 @@ export default function ListaAlumnos() {
     } finally {
       setLoading(false);
     }
-  }, [user?.token, filtros, modo]);
+  }, [user?.token, filtros, modo, user?.rol, user?.preceptorId, cicloLectivo?.id]);
 
   useEffect(() => {
     if (user?.token) cargarAlumnos();
@@ -116,14 +150,18 @@ export default function ListaAlumnos() {
   ];
 
   const accionesExtraFila = (alumno) => {
-    const acciones = [
-      {
+    const acciones = [];
+    
+    // Solo admin/director/preceptor pueden asignar tutores (pero preceptor solo ve)
+    if (user?.rol !== "ROLE_PRECEPTOR") {
+      acciones.push({
         icon: <FaUserFriends />,
         onClick: () => abrirModalAsignarTutor(alumno),
         title: "Asignar Tutor",
-      }
-    ];
-    if (modo === 'excluidos') {
+      });
+    }
+    
+    if (modo === 'excluidos' && user?.rol !== "ROLE_PRECEPTOR") {
       acciones.push({
         label: 'Reactivar',
         className: 'btn btn-sm btn-warning',
@@ -148,19 +186,21 @@ export default function ListaAlumnos() {
         columnas={columnasAlumnos}
         datos={alumnos}
         onView={abrirModalVer}
-        onDelete={abrirModalEliminar}
+        onDelete={user?.rol === "ROLE_PRECEPTOR" ? undefined : abrirModalEliminar}
         camposFiltrado={["nombre", "apellido", "dni"]}
         placeholderBuscador="Buscar por nombre o DNI"
         // botones extra dinámicos
         extraButtons={accionesExtraFila}
         // insertar selector de modo a la izquierda del control Mostrar
-        leftControls={() => (
-          <div className="btn-group btn-group-sm" role="group" aria-label="Modo listado alumnos">
-            <button className={`btn ${modo==='filtros' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('filtros')}>Activos / Filtros</button>
-            <button className={`btn ${modo==='egresados' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('egresados')}>Egresados</button>
-            <button className={`btn ${modo==='excluidos' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('excluidos')}>Excluidos</button>
-          </div>
-        )}
+        leftControls={() => 
+          user?.rol === "ROLE_PRECEPTOR" ? null : (
+            <div className="btn-group btn-group-sm" role="group" aria-label="Modo listado alumnos">
+              <button className={`btn ${modo==='filtros' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('filtros')}>Activos / Filtros</button>
+              <button className={`btn ${modo==='egresados' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('egresados')}>Egresados</button>
+              <button className={`btn ${modo==='excluidos' ? 'btn-primary':'btn-outline-primary'}`} onClick={()=>setModo('excluidos')}>Excluidos</button>
+            </div>
+          )
+        }
       />
 
       <ModalVerEntidad

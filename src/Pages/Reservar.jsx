@@ -264,19 +264,23 @@ export default function ReservarEspacio() {
                       const libre = !m.ocupado;
                       const isSelected = modulosSeleccionados.includes(m.modulo.id);
                       return (
-                        <tr key={m.modulo.id} className={isSelected ? "table-info" : libre ? "" : "table-danger"}>
+                        <tr key={m.modulo.id} className={isSelected ? "table-info" : libre ? "" : "table-danger"} style={!libre ? { opacity: 0.6, cursor: 'not-allowed' } : {}}>
                           <td className="text-center">
                             <Form.Check
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleModuloSeleccionado(m.modulo.id)}
                               disabled={!libre}
+                              title={!libre ? "Este módulo ya está ocupado" : "Seleccionar módulo"}
                             />
                           </td>
                           <td>{m.modulo.orden}</td>
                           <td>{m.modulo.desde}</td>
                           <td>{m.modulo.hasta}</td>
-                          <td>{libre ? "Libre" : (m.motivoOcupacion ? `Ocupado - ${m.motivoOcupacion}` : "Ocupado")}</td>
+                          <td>
+                            <strong>{libre ? "✓ Libre" : "✗ Ocupado"}</strong>
+                            {!libre && m.motivoOcupacion && ` - ${m.motivoOcupacion}`}
+                          </td>
                         </tr>
                       );
                     })

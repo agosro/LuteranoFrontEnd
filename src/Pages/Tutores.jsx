@@ -6,6 +6,7 @@ import {
   eliminarTutor,
 } from "../Services/TutorService";
 import { listarAlumnosACargo } from "../Services/TutorAlumnoService";
+import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { camposTutor } from "../Entidades/camposTutor";
 import ModalVerEntidad from "../Components/Modals/ModalVerEntidad";
 import ModalCrearEntidad from "../Components/Modals/ModalCrear";
@@ -15,10 +16,12 @@ import TablaGenerica from "../Components/TablaLista";
 import BotonCrear from "../Components/Botones/BotonCrear";
 import { toast } from "react-toastify";
 import { useAuth } from "../Context/AuthContext";
+import { useCicloLectivo } from "../Context/CicloLectivoContext";
 import { inputLocalToBackendISO } from "../utils/fechas";
 
 export default function ListaTutores() {
   const { user } = useAuth();
+  const { cicloLectivo } = useCicloLectivo();
   const token = user?.token;
 
   const [tutores, setTutores] = useState([]);
@@ -42,7 +45,50 @@ export default function ListaTutores() {
     const cargarDatos = async () => {
       setLoading(true);
       try {
-        const tutoresData = await listarTutores(token); // ya devuelve array
+        let tutoresData = [];
+        
+        // Si es preceptor, cargar solo tutores de sus alumnos
+        if (user?.rol === "ROLE_PRECEPTOR" && user?.preceptorId) {
+          // Validar que hay ciclo lectivo
+          if (!cicloLectivo?.id) {
+            toast.warn("Seleccioná un ciclo lectivo en Configuración");
+            tutoresData = [];
+          } else {
+            try {
+              // Importar dinámicamente los servicios necesarios
+              const { listarCursosPorPreceptor } = await import("../Services/CursoService");
+              
+              // Obtener cursos del preceptor
+              const cursosPreceptor = await listarCursosPorPreceptor(token, user.preceptorId);
+              const cursoIds = (cursosPreceptor || []).map(c => c.id);
+              
+              // Obtener alumnos de esos cursos
+              const alumnosPromesas = cursoIds.map(cursoId =>
+                listarAlumnosPorCurso(token, cursoId, cicloLectivo.id)
+              );
+              const resultados = await Promise.all(alumnosPromesas);
+              const alumnos = resultados.flat();
+              
+              // Extraer tutores únicos de esos alumnos
+              const tutoresMap = new Map();
+              alumnos.forEach(alumno => {
+                (alumno.tutores || []).forEach(tutor => {
+                  if (!tutoresMap.has(tutor.id)) {
+                    tutoresMap.set(tutor.id, tutor);
+                  }
+                });
+              });
+              tutoresData = Array.from(tutoresMap.values());
+            } catch (e) {
+              console.error("Error cargando tutores del preceptor:", e);
+              tutoresData = [];
+            }
+          }
+        } else {
+          // Admin/Director ven todos los tutores
+          tutoresData = await listarTutores(token);
+        }
+        
         setTutores(tutoresData);
       } catch (error) {
         toast.error("Error cargando tutores: " + error.message);
@@ -52,7 +98,7 @@ export default function ListaTutores() {
     };
 
     cargarDatos();
-  }, [token]);
+  }, [token, user?.rol, user?.preceptorId, cicloLectivo?.id]);
 
   const handleInputChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -187,22 +233,23 @@ export default function ListaTutores() {
         columnas={columnasTutores}
         datos={tutores}
         onView={abrirModalVer}
-        // onEdit eliminado
-        onDelete={abrirModalEliminar}
+        onDelete={user?.rol === "ROLE_PRECEPTOR" ? undefined : abrirModalEliminar}
         camposFiltrado={["nombreApellido", "email"]}
-        botonCrear={<BotonCrear texto="Crear tutor" onClick={abrirModalCrear} />}
+        botonCrear={user?.rol === "ROLE_PRECEPTOR" ? undefined : <BotonCrear texto="Crear tutor" onClick={abrirModalCrear} />}
         placeholderBuscador="Buscar por nombre o email"
       />
 
-      <ModalCrearEntidad
-        show={modalCrearShow}
-        onClose={cerrarModalCrear}
-        campos={camposTutor(false)}  // modo edición
-        formData={formData}
-        onInputChange={handleInputChange}
-        onSubmit={handleCreate}
-        titulo="Crear Tutor"
-      />
+      {user?.rol !== "ROLE_PRECEPTOR" && (
+        <ModalCrearEntidad
+          show={modalCrearShow}
+          onClose={cerrarModalCrear}
+          campos={camposTutor(false)}  // modo edición
+          formData={formData}
+          onInputChange={handleInputChange}
+          onSubmit={handleCreate}
+          titulo="Crear Tutor"
+        />
+      )}
 
 
 
@@ -233,16 +280,18 @@ export default function ListaTutores() {
           },
         ]}
         titulo={`Datos del tutor: ${tutorSeleccionado?.nombre} ${tutorSeleccionado?.apellido}`}
-        detallePathBase="tutores"
+        detallePathBase={user?.rol === "ROLE_PRECEPTOR" ? undefined : "tutores"}
       />
 
-      <ConfirmarEliminar
-        show={modalEliminarShow}
-        onClose={cerrarModalEliminar}
-        onConfirm={handleDelete}
-        item={tutorSeleccionado}
-        tipo="tutor"
-      />
+      {user?.rol !== "ROLE_PRECEPTOR" && (
+        <ConfirmarEliminar
+          show={modalEliminarShow}
+          onClose={cerrarModalEliminar}
+          onConfirm={handleDelete}
+          item={tutorSeleccionado}
+          tipo="tutor"
+        />
+      )}
     </>
   );
 }
