@@ -40,8 +40,8 @@ export default function FiltroAlumnosPage() {
 
   const handleCreate = async (datos) => {
     try {
-  const cursoIdSelRaw = typeof datos.cursoActual === 'object' ? datos.cursoActual?.id : datos.cursoActual;
-  const cursoIdSel = cursoIdSelRaw ? Number(cursoIdSelRaw) : null;
+      const cursoIdSelRaw = typeof datos.cursoActual === 'object' ? datos.cursoActual?.id : datos.cursoActual;
+      const cursoIdSel = cursoIdSelRaw ? Number(cursoIdSelRaw) : null;
       // Validación: curso obligatorio
       if (!cursoIdSel) {
         toast.error("El curso es obligatorio");
@@ -56,13 +56,13 @@ export default function FiltroAlumnosPage() {
         email: datos.email,
         direccion: datos.direccion,
         telefono: datos.telefono,
-  fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento) || undefined,
-  fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso) || undefined,
+        fechaNacimiento: inputLocalToBackendISO(datos.fechaNacimiento) || undefined,
+        fechaIngreso: inputLocalToBackendISO(datos.fechaIngreso) || undefined,
         // ya no se envía tutor único; multi-tutores se asignan luego
         cursoActual: { id: Number(cursoIdSel) },
       };
 
-  const respCrear = await crearAlumno(user.token, nuevoAlumno);
+      const respCrear = await crearAlumno(user.token, nuevoAlumno);
       toast.success("Alumno creado con éxito");
 
       // Si se seleccionaron tutores en el flujo de creación, asignarlos ahora
@@ -86,6 +86,11 @@ export default function FiltroAlumnosPage() {
       cerrarModalCrear();
     } catch (error) {
       toast.error(error.message || "Error creando alumno");
+      if (error.data && error.data.errors) {
+        Object.entries(error.data.errors).forEach(([campo, mensaje]) => {
+          toast.error(`${campo}: ${mensaje}`);
+        });
+      }
     }
   };
 

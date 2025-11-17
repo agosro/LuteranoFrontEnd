@@ -164,6 +164,11 @@ export default function ListaPreceptores() {
       setPreceptores(preceptoresActualizados);
     } catch (error) {
       toast.error(error.message || "Error creando preceptor");
+      if (error.data && error.data.errors) {
+        Object.entries(error.data.errors).forEach(([campo, mensaje]) => {
+          toast.error(`${campo}: ${mensaje}`);
+        });
+      }
       console.error("Error al crear preceptor:", error);
     }
   };

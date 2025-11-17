@@ -225,24 +225,14 @@ export default function Usuarios() {
       roleId: null
     });
   } catch (error) {
-  let mensaje = "Error desconocido al crear usuario";
-
-  if (error.response) {
-    // Si viene un error de validación por campos
-    if (error.response.data?.errors) {
-      mensaje = Object.values(error.response.data.errors).join(", ");
-    } else if (error.response.data?.mensaje) {
-      mensaje = error.response.data.mensaje;
-    } else if (typeof error.response.data === "string") {
-      mensaje = error.response.data;
+    toast.error(error.message || "Error creando usuario");
+    if (error.data && error.data.errors) {
+      Object.entries(error.data.errors).forEach(([campo, mensaje]) => {
+        toast.error(`${campo}: ${mensaje}`);
+      });
     }
-  } else if (error.message) {
-    mensaje = error.message;
+    console.error(error);
   }
-
-  toast.error(mensaje);
-  console.error(error);
-}
 };
 
   // Usamos loading dentro de la tabla para evitar romper el orden de hooks
