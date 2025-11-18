@@ -21,7 +21,7 @@ const baseApiUrl = typeof import.meta !== 'undefined' && import.meta.env && impo
       .replace(/\/api$/i, '')    // si termina exactamente en /api lo quitamos
   : ''
 
-async function request(path, { method = 'GET', body = null, headers = {}, skipAuth = false, signal, timeoutMs = 60000 } = {}) {
+async function request(path, { method = 'GET', body = null, headers = {}, skipAuth = false, signal, timeoutMs = 120000 } = {}) {
   // Normalización de la URL:
   // Siempre usamos la variable de entorno VITE_API_URL (dev y prod) para construir la URL base.
   // IMPORTANTE: Respetamos el path tal cual lo envían los Services (algunos empiezan con /api y otros no),
@@ -53,17 +53,27 @@ async function request(path, { method = 'GET', body = null, headers = {}, skipAu
   const controller = !signal ? (typeof AbortController !== 'undefined' ? new AbortController() : null) : null
   const abortSignal = signal || controller?.signal
 
-  const opts = {
-    method,
-    headers: {
-      'Content-Type': shouldJson ? 'application/json' : undefined,
-      // Evitar pantalla de advertencia de ngrok
-      'ngrok-skip-browser-warning': 'true',
-      ...authHeaders,
-      ...headers,
-    },
-    signal: abortSignal,
-  }
+const baseHeaders = {
+  'ngrok-skip-browser-warning': 'true',
+  ...authHeaders,
+  ...headers,
+}
+
+// Solo ponemos Content-Type si el body es JSON.
+// Para FormData NO hay que tocarlo.
+if (shouldJson) {
+  baseHeaders['Content-Type'] = 'application/json'
+}
+
+const opts = {
+  method,
+  headers: baseHeaders,
+  signal: abortSignal,
+}
+
+if (body != null) {
+  opts.body = shouldJson ? JSON.stringify(body) : body
+}
 
   if (body != null) {
     opts.body = shouldJson ? JSON.stringify(body) : body

@@ -147,28 +147,29 @@ export default function ImportarCalificaciones() {
 		const sample = [
 			headers,
 			[
-				"PRIMER AÑO",
-				"A",
-				"MAÑANA",
-				"CICLO BASICO",
-				"2025",
-				"40111222",
-				"García",
-				"Lucía",
-				"12/03/2011",
-				"MATEMÁTICA",
-				"MAT-101",
-				"1A",
-				"7",
-				"8",
-				"9",
-				"-",
-				"6",
-				"7",
-				"8",
-				"-",
+			"PRIMER AÑO",
+			"A",
+			"MAÑANA",
+			"CICLO BASICO",
+			"2025",
+			"40111222",
+			"García",
+			"Lucía",
+			"12/03/2011",
+			"Ciencias Sociales I", // o MATEMÁTICA, da igual, es de ejemplo
+			"MAT-101",
+			"1A",
+			"7",
+			"8",
+			"9",
+			"-",
+			"6",
+			"7",
+			"8",
+			"-",
 			].join(";")
 		].join("\n");
+
 		const blob = new Blob([sample], { type: "text/csv;charset=UTF-8;" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
@@ -176,8 +177,7 @@ export default function ImportarCalificaciones() {
 		a.download = "plantilla_notas.csv";
 		a.click();
 		URL.revokeObjectURL(url);
-	};
-
+		};
 	const resetFile = () => {
 		setFile(null);
 		setResult(null);
