@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 export default function FiltrosAsistencia({
   cursos = [],
@@ -13,6 +13,11 @@ export default function FiltrosAsistencia({
   etiquetaCurso = 'Curso',
   etiquetaFecha = 'Fecha',
 }) {
+  // Obtener fecha máxima (hoy)
+  const maxFecha = useMemo(() => {
+    return new Date().toISOString().slice(0, 10);
+  }, []);
+
   return (
     <div className="card mb-3">
       <div className="card-body">
@@ -33,7 +38,13 @@ export default function FiltrosAsistencia({
           <div className="col-sm-3">
             <div className="mb-3">
               <label className="form-label">{etiquetaFecha}</label>
-              <input type="date" className="form-control" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <input 
+                type="date" 
+                className="form-control" 
+                value={fecha} 
+                onChange={(e) => setFecha(e.target.value)}
+                max={maxFecha}
+              />
             </div>
           </div>
           <div className={mostrarCurso ? 'col-sm-5' : 'col-sm-9'}>

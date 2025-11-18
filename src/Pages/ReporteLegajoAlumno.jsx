@@ -407,14 +407,16 @@ export default function ReporteLegajoAlumno() {
                     <h6>Contacto</h6>
                     <div className="small">Teléfono: <strong>{datos.alumno?.telefono || '-'}</strong></div>
                     <div className="small">Email: <strong>{datos.alumno?.email || '-'}</strong></div>
-                    <div className="small">
-                      Tutor: {alumnoSel?.tutor ? (
-                        <>
-                          <strong>{`${alumnoSel.tutor.apellido ?? ''} ${alumnoSel.tutor.nombre ?? ''}`.trim()}</strong>
-                          {" "}· Teléfono: <strong>{alumnoSel.tutor.telefono || '-'}</strong>
-                        </>
-                      ) : (<strong> -</strong>)}
-                    </div>
+                    {(alumnoSel?.tutores && alumnoSel.tutores.length > 0) ? (
+                      alumnoSel.tutores.map((tutor, idx) => (
+                        <div className="small" key={idx}>
+                          Tutor {idx + 1}: <strong>{`${tutor.apellido ?? ''} ${tutor.nombre ?? ''}`.trim()}</strong>
+                          {tutor.telefono && <> · Teléfono: <strong>{tutor.telefono}</strong></>}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="small">Tutor: <strong>-</strong></div>
+                    )}
                   </div>
                 </Col>
               </Row>

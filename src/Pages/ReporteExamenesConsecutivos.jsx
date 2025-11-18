@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Row, Col, Form, Button, Spinner, Alert, Table, Badge } from 'react-bootstrap';
+import { Card, Row, Col, Form, Button, Spinner, Alert, Table, Badge, Collapse } from 'react-bootstrap';
 import { FileText, AlertTriangle, Info, BarChart3, PieChart, ChevronDown, ChevronUp } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
@@ -7,6 +7,7 @@ import { useAuth } from '../Context/AuthContext';
 import { listarCursos } from '../Services/CursoService';
 import { listarMaterias } from '../Services/MateriaService';
 import { porMateria, porCurso } from '../Services/ReporteExamenesConsecutivosService';
+import { listarCalifPorMateria } from '../Services/CalificacionesService';
 import { toast } from 'react-toastify';
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
@@ -114,7 +115,6 @@ const GrillaNotas = ({ caso }) => {
   });
 
   // Marcar consecutivos basándonos en la cantidad total
-  let consecutivosContados = 0;
   for (let i = 0; i < notasOrdenadas.length; i++) {
     if (notasOrdenadas[i].nota < 4) {
       if (i > 0 && notasOrdenadas[i - 1].nota < 4) {
@@ -166,6 +166,186 @@ const GrillaNotas = ({ caso }) => {
         </div>
       )}
     </div>
+  );
+};
+
+// Componente para fila expandible con detalle completo
+const FilaExpandible = ({ caso, token, ambito }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [calificaciones, setCalificaciones] = useState([]);
+  const [loadingCalif, setLoadingCalif] = useState(false);
+
+  const cargarCalificaciones = async () => {
+    if (!caso.alumnoId || !caso.materiaId) return;
+    try {
+      setLoadingCalif(true);
+      const data = await listarCalifPorMateria(token, caso.alumnoId, caso.materiaId);
+      setCalificaciones(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error('Error al cargar calificaciones');
+      setCalificaciones([]);
+    } finally {
+      setLoadingCalif(false);
+    }
+  };
+
+  const handleToggle = () => {
+    if (!expanded && calificaciones.length === 0) {
+      cargarCalificaciones();
+    }
+    setExpanded(!expanded);
+  };
+
+  // Identificar notas consecutivas desaprobadas
+  const identificarConsecutivas = (califs) => {
+    const sorted = [...califs].sort((a, b) => {
+      if (a.etapa !== b.etapa) return a.etapa - b.etapa;
+      return a.numeroExamen - b.numeroExamen;
+    });
+
+    const marcadas = sorted.map(c => ({ ...c, esConsecutivo: false }));
+    
+    for (let i = 1; i < marcadas.length; i++) {
+      if (marcadas[i].nota < 4 && marcadas[i-1].nota < 4) {
+        marcadas[i].esConsecutivo = true;
+        marcadas[i-1].esConsecutivo = true;
+      }
+    }
+
+    return marcadas;
+  };
+
+  const califsConMarca = useMemo(() => identificarConsecutivas(calificaciones), [calificaciones]);
+  
+  // Agrupar por etapa
+  const califsPorEtapa = useMemo(() => {
+    return califsConMarca.reduce((acc, c) => {
+      if (!acc[c.etapa]) acc[c.etapa] = [];
+      acc[c.etapa].push(c);
+      return acc;
+    }, {});
+  }, [califsConMarca]);
+
+  // Calcular puntaje y causa descriptiva
+  const puntajeCausa = useMemo(() => {
+    const puntaje = caso.puntajeRiesgo || 0;
+    const consecutivos = caso.cantidadConsecutivas || 0;
+    const causa = consecutivos > 0 ? `${consecutivos} examen${consecutivos > 1 ? 'es' : ''} consecutivo${consecutivos > 1 ? 's' : ''}` : 'Evaluando';
+    return { puntaje, causa };
+  }, [caso]);
+
+  return (
+    <>
+      <tr>
+        <td><strong>{caso.alumnoNombre}</strong></td>
+        <td className="text-center">
+          <div className="d-flex flex-column gap-1 align-items-center">
+            <Badge 
+              bg={caso.estadoRiesgo === 'EMERGENCIA' ? 'dark' : caso.estadoRiesgo === 'CRÍTICO' ? 'danger' : caso.estadoRiesgo === 'ALTO' ? 'warning' : 'info'}
+              text={caso.estadoRiesgo === 'ALTO' || caso.estadoRiesgo === 'MEDIO' ? 'dark' : 'white'}
+            >
+              {caso.estadoRiesgo || 'N/A'}
+            </Badge>
+            <div className="small text-muted">
+              Puntaje: <strong>{puntajeCausa.puntaje}</strong>
+            </div>
+          </div>
+        </td>
+        {ambito === 'curso' && <td>{caso.materiaNombre || '-'}</td>}
+        {ambito === 'materia' && <td className="text-center">{caso.cursoStr}</td>}
+        {ambito === 'materia' && (
+          <td>
+            {caso.docenteNombreCompleto === 'Sin asignar' ? (
+              <span className="text-muted fst-italic">{caso.docenteNombreCompleto}</span>
+            ) : (
+              caso.docenteNombreCompleto || '-'
+            )}
+          </td>
+        )}
+        <td>
+          <div className="d-flex flex-column gap-1">
+            <GrillaNotas caso={caso} />
+            <div className="small text-muted">
+              <strong>Causa:</strong> {puntajeCausa.causa}
+            </div>
+          </div>
+        </td>
+        <td className="text-center">
+          <div className="d-flex gap-1 justify-content-center">
+            <Button 
+              size="sm" 
+              variant={expanded ? "primary" : "outline-primary"}
+              onClick={handleToggle}
+              title="Ver detalle completo de notas"
+            >
+              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline-secondary"
+              onClick={() => {
+                if (caso.alumnoId) {
+                  const url = `/reportes/notas-alumnos?alumnoId=${caso.alumnoId}&anio=${new Date().getFullYear()}&autoGenerate=true`;
+                  window.open(url, '_blank');
+                }
+              }}
+              title="Ver reporte completo de notas"
+            >
+              <FileText size={14} />
+            </Button>
+          </div>
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan="100%">
+            <Collapse in={expanded}>
+              <div className="p-3 bg-light">
+                <h6 className="mb-3">Detalle completo de calificaciones</h6>
+                {loadingCalif ? (
+                  <div className="text-center py-3">
+                    <Spinner animation="border" size="sm" /> Cargando calificaciones...
+                  </div>
+                ) : calificaciones.length === 0 ? (
+                  <Alert variant="info" className="mb-0">No hay calificaciones registradas para esta materia</Alert>
+                ) : (
+                  <div>
+                    {Object.entries(califsPorEtapa).map(([etapa, califs]) => (
+                      <div key={etapa} className="mb-3">
+                        <div className="fw-bold mb-2">Etapa {etapa}</div>
+                        <div className="d-flex flex-wrap gap-2">
+                          {califs.map((c, idx) => (
+                            <div
+                              key={idx}
+                              className={`badge ${c.esConsecutivo ? 'bg-danger' : c.nota < 4 ? 'bg-secondary' : 'bg-success'} p-2`}
+                              style={{ fontSize: '13px', minWidth: '80px' }}
+                              title={c.esConsecutivo ? 'Examen consecutivo desaprobado' : ''}
+                            >
+                              <div>Examen {c.numeroExamen}</div>
+                              <div className="fw-bold">Nota: {c.nota}</div>
+                              {c.esConsecutivo && (
+                                <div className="mt-1 small">
+                                  <AlertTriangle size={12} /> Consecutivo
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="mt-3 small text-muted">
+                      <Badge bg="danger" className="me-2">Rojo</Badge> Exámenes consecutivos desaprobados | 
+                      <Badge bg="secondary" className="mx-2">Gris</Badge> Desaprobado | 
+                      <Badge bg="success" className="mx-2">Verde</Badge> Aprobado
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Collapse>
+          </td>
+        </tr>
+      )}
+    </>
   );
 };
 
@@ -226,10 +406,10 @@ export default function ReporteExamenesConsecutivos() {
           raw: c
         })));
         setMaterias((ms || []).map(m => ({
-          value: m.id ?? m.materiaId ?? m.codigo ?? '',
-          label: m.nombre ?? m.nombreMateria ?? m.descripcion ?? `Materia ${m.id ?? m.materiaId ?? ''}`,
+          value: m.id,
+          label: m.nombreMateria || m.descripcion || `Materia ${m.id}`,
           raw: m
-        })).filter(o => o.value !== ''));
+        })).filter(o => o.value));
       } catch {
         // ignore
       }
@@ -921,7 +1101,7 @@ export default function ReporteExamenesConsecutivos() {
                       <thead className="table-light">
                         <tr>
                           <th style={{ width: '20%' }}>Alumno</th>
-                          <th style={{ width: '10%' }} className="text-center">Riesgo</th>
+                          <th style={{ width: '12%' }} className="text-center">Riesgo</th>
                           {ambito === 'curso' && <th style={{ width: '15%' }}>Materia</th>}
                           {ambito === 'materia' && <th style={{ width: '10%' }} className="text-center">Curso</th>}
                           {ambito === 'materia' && <th style={{ width: '15%' }}>Docente</th>}
@@ -931,44 +1111,7 @@ export default function ReporteExamenesConsecutivos() {
                       </thead>
                       <tbody>
                         {casosParaTabla.map((c, idx) => (
-                          <tr key={idx}>
-                            <td><strong>{c.alumnoNombre}</strong></td>
-                            <td className="text-center">
-                              <Badge 
-                                bg={c.estadoRiesgo === 'EMERGENCIA' ? 'dark' : c.estadoRiesgo === 'CRÍTICO' ? 'danger' : c.estadoRiesgo === 'ALTO' ? 'warning' : 'info'}
-                                text={c.estadoRiesgo === 'ALTO' || c.estadoRiesgo === 'MEDIO' ? 'dark' : 'white'}
-                              >
-                                {c.estadoRiesgo || 'N/A'}
-                              </Badge>
-                            </td>
-                            {ambito === 'curso' && <td>{c.materiaNombre || '-'}</td>}
-                            {ambito === 'materia' && <td className="text-center">{c.cursoStr}</td>}
-                            {ambito === 'materia' && (
-                              <td>
-                                {c.docenteNombreCompleto === 'Sin asignar' ? (
-                                  <span className="text-muted fst-italic">{c.docenteNombreCompleto}</span>
-                                ) : (
-                                  c.docenteNombreCompleto || '-'
-                                )}
-                              </td>
-                            )}
-                            <td><GrillaNotas caso={c} /></td>
-                            <td className="text-center">
-                              <Button 
-                                size="sm" 
-                                variant="outline-primary"
-                                onClick={() => {
-                                  if (c.alumnoId) {
-                                    const url = `/reportes/notas-alumnos?alumnoId=${c.alumnoId}&anio=${anio}&autoGenerate=true`;
-                                    window.open(url, '_blank');
-                                  }
-                                }}
-                                title="Ver reporte completo de notas"
-                              >
-                                <FileText size={14} />
-                              </Button>
-                            </td>
-                          </tr>
+                          <FilaExpandible key={idx} caso={c} token={token} ambito={ambito} />
                         ))}
                       </tbody>
                     </Table>

@@ -44,6 +44,13 @@ export default function ListaAlumnos() {
     setModalAsignarTutorShow(false);
   };
 
+  // Actualizar alumno en la lista cuando cambian sus tutores
+  const handleAlumnoActualizado = (alumnoActualizado) => {
+    setAlumnos(prev => 
+      prev.map(a => a.id === alumnoActualizado.id ? alumnoActualizado : a)
+    );
+  };
+
   // cargar alumnos
   const cargarAlumnos = useCallback(async () => {
     setLoading(true);
@@ -226,7 +233,7 @@ export default function ListaAlumnos() {
         onClose={cerrarModalAsignarTutor}
         alumno={alumnoParaAsignar}
         token={user?.token}
-        onAlumnoActualizado={() => cargarAlumnos()}
+        onAlumnoActualizado={handleAlumnoActualizado}
       />
     </>
   );
