@@ -55,7 +55,7 @@ export default function ReporteNotasAlumnos() {
   const [diag, setDiag] = useState(null); // info de diagnóstico
   // const [rawForYear, setRawForYear] = useState(null); // calificaciones crudas del año
   const printRef = React.useRef(null);
-  // Nota Final por materia (clave: materiaId -> NF)
+  // PFA (Promedio Final Anual) por materia (clave: materiaId -> PFA)
   const [nfMap, setNfMap] = useState({});
   // Remontar selector cuando cambian filtros (año/división) para forzar recarga
   const alumnoSelectKey = React.useMemo(
@@ -296,7 +296,7 @@ export default function ReporteNotasAlumnos() {
       "Materia",
       "E1 N1","E1 N2","E1 N3","E1 N4","E1 Prom",
       "E2 N1","E2 N2","E2 N3","E2 N4","E2 Prom",
-      "PG","NF","Estado"
+      "PG","CO","EX","PFA","Estado"
     ];
     const rows = resumen.map(r => {
       const e1arr = Array.isArray(r.e1Notas) ? r.e1Notas : [];
@@ -305,7 +305,7 @@ export default function ReporteNotasAlumnos() {
         r.materiaNombre || "",
         e1arr[0] ?? "", e1arr[1] ?? "", e1arr[2] ?? "", e1arr[3] ?? "", (r.e1 ?? ""),
         e2arr[0] ?? "", e2arr[1] ?? "", e2arr[2] ?? "", e2arr[3] ?? "", (r.e2 ?? ""),
-        (r.pg ?? ""), (nfMap?.[r.materiaId] ?? ""), (r.estado ?? "")
+        (r.pg ?? ""), (r.co ?? ""), (r.ex ?? ""), (nfMap?.[r.materiaId] ?? ""), (r.estado ?? "")
       ];
     });
     const csv = [header, ...rows]
@@ -837,13 +837,17 @@ export default function ReporteNotasAlumnos() {
                         <th colSpan={5} className="text-center">Calificaciones Etapa 1</th>
                         <th colSpan={5} className="text-center">Calificaciones Etapa 2</th>
                         <th>PG</th>
-                        <th>NF</th>
+                        <th>CO</th>
+                        <th>EX</th>
+                        <th>PFA</th>
                         <th>Estado</th>
                       </tr>
                       <tr>
                         <th></th>
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E1</th>
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
+                        <th></th>
+                        <th></th>
                         <th></th>
                         <th></th>
                         <th></th>
@@ -859,6 +863,8 @@ export default function ReporteNotasAlumnos() {
                             <td>{e1[0] ?? '-'}</td><td>{e1[1] ?? '-'}</td><td>{e1[2] ?? '-'}</td><td>{e1[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e1 ?? '-'}</Badge></td>
                             <td>{e2[0] ?? '-'}</td><td>{e2[1] ?? '-'}</td><td>{e2[2] ?? '-'}</td><td>{e2[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e2 ?? '-'}</Badge></td>
                             <td><Badge bg={(r.pg ?? 0) >= 6 ? 'success' : 'danger'}>{r.pg ?? '-'}</Badge></td>
+                            <td>{r.co ?? '-'}</td>
+                            <td>{r.ex ?? '-'}</td>
                             <td>{nfMap?.[r.materiaId] ?? '-'}</td>
                             <td>{r.estado ?? '-'}</td>
                           </tr>

@@ -885,7 +885,11 @@ export default function ReporteNotasCursoMateria() {
                           {showNF && <td><Badge bg="secondary">{nfMap[a.id] ?? '-'}</Badge></td>}
                           <td>{m.co ?? "-"}</td>
                           <td>{m.ex ?? "-"}</td>
-                          <td>{m.pfa ?? "-"}</td>
+                          <td>{
+                            (typeof m.pfa === 'number' && !isNaN(m.pfa))
+                              ? Math.round(m.pfa)
+                              : (m.pfa ?? "-")
+                          }</td>
                           <td>{m.estado??"-"}</td>
                         </tr>
                       );
