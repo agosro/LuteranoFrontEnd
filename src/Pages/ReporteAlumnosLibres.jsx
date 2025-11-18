@@ -19,7 +19,6 @@ export default function ReporteAlumnosLibres() {
   const [cursoId, setCursoId] = useState('');
   const [anio, setAnio] = useState(String(new Date().getFullYear()));
   const [items, setItems] = useState([]);
-  const [limit, setLimit] = useState(0); // 0 = mostrar todos
   const [cargando, setCargando] = useState(false);
   const printRef = useRef(null);
 
@@ -45,7 +44,7 @@ export default function ReporteAlumnosLibres() {
       setCargando(true);
       const cursoParam = (modo === 'curso' && cursoId) ? Number(cursoId) : null;
       const res = await fetchAlumnosLibres(Number(anio), cursoParam, token);
-      const lista = Array.isArray(res?.libres) ? res.libres : [];
+      const lista = Array.isArray(res?.filas) ? res.filas : [];
       setItems(lista);
       if (res?.code && res.code < 0) toast.error(res?.mensaje || 'Error en el reporte');
     } catch (e) {
@@ -64,10 +63,8 @@ export default function ReporteAlumnosLibres() {
   const displayedItems = useMemo(() => {
     const arr = Array.isArray(items) ? [...items] : [];
     arr.sort((a,b) => (Number(b?.inasistenciasAcum)||0) - (Number(a?.inasistenciasAcum)||0));
-    // Si limit es 0, null o undefined, mostrar todos
-    if (!limit || Number(limit) <= 0) return arr;
-    return arr.slice(0, Number(limit));
-  }, [items, limit]);
+    return arr;
+  }, [items]);
 
   const totalFilas = displayedItems.length;
   const promedioInasist = useMemo(() => {
@@ -139,16 +136,18 @@ export default function ReporteAlumnosLibres() {
 
   const exportCSV = () => {
     if (!displayedItems || displayedItems.length === 0) return;
-    const header = ["Alumno", "DNI", "Curso", "Nivel", "División", "Motivo", "Inasistencias"];
-    const rows = displayedItems.map(it => [
-      `${(it?.apellido || '').trim()} ${(it?.nombre || '').trim()}`.trim(),
-      it?.dni ?? '',
-      it?.cursoEtiqueta ?? `${it?.anio ?? ''}`.trim(),
-      it?.nivel ?? '',
-      it?.division ?? '',
-      it?.motivo ?? '',
-      it?.inasistenciasAcum ?? ''
-    ]);
+    const header = ["Alumno", "DNI", "Curso", "Inasistencias"];
+    const rows = displayedItems.map(it => {
+      const anio = it?.anio ?? '';
+      const division = it?.division ?? '';
+      const cursoFormat = `${anio}°${division}`;
+      return [
+        `${(it?.apellido || '').trim()} ${(it?.nombre || '').trim()}`.trim(),
+        it?.dni ?? '',
+        cursoFormat,
+        it?.inasistenciasAcum ?? ''
+      ];
+    });
     const csv = [header, ...rows]
       .map(cols => cols.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(','))
       .join('\n');
@@ -158,8 +157,7 @@ export default function ReporteAlumnosLibres() {
     a.href = url;
     const cursoLbl = modo === 'curso' ? (cursos.find(c=>String(c.value)===String(cursoId))?.label || String(cursoId||'')) : 'todos';
     const cursoSlug = cursoLbl.replace(/\s+/g, '_');
-    const topSlug = (limit != null) ? `_top_${limit}` : '';
-    a.download = `reporte_alumnos_libres_${cursoSlug}_${anio}${topSlug}.csv`;
+    a.download = `reporte_alumnos_libres_${cursoSlug}_${anio}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -259,7 +257,7 @@ export default function ReporteAlumnosLibres() {
       }
     `;
     const titulo = modo === 'curso' ? `Alumnos Libres · Curso ${cursos.find(c=>String(c.value)===String(cursoId))?.label || ''}` : 'Alumnos Libres · Todos los cursos';
-    const sub = `Año: ${anio} · Top N: ${limit ?? 'Todos'}`;
+    const sub = `Año: ${anio}`;
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Alumnos Libres</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>${titulo}</h3>`);
     win.document.write(`<div class="sub">${sub}</div>`);
@@ -331,20 +329,6 @@ export default function ReporteAlumnosLibres() {
               <select className="form-select" value={anio} onChange={(e) => setAnio(e.target.value)}>
                 {aniosPosibles.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
-            </div>
-            <div className="col-sm-2">
-              <label className="form-label">Top N (opcional)</label>
-              <input 
-                type="number" 
-                min={0} 
-                className="form-control" 
-                value={limit} 
-                onChange={(e) => setLimit(Number(e.target.value))}
-                placeholder="0 = Todos"
-              />
-            </div>
-            <div className="col-sm-12">
-              <small className="text-muted">* Dejar en 0 para mostrar todos los alumnos libres</small>
             </div>
             <div className="col-sm-12 d-flex justify-content-end">
               <button className="btn btn-primary" onClick={fetchReporte} disabled={cargando || (modo==='curso' && !cursoId)}>
@@ -429,55 +413,6 @@ export default function ReporteAlumnosLibres() {
                     </Card.Body>
                   </Card>
                 </Col>
-                <Col md={5}>
-                  <Card>
-                    <Card.Body>
-                      <h6 className="mb-3">Distribución por Motivo</h6>
-                      <ResponsiveContainer width="100%" height={250}>
-                        <PieChart>
-                          <Pie
-                            data={kpisData.motivoData}
-                            cx="50%"
-                            cy="45%"
-                            labelLine={false}
-                            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                            outerRadius={70}
-                            fill="#8884d8"
-                            dataKey="value"
-                          >
-                            {kpisData.motivoData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value, name) => [`${value} alumnos`, name]} />
-                          <Legend 
-                            verticalAlign="bottom" 
-                            height={36}
-                            formatter={(value, entry) => `${value}: ${entry.payload.value}`}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                {kpisData.top5.length > 0 && (
-                  <Col md={12}>
-                    <Card>
-                      <Card.Body>
-                        <h6 className="mb-3">Top 5 Alumnos con Más Inasistencias</h6>
-                        <ResponsiveContainer width="100%" height={200}>
-                          <BarChart data={kpisData.top5} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="nombre" angle={-15} textAnchor="end" height={60} />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="inasistencias" name="Inasistencias" fill="#dc3545" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                )}
               </Row>
             </Accordion.Body>
           </Accordion.Item>
@@ -499,28 +434,24 @@ export default function ReporteAlumnosLibres() {
                   <th>Alumno</th>
                   <th>DNI</th>
                   <th>Curso</th>
-                  <th>Nivel</th>
-                  <th>División</th>
-                  <th>Motivo</th>
                   <th className="text-end">Inasistencias</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 && (
-                  <tr><td colSpan={7} className="text-center text-muted py-3">Sin datos</td></tr>
+                  <tr><td colSpan={4} className="text-center text-muted py-3">Sin datos</td></tr>
                 )}
                 {items.map((it, idx) => {
                   const alumno = `${(it?.apellido || '').trim()} ${(it?.nombre || '').trim()}`.trim() || '-';
-                  const curso = it?.cursoEtiqueta || `${it?.anio ?? ''}`.trim() || '-';
+                  const anio = it?.anio ?? '';
+                  const division = it?.division ?? '';
+                  const cursoFormat = `${anio}°${division}`;
                   const cant = it?.inasistenciasAcum ?? 0;
                   return (
                     <tr key={idx}>
                       <td>{alumno}</td>
                       <td>{it?.dni ?? ''}</td>
-                      <td>{curso}</td>
-                      <td>{it?.nivel ?? ''}</td>
-                      <td>{it?.division ?? ''}</td>
-                      <td>{it?.motivo ?? ''}</td>
+                      <td>{cursoFormat}</td>
                       <td className="text-end"><span className={`badge ${cant > 25 ? 'text-bg-danger' : 'text-bg-warning text-dark'}`}>{cant}</span></td>
                     </tr>
                   );
