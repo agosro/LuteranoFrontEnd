@@ -3,7 +3,7 @@ import { Modal, Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import VistaEntidad from "../VistaEntidad";
 
-export default function ModalVerEntidad({ show, onClose, datos, campos, titulo, detallePathBase }) {
+export default function ModalVerEntidad({ show, onClose, datos, campos, titulo, detallePathBase, mostrarLinkDetalle = true }) {
   const navigate = useNavigate();
 
   if (!show || !datos) return null;
@@ -32,19 +32,21 @@ export default function ModalVerEntidad({ show, onClose, datos, campos, titulo, 
         <VistaEntidad datos={datos} campos={campos} />
 
         {/* 🔹 Link que funciona con click normal y rueda del mouse */}
-        <div className="mt-3 text-end">
-          <button
-            type="button"
-            className="btn btn-link"
-            onClick={handleVerDetalle}
-            onMouseDown={handleVerDetalle}
-            onAuxClick={handleVerDetalle}
-            style={{ cursor: 'pointer' }}
-            title="Click normal: abre aquí | Rueda del mouse o Ctrl+Click: abre en nueva pestaña"
-          >
-            Ver detalle completo →
-          </button>
-        </div>
+        {mostrarLinkDetalle && (
+          <div className="mt-3 text-end">
+            <button
+              type="button"
+              className="btn btn-link"
+              onClick={handleVerDetalle}
+              onMouseDown={handleVerDetalle}
+              onAuxClick={handleVerDetalle}
+              style={{ cursor: 'pointer' }}
+              title="Click normal: abre aquí | Rueda del mouse o Ctrl+Click: abre en nueva pestaña"
+            >
+              Ver detalle completo →
+            </button>
+          </div>
+        )}
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" onClick={onClose}>

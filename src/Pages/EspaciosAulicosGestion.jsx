@@ -155,6 +155,7 @@ export default function EspaciosAulicosGestion() {
         datos={seleccionado}
         campos={camposEspacioAulico(true)}
         titulo={`Datos del espacio: ${seleccionado?.nombre || ''}`}
+        mostrarLinkDetalle={false}
       />
 
       <ConfirmarEliminar
