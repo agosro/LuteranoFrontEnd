@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Row, Col, Accordion } from 'react-bootstrap';
+import { Card, Row, Col, Accordion, Collapse, Table } from 'react-bootstrap';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, Calendar, AlertCircle } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
@@ -23,6 +23,7 @@ export default function ReporteTardanzas() {
   const [limit, setLimit] = useState(20);
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(false);
+  const [expandedRows, setExpandedRows] = useState(new Set());
   const printRef = useRef(null);
 
   useEffect(() => {
@@ -71,6 +72,26 @@ export default function ReporteTardanzas() {
   };
 
   const getCantidadTardanzas = (it) => (it?.cantidadTardanzas ?? 0);
+
+  const toggleRow = (alumnoId) => {
+    const newSet = new Set(expandedRows);
+    if (newSet.has(alumnoId)) {
+      newSet.delete(alumnoId);
+    } else {
+      newSet.add(alumnoId);
+    }
+    setExpandedRows(newSet);
+  };
+
+  const formatFecha = (fecha) => {
+    if (!fecha) return '-';
+    try {
+      const date = new Date(fecha);
+      return date.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    } catch {
+      return fecha;
+    }
+  };
 
   const totalTardanzas = useMemo(() => items.reduce((acc, it) => acc + (it?.cantidadTardanzas ?? 0), 0), [items]);
 
@@ -169,9 +190,8 @@ export default function ReporteTardanzas() {
     URL.revokeObjectURL(url);
   };
 
-  // Imprimir/PDF solo tabla
+  // Imprimir/PDF solo tabla, mostrando todos los detalles expandidos
   const printOnlyTable = () => {
-    if (!printRef.current) return;
     const win = window.open('', '_blank');
     if (!win) return;
     const css = `
@@ -200,11 +220,11 @@ export default function ReporteTardanzas() {
     };
     const rango = (desde || hasta) ? `${fmt(desde)} – ${fmt(hasta)}` : 'Todos';
     const sub = `Rango: ${rango} · Top N: ${limit ?? ''}`;
-    
+
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de Tardanzas</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>${titulo}</h3>`);
     win.document.write(`<div class="sub">${sub}</div>`);
-    
+
     // KPIs en PDF
     if (kpisData) {
       win.document.write(`<div class="kpi-section">`);
@@ -214,7 +234,7 @@ export default function ReporteTardanzas() {
       win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio por Alumno</div><div class="kpi-value">${kpisData.promedioTardanzas}</div></div>`);
       win.document.write(`<div class="kpi-card"><div class="kpi-label">Máximo</div><div class="kpi-value">${kpisData.tardanzaMaxima}</div><div style="font-size:10px;color:#666;">Mínimo: ${kpisData.tardanzaMinima}</div></div>`);
       win.document.write(`</div>`);
-      
+
       // Distribución
       win.document.write(`<div><strong style="font-size:11px;">Distribución por rangos:</strong><ul class="dist-list">`);
       kpisData.distribucion.forEach(d => {
@@ -223,8 +243,49 @@ export default function ReporteTardanzas() {
       win.document.write(`</ul></div>`);
       win.document.write(`</div>`);
     }
-    
-    win.document.write(printRef.current.innerHTML);
+
+    // Tabla de resultados con detalles expandidos
+    win.document.write('<div class="table-responsive"><table class="table table-hover align-middle mb-0">');
+    win.document.write('<thead class="table-light"><tr><th>Alumno</th><th>DNI</th><th>Curso</th><th class="text-end">Tardanzas</th><th></th></tr></thead>');
+    win.document.write('<tbody>');
+    if (!items || items.length === 0) {
+      win.document.write('<tr><td colspan="5" class="text-center text-muted py-3">Sin datos</td></tr>');
+    } else {
+      items.forEach((it) => {
+        const alumno = getNombreAlumno(it);
+        const curso = getNombreCurso(it);
+        const cant = getCantidadTardanzas(it);
+        const tieneDetalles = Array.isArray(it.detalles) && it.detalles.length > 0;
+        win.document.write('<tr>');
+        win.document.write(`<td>${alumno}</td>`);
+        win.document.write(`<td>${it.dni || '-'}</td>`);
+        win.document.write(`<td>${curso}</td>`);
+        win.document.write(`<td class="text-end"><span class="badge text-bg-warning text-dark">${cant}</span></td>`);
+        win.document.write('<td></td>');
+        win.document.write('</tr>');
+        // Detalle expandido siempre
+        if (tieneDetalles) {
+          win.document.write('<tr class="table-light"><td colspan="5"><div class="p-3">');
+          win.document.write(`<h6 class="mb-3"><span style="vertical-align:middle;">&#128197;</span> Detalle de tardanzas (${it.detalles.length})</h6>`);
+          win.document.write('<div class="table-responsive"><table class="table table-sm mb-0" style="font-size:0.9rem"><thead class="table-secondary"><tr><th style="width:25%">Fecha</th><th>Observación</th></tr></thead><tbody>');
+          it.detalles.forEach((detalle) => {
+            win.document.write('<tr>');
+            win.document.write(`<td><strong>${formatFecha(detalle.fecha)}</strong></td>`);
+            win.document.write('<td>');
+            if (detalle.observacion) {
+              win.document.write(`<div class="d-flex align-items-start gap-2"><span style="vertical-align:middle;">&#9888;&#65039;</span><span>${detalle.observacion}</span></div>`);
+            } else {
+              win.document.write('<span class="text-muted">-</span>');
+            }
+            win.document.write('</td>');
+            win.document.write('</tr>');
+          });
+          win.document.write('</tbody></table></div></div></td></tr>');
+        }
+      });
+    }
+    win.document.write('</tbody></table></div>');
+
     win.document.write('</body></html>');
     win.document.close();
     win.focus();
@@ -428,30 +489,83 @@ export default function ReporteTardanzas() {
                   const alumno = getNombreAlumno(it);
                   const curso = getNombreCurso(it);
                   const cant = getCantidadTardanzas(it);
+                  const isExpanded = expandedRows.has(it.alumnoId);
+                  const tieneDetalles = Array.isArray(it.detalles) && it.detalles.length > 0;
+
                   return (
-                    <tr key={idx}>
-                      <td>
-                        <button 
-                          className="btn btn-link p-0 text-start" 
-                          onClick={() => navigate(`/alumno/${it.alumnoId}`)}
-                          disabled={!it.alumnoId}
-                        >
-                          {alumno}
-                        </button>
-                      </td>
-                      <td>{it.dni || '-'}</td>
-                      <td>{curso}</td>
-                      <td className="text-end"><span className="badge text-bg-warning text-dark">{cant}</span></td>
-                      <td>
-                        <button 
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => navigate(`/alumno/${it.alumnoId}`)}
-                          disabled={!it.alumnoId}
-                        >
-                          Ver detalle
-                        </button>
-                      </td>
-                    </tr>
+                    <React.Fragment key={idx}>
+                      <tr>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            {tieneDetalles && (
+                              <button 
+                                className="btn btn-sm p-0 border-0"
+                                onClick={() => toggleRow(it.alumnoId)}
+                                title={isExpanded ? 'Contraer' : 'Expandir'}
+                              >
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </button>
+                            )}
+                            <button 
+                              className="btn btn-link p-0 text-start" 
+                              onClick={() => {
+                                navigate(`/alumnos/${it.alumnoId}`);
+                              }}
+                              disabled={!it.alumnoId}
+                              style={{ cursor: !it.alumnoId ? 'not-allowed' : 'pointer' }}
+                            >
+                              {alumno}
+                            </button>
+                          </div>
+                        </td>
+                        <td>{it.dni || '-'}</td>
+                        <td>{curso}</td>
+                        <td className="text-end"><span className="badge text-bg-warning text-dark">{cant}</span></td>
+                        {/* Botón de 'Ver detalle' eliminado, ya que el detalle está en el desplegable */}
+                      </tr>
+                      {/* Fila expandida con detalle de tardanzas */}
+                      {tieneDetalles && isExpanded && (
+                        <tr className="table-light">
+                          <td colSpan={5}>
+                            <div className="p-3">
+                              <h6 className="mb-3">
+                                <Calendar size={18} className="me-2 mb-1" />
+                                Detalle de tardanzas ({it.detalles.length})
+                              </h6>
+                              <div className="table-responsive">
+                                <Table size="sm" className="mb-0" style={{ fontSize: '0.9rem' }}>
+                                  <thead className="table-secondary">
+                                    <tr>
+                                      <th style={{ width: '25%' }}>Fecha</th>
+                                      <th>Observación</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {it.detalles.map((detalle, dIdx) => (
+                                      <tr key={dIdx}>
+                                        <td>
+                                          <strong>{formatFecha(detalle.fecha)}</strong>
+                                        </td>
+                                        <td>
+                                          {detalle.observacion ? (
+                                            <div className="d-flex align-items-start gap-2">
+                                              <AlertCircle size={16} className="text-muted flex-shrink-0 mt-1" />
+                                              <span>{detalle.observacion}</span>
+                                            </div>
+                                          ) : (
+                                            <span className="text-muted">-</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </Table>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
