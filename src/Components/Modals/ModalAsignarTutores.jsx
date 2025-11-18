@@ -16,8 +16,16 @@ export default function ModalAsignarTutores({ show, onClose, alumno, token, onAl
   const [resultados, setResultados] = useState([]);
   const [loadingBusqueda, setLoadingBusqueda] = useState(false);
   const [operando, setOperando] = useState(false);
+  const [alumnoLocal, setAlumnoLocal] = useState(alumno);
 
-  const tutoresAsignados = useMemo(() => alumno?.tutores || [], [alumno]);
+  // Sincronizar alumnoLocal cuando alumno prop cambia (al abrir modal)
+  useEffect(() => {
+    if (show) {
+      setAlumnoLocal(alumno);
+    }
+  }, [show, alumno]);
+
+  const tutoresAsignados = useMemo(() => alumnoLocal?.tutores || [], [alumnoLocal]);
   const asignadosIds = useMemo(() => new Set(tutoresAsignados.map(t => t.id)), [tutoresAsignados]);
 
   const ejecutarBusqueda = useCallback(async (q) => {
@@ -48,7 +56,7 @@ export default function ModalAsignarTutores({ show, onClose, alumno, token, onAl
       <div className="modal-dialog modal-lg">
         <div className="modal-content">
           <div className="modal-header">
-            <h5 className="modal-title">Gestionar tutores de {alumno?.nombre} {alumno?.apellido}</h5>
+            <h5 className="modal-title">Gestionar tutores de {alumnoLocal?.nombre} {alumnoLocal?.apellido}</h5>
             <button type="button" className="btn-close" onClick={onClose}></button>
           </div>
           <div className="modal-body">
@@ -67,9 +75,11 @@ export default function ModalAsignarTutores({ show, onClose, alumno, token, onAl
                       onClick={async () => {
                         try {
                           setOperando(true);
-                          const resp = await desasignarMultiplesTutores(token, alumno.id, [t.id]);
+                          const resp = await desasignarMultiplesTutores(token, alumnoLocal.id, [t.id]);
                           if (resp.success) {
                             toast.success(resp.message || 'Tutor desasignado');
+                            // Actualizar estado local inmediatamente
+                            setAlumnoLocal(resp.alumno);
                             onAlumnoActualizado(resp.alumno);
                           } else {
                             toast.warn(resp.message || 'Respuesta desconocida');
@@ -117,9 +127,11 @@ export default function ModalAsignarTutores({ show, onClose, alumno, token, onAl
                       onClick={async () => {
                         try {
                           setOperando(true);
-                          const resp = await asignarMultiplesTutores(token, alumno.id, [t.id]);
+                          const resp = await asignarMultiplesTutores(token, alumnoLocal.id, [t.id]);
                           if (resp.success) {
                             toast.success(resp.message || 'Tutor asignado');
+                            // Actualizar estado local inmediatamente
+                            setAlumnoLocal(resp.alumno);
                             onAlumnoActualizado(resp.alumno);
                             setQuery(''); // limpiar para evitar duplicar
                             setResultados([]);
