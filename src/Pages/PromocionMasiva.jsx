@@ -212,12 +212,9 @@ export default function PromocionMasiva() {
                     <div>• Procesando alumnos del ciclo lectivo...</div>
                     <div>• Evaluando condiciones académicas...</div>
                     <div>• Aplicando reglas de promoción...</div>
-                    {tiempoTranscurrido > 30 && (
-                      <div className="mt-2 fw-bold">Tiempo estimado restante: {Math.max(0, Math.ceil((180 - tiempoTranscurrido) / 60))} minuto(s)</div>
-                    )}
                   </div>
                   <div className="mt-3 small">
-                    <strong>Nota:</strong> Este proceso puede tardar varios minutos dependiendo de la cantidad de alumnos.
+                    <strong>Nota:</strong> Este proceso puede tardar hasta 30 minutos dependiendo de la cantidad de alumnos.
                     Por favor, no cierres esta ventana ni recargues la página.
                   </div>
                 </div>

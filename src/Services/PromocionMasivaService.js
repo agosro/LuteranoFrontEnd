@@ -6,8 +6,8 @@ import { httpClient } from './httpClient'
 // Ejecuta la promoción real (requiere ADMIN o DIRECTOR)
 export const ejecutarPromocionMasiva = async (token, payload) => {
   void token
-  // Aumentar timeout a 10 minutos para operaciones masivas
-  const data = await httpClient.post('/promocion/masiva', payload, { timeoutMs: 600000 })
+  // Aumentar timeout a 45 minutos para operaciones masivas
+  const data = await httpClient.post('/promocion/masiva', payload, { timeoutMs: 2700000 })
   const code = data?.code
   if (typeof code === 'number' && code < 0) throw new Error(data?.mensaje || 'Error en la operación de promoción')
   return data
@@ -16,8 +16,8 @@ export const ejecutarPromocionMasiva = async (token, payload) => {
 // Simula la promoción (accesible para PRECEPTOR también)
 export const simularPromocionMasiva = async (token, payload) => {
   void token
-  // Aumentar timeout a 10 minutos para operaciones masivas
-  const data = await httpClient.post('/promocion/masiva/simulacion', payload, { timeoutMs: 600000 })
+  // Aumentar timeout a 45 minutos para operaciones masivas
+  const data = await httpClient.post('/promocion/masiva/simulacion', payload, { timeoutMs: 2700000 })
   const code = data?.code
   if (typeof code === 'number' && code < 0) throw new Error(data?.mensaje || 'Error en la simulación de promoción')
   return data
