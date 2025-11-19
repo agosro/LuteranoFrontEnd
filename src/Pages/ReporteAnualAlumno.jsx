@@ -315,7 +315,7 @@ export default function ReporteAnualAlumno() {
       "Materia",
       "E1 N1","E1 N2","E1 N3","E1 N4","E1 Prom",
       "E2 N1","E2 N2","E2 N3","E2 N4","E2 Prom",
-      "PG","Estado","CO","EX","Nota Final","Estado Final","Estado Materia"
+      "PG","CO","EX","PFA"
     ];
     lines.push(header);
     if (Array.isArray(materias)) {
@@ -326,7 +326,7 @@ export default function ReporteAnualAlumno() {
           r.materiaNombre || "",
           e1arr[0] ?? "", e1arr[1] ?? "", e1arr[2] ?? "", e1arr[3] ?? "", (r.e1 ?? ""),
           e2arr[0] ?? "", e2arr[1] ?? "", e2arr[2] ?? "", e2arr[3] ?? "", (r.e2 ?? ""),
-          (r.pg ?? ""), (r.estado ?? ""), (r.co ?? ""), (r.ex ?? ""), (r.notaFinal ?? ""), (r.estadoFinal ?? ""), (r.estadoMateria ?? "")
+          (r.pg ?? ""), (r.co ?? ""), (r.ex ?? ""), (r.notaFinal ?? "")
         ]);
       });
     }
@@ -356,83 +356,23 @@ export default function ReporteAnualAlumno() {
   };
 
   const printOnlyTable = () => {
-    // Imprimir TODO el informe (encabezado, resumen, tabla y bloques inferiores)
+    // Imprimir solo el informe principal (sin KPIs, análisis ni referencias)
     if (!printRef.current) return;
     const win = window.open('', '_blank');
     if (!win) return;
     const css = `
-      body { 
-        font-family: 'Segoe UI', Arial, sans-serif; 
-        padding: 24px; 
-        color: #212529;
-      }
-      h3 { 
-        margin: 0 0 8px 0; 
-        font-size: 22px;
-        font-weight: 600;
-        color: #0d6efd;
-        border-bottom: 2px solid #0d6efd;
-        padding-bottom: 6px;
-      }
-      .kpi-section {
-        background: #f8f9fa;
-        padding: 16px;
-        border-radius: 6px;
-        margin-bottom: 20px;
-        border: 1px solid #dee2e6;
-      }
-      .kpi-title {
-        font-size: 16px;
-        font-weight: 600;
-        margin-bottom: 12px;
-        color: #495057;
-      }
-      .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin-bottom: 16px;
-      }
-      .kpi-card {
-        background: white;
-        padding: 10px;
-        border-radius: 4px;
-        border: 1px solid #dee2e6;
-        text-align: center;
-      }
-      .kpi-label {
-        font-size: 11px;
-        color: #6c757d;
-        margin-bottom: 4px;
-      }
-      .kpi-value {
-        font-size: 18px;
-        font-weight: 600;
-        color: #212529;
-      }
-      .kpi-distribution {
-        font-size: 12px;
-        line-height: 1.8;
-        color: #495057;
-      }
-      .kpi-dist-item {
-        display: flex;
-        justify-content: space-between;
-        padding: 4px 8px;
-        background: white;
-        border-radius: 3px;
-        margin-bottom: 4px;
-      }
-      table { 
+      body { font-size: 11px !important; font-family: 'Segoe UI', Arial, sans-serif; color: #212529; }
+      table {
         width: 100%; 
         border-collapse: collapse; 
         margin-bottom: 16px;
-        font-size: 11px;
+        font-size: inherit;
       }
       th, td { 
         border: 1px solid #dee2e6; 
         padding: 6px 8px; 
         text-align: left;
+        font-size: inherit;
       }
       thead tr:first-child th { 
         background: #e9ecef; 
@@ -446,60 +386,40 @@ export default function ReporteAnualAlumno() {
         border: 1px solid #dee2e6; 
         margin-bottom: 12px; 
         border-radius: 6px;
+        font-size: inherit;
       }
       .card-header { 
         background: #e9ecef; 
         padding: 8px 12px; 
         font-weight: 600;
         border-bottom: 1px solid #dee2e6;
+        font-size: inherit;
       }
       .card-body { 
         padding: 12px; 
+        font-size: inherit;
       }
       .badge { 
-        font-size: 11px;
+        font-size: inherit;
         padding: 4px 8px;
         border-radius: 4px;
       }
+      .small, small { font-size: inherit !important; }
+      .d-print-none {
+        display: none !important;
+      }
       @media print {
-        body { padding: 12px; }
-        .kpi-section { page-break-inside: avoid; }
+        body { padding: 12px; font-size: 11px !important; }
+        h1, h2, h3 { font-size: 18px !important; font-weight: bold; }
       }
     `;
+    // Clonar el contenido y remover elementos con d-print-none
+    const clone = printRef.current.cloneNode(true);
+    const elementsToRemove = clone.querySelectorAll('.d-print-none');
+    elementsToRemove.forEach(el => el.remove());
+    
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte Anual de Alumno</title><style>${css}</style></head><body>`);
-    
-    // KPIs en formato texto
-    if (kpisData) {
-      win.document.write(`<div class="kpi-section">`);
-      win.document.write(`<div class="kpi-title">📊 Análisis del Rendimiento</div>`);
-      
-      // Métricas principales
-      win.document.write(`<div class="kpi-grid">`);
-      win.document.write(`<div class="kpi-card"><div class="kpi-label">% Aprobación</div><div class="kpi-value">${kpisData.porcentajeAprobacion}%</div><div class="kpi-label">${kpisData.aprobadas}/${kpisData.totalMaterias}</div></div>`);
-      win.document.write(`<div class="kpi-card"><div class="kpi-label">Promedio General</div><div class="kpi-value">${kpisData.promedio ?? '-'}</div></div>`);
-      win.document.write(`<div class="kpi-card"><div class="kpi-label">Nota Máxima</div><div class="kpi-value">${kpisData.notaMaxima ?? '-'}</div></div>`);
-      win.document.write(`<div class="kpi-card"><div class="kpi-label">Nota Mínima</div><div class="kpi-value">${kpisData.notaMinima ?? '-'}</div></div>`);
-      win.document.write(`</div>`);
-      
-      // Distribución y comparación de etapas
-      win.document.write(`<div class="kpi-distribution">`);
-      win.document.write(`<strong>Distribución de Notas:</strong><br>`);
-      kpisData.distribucion.forEach(d => {
-        win.document.write(`<div class="kpi-dist-item"><span>Rango ${d.rango}:</span><span><strong>${d.count}</strong> materias</span></div>`);
-      });
-      win.document.write(`<br><strong>Comparación por Etapas:</strong><br>`);
-      win.document.write(`<div class="kpi-dist-item"><span>Etapa 1:</span><span><strong>${kpisData.promedioE1 ?? '-'}</strong></span></div>`);
-      win.document.write(`<div class="kpi-dist-item"><span>Etapa 2:</span><span><strong>${kpisData.promedioE2 ?? '-'}</strong></span></div>`);
-      if (kpisData.promedioE1 && kpisData.promedioE2) {
-        const tendencia = parseFloat(kpisData.promedioE2) > parseFloat(kpisData.promedioE1) ? '↑ Mejoró' : parseFloat(kpisData.promedioE2) < parseFloat(kpisData.promedioE1) ? '↓ Bajó' : '→ Sin cambio';
-        win.document.write(`<div class="kpi-dist-item"><span>Tendencia:</span><span><strong>${tendencia}</strong></span></div>`);
-      }
-      win.document.write(`</div>`);
-      
-      win.document.write(`</div>`);
-    }
-    
-    win.document.write(printRef.current.innerHTML);
+    win.document.write(clone.innerHTML);
     win.document.write('</body></html>');
     win.document.close();
     win.focus();
@@ -778,7 +698,6 @@ export default function ReporteAnualAlumno() {
                     <td colSpan={2}>
                       Apellido y nombre alumno: <strong>{dto?.apellido || '-'}, {dto?.nombre || '-'}</strong>
                       &nbsp;&nbsp; DNI: <strong>{dto?.dni || '-'}</strong>
-                      &nbsp;&nbsp; Legajo: <strong>{dto?.legajo || dto?.dni || '-'}</strong>
                     </td>
                   </tr>
                   <tr>
@@ -794,32 +713,15 @@ export default function ReporteAnualAlumno() {
             </Card.Body>
           </Card>
 
-          {/* Estadísticas rápidas (sin Licencias) */}
-          <Card className="mb-3 d-print-none">
-            <Card.Body>
-              <div className="row g-2">
-                <div className="col-auto"><span className="badge text-bg-secondary">Promedio final curso: {dto?.promedioFinalCurso ?? '-'}</span></div>
-                <div className="col-auto"><span className="badge text-bg-warning text-dark">Inasistencias (pond.): {dto?.inasistencias?.ponderado ?? '-'}</span></div>
-                <div className="col-auto"><span className="badge text-bg-light">Ausentes: {dto?.inasistencias?.ausentes ?? 0}</span></div>
-                <div className="col-auto"><span className="badge text-bg-light">Tardes: {dto?.inasistencias?.tardes ?? 0}</span></div>
-                <div className="col-auto"><span className="badge text-bg-light">Retiros: {dto?.inasistencias?.retiros ?? 0}</span></div>
-                <div className="col-auto"><span className="badge text-bg-light">Justificados: {dto?.inasistencias?.justificados ?? 0}</span></div>
-                <div className="col-auto"><span className="badge text-bg-danger">Previas: {cantPrevias}</span></div>
-              </div>
-            </Card.Body>
-          </Card>
-
-          
-
           {/* Tabla detallada */}
           <Card>
             <Card.Body>
-              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 d-print-none">
                 <div>
                   <h5 className="mb-1">Detalle por Materia</h5>
                   {dto && (
                     <div className="text-muted small">
-                      Alumno: {dto.apellido}, {dto.nombre} {dto.dni ? `(DNI ${dto.dni})` : ''} · Año: {dto.anio}
+                      Alumno: {dto.apellido}, {dto.nombre} {dto.dni ? `(DNI ${dto.dni})` : ''} · Curso: {dto?.curso ? `${dto.curso.anio ?? ''}${dto?.curso?.anio != null ? '°' : ''} ${dto.curso.division || ''}`.trim() : '-'} · Año: {dto.anio}
                     </div>
                   )}
                 </div>
@@ -832,12 +734,9 @@ export default function ReporteAnualAlumno() {
                   <li><strong>N1-N4:</strong> Notas individuales de cada etapa</li>
                   <li><strong>E1/E2:</strong> Promedio de la Etapa 1 y 2</li>
                   <li><strong>PG:</strong> Promedio General del año</li>
-                  <li><strong>Estado:</strong> Aprobado/Desaprobado según PG</li>
                   <li><strong>CO:</strong> Nota de Coloquio (si aplica)</li>
                   <li><strong>EX:</strong> Nota de Examen Final (si aplica)</li>
-                  <li><strong>Nota Final:</strong> Calificación final definitiva</li>
-                  <li><strong>Estado Final:</strong> Resultado del examen final</li>
-                  <li><strong>Estado Materia:</strong> Situación definitiva (promocionada, regular, previa, etc.)</li>
+                  <li><strong>PFA:</strong> Promedio Final Anual (promedia PG, coloquio o examen)</li>
                 </ul>
               </Alert>
 
@@ -850,20 +749,14 @@ export default function ReporteAnualAlumno() {
                         <th colSpan={5} className="text-center">1° Etapa · Calificaciones</th>
                         <th colSpan={5} className="text-center">2° Etapa · Calificaciones</th>
                         <th>PG</th>
-                        <th>Estado</th>
                         <th>CO</th>
                         <th>EX</th>
-                        <th>Nota Final</th>
-                        <th>Estado Final</th>
-                        <th>Estado Materia</th>
+                        <th>PFA</th>
                       </tr>
                       <tr>
                         <th></th>
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E1</th>
                         <th>N1</th><th>N2</th><th>N3</th><th>N4</th><th>E2</th>
-                        <th></th>
-                        <th></th>
-                        <th></th>
                         <th></th>
                         <th></th>
                         <th></th>
@@ -880,12 +773,9 @@ export default function ReporteAnualAlumno() {
                             <td>{e1[0] ?? '-'}</td><td>{e1[1] ?? '-'}</td><td>{e1[2] ?? '-'}</td><td>{e1[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e1 ?? '-'}</Badge></td>
                             <td>{e2[0] ?? '-'}</td><td>{e2[1] ?? '-'}</td><td>{e2[2] ?? '-'}</td><td>{e2[3] ?? '-'}</td><td><Badge bg="light" text="dark">{r.e2 ?? '-'}</Badge></td>
                             <td><Badge bg={(r.pg ?? 0) >= 6 ? 'success' : 'danger'}>{r.pg ?? '-'}</Badge></td>
-                            <td>{r.estado ?? '-'}</td>
                             <td>{r.co ?? '-'}</td>
                             <td>{r.ex ?? '-'}</td>
                             <td>{r.notaFinal ?? '-'}</td>
-                            <td>{r.estadoFinal ?? '-'}</td>
-                            <td>{r.estadoMateria ?? '-'}</td>
                           </tr>
                         );
                       })}

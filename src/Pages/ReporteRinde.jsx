@@ -601,7 +601,7 @@ export default function ReporteRinde() {
                         <th className="text-end">PG</th>
                         <th className="text-end">CO</th>
                         <th className="text-end">EX</th>
-                        <th className="text-end">PF</th>
+                        <th className="text-end">PFA</th>
                         <th>Condición</th>
                       </tr>
                     </thead>
@@ -641,7 +641,7 @@ export default function ReporteRinde() {
                                 <th className="text-end">PG</th>
                                 <th className="text-end">CO</th>
                                 <th className="text-end">EX</th>
-                                <th className="text-end">PF</th>
+                                <th className="text-end">PFA</th>
                                 <th>Condición</th>
                               </tr>
                             </thead>

@@ -24,10 +24,13 @@ export default function ReporteDesempenoDocente() {
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [cursos, setCursos] = useState([]);
   const [materias, setMaterias] = useState([]);
+  const [materiasCurso, setMateriasCurso] = useState([]);
   const [cursoId, setCursoId] = useState('');
   const [materiaId, setMateriaId] = useState('');
   const [docenteOpt, setDocenteOpt] = useState(null);
   const [docenteId, setDocenteId] = useState(docenteIdFromUrl || '');
+  const [modo, setModo] = useState('curso'); // 'curso' | 'materia' | 'docente' | 'anio'
+  const [busquedaDocente, setBusquedaDocente] = useState('');
   const [cargando, setCargando] = useState(false);
   const [data, setData] = useState(null);
   const printRef = useRef(null);
@@ -48,54 +51,62 @@ export default function ReporteDesempenoDocente() {
     })();
   }, [token]);
 
-  // Filtrar materias y docentes cuando cambia el curso
+  // Cargar materias del curso seleccionado
+  useEffect(() => {
+    if (!token || !cursoId) {
+      setMateriasCurso([]);
+      return;
+    }
+    (async () => {
+      try {
+        const lista = await listarMateriasDeCurso(token, cursoId);
+        setMateriasCurso(Array.isArray(lista) ? lista : []);
+      } catch {
+        setMateriasCurso([]);
+      }
+    })();
+  }, [token, cursoId]);
+
+  // Ya no filtramos materias por curso, solo limpiamos selección si cambia el curso
   useEffect(() => {
     if (!cursoId) {
-      // Si no hay curso seleccionado, mostrar todas las materias
-      // setMaterias(todasLasMaterias); // Eliminado: todasLasMaterias ya no se usa
       setMateriaId('');
       setDocenteOpt(null);
       setDocenteId('');
-      return;
     }
-
-    // Cargar materias del curso seleccionado
-    (async () => {
-      try {
-        const materiasCurso = await listarMateriasDeCurso(token, cursoId);
-        setMaterias(materiasCurso || []);
-        // Limpiar la materia seleccionada si ya no está en el curso
-        if (materiaId) {
-          const materiaExiste = materiasCurso?.some(m => String(m.materiaId) === String(materiaId));
-          if (!materiaExiste) {
-            setMateriaId('');
-          }
-        }
-        // Limpiar docente
-        setDocenteOpt(null);
-        setDocenteId('');
-      } catch (e) {
-        console.error('Error al cargar materias del curso:', e);
-        setMaterias([]);
-      }
-    })();
-  }, [cursoId, token, materiaId]);
+    // No tocamos setMaterias, siempre mostramos todas las materias
+  }, [cursoId]);
 
   const generar = async () => {
     if (!anio || anio < 2000 || anio > 2100) {
       toast.error('Año inválido');
       return;
     }
+    // Validar según modo
+    if (modo === 'curso' && !cursoId) {
+      toast.error('Seleccioná un curso');
+      return;
+    }
+    if (modo === 'materia' && !materiaId) {
+      toast.error('Seleccioná una materia');
+      return;
+    }
+    if (modo === 'docente' && !docenteId) {
+      toast.error('Seleccioná un docente');
+      return;
+    }
     setCargando(true);
     setData(null);
     try {
       let resp;
-      if (cursoId) {
+      if (modo === 'curso' && cursoId) {
         resp = await reportePorCurso(token, anio, Number(cursoId));
-      } else if (materiaId) {
+      } else if (modo === 'materia' && materiaId) {
         resp = await reportePorMateria(token, anio, Number(materiaId));
-      } else if (docenteId) {
+      } else if (modo === 'docente' && docenteId) {
         resp = await reportePorDocente(token, anio, Number(docenteId));
+      } else if (modo === 'anio') {
+        resp = await reporteCompleto(token, anio);
       } else {
         resp = await reporteCompleto(token, anio);
       }
@@ -106,6 +117,8 @@ export default function ReporteDesempenoDocente() {
     } finally { setCargando(false); }
   };
 
+  // ...existing code...
+
   // Auto-generar cuando viene de URL
   useEffect(() => {
     if (autoGenerar && docenteIdFromUrl && token && !data && !cargando) {
@@ -114,27 +127,57 @@ export default function ReporteDesempenoDocente() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoGenerar, docenteIdFromUrl, token]);
 
+  // Opciones de materias según modo
   const materiasOpts = useMemo(() => {
-    const arr = Array.isArray(materias) ? materias : [];
+    let arr = [];
+    if (modo === 'curso' && cursoId) {
+      arr = materiasCurso;
+    } else if (modo === 'materia' && cursoId) {
+      arr = materiasCurso;
+    } else {
+      arr = materias;
+    }
     return arr.map((m) => ({
       value: m.id ?? m.materiaId ?? '',
       label: m.nombre ?? m.nombreMateria ?? `Materia ${m.id ?? ''}`,
     })).filter(o => o.value !== '');
-  }, [materias]);
+  }, [materias, materiasCurso, cursoId, modo]);
 
-  // Extraer docentes únicos de las materias filtradas por curso
+  // Opciones de docentes según modo
   const docentesDeCurso = useMemo(() => {
-    if (!cursoId || !materias.length) return null;
-    
-    const docentesMap = new Map();
-    materias.forEach(m => {
+    let docentesMap = new Map();
+    let fuente = [];
+    if (modo === 'curso' && cursoId) {
+      fuente = materiasCurso;
+    } else if (modo === 'materia' && materiaId && cursoId) {
+      fuente = materiasCurso.filter(m => String(m.materiaId ?? m.id) === String(materiaId));
+    } else if (modo === 'materia' && materiaId) {
+      fuente = materias.filter(m => String(m.materiaId ?? m.id) === String(materiaId));
+    } else if (modo === 'docente' && cursoId && materiaId) {
+      fuente = materiasCurso.filter(m => String(m.materiaId ?? m.id) === String(materiaId));
+    } else if (modo === 'docente' && cursoId) {
+      fuente = materiasCurso;
+    } else if (modo === 'docente' && materiaId) {
+      fuente = materias.filter(m => String(m.materiaId ?? m.id) === String(materiaId));
+    } else {
+      fuente = materias;
+    }
+    fuente.forEach(m => {
       if (m.docente && m.docente.id) {
         docentesMap.set(m.docente.id, m.docente);
       }
     });
-    
-    return Array.from(docentesMap.values());
-  }, [cursoId, materias]);
+    let lista = Array.from(docentesMap.values());
+    if (modo === 'docente' && busquedaDocente) {
+      const q = busquedaDocente.toLowerCase();
+      lista = lista.filter(d =>
+        (d.nombre && d.nombre.toLowerCase().includes(q)) ||
+        (d.apellido && d.apellido.toLowerCase().includes(q)) ||
+        (d.dni && String(d.dni).includes(q))
+      );
+    }
+    return lista;
+  }, [cursoId, materiaId, materiasCurso, materias, modo, busquedaDocente]);
 
   const resultadosMateria = useMemo(() => {
     return Array.isArray(data?.resultadosPorMateria) ? data.resultadosPorMateria : [];
@@ -643,46 +686,133 @@ export default function ReporteDesempenoDocente() {
             </Col>
             <Col md={2} sm={6} xs={12}>
               <Form.Group>
-                <Form.Label>Curso (opcional)</Form.Label>
-                <Form.Select value={cursoId} onChange={(e)=>setCursoId(e.target.value)}>
-                  <option value="">-- Todos --</option>
-                  {cursos.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {`${c.anio || ''}° ${c.division || ''}`.trim()}
-                    </option>
-                  ))}
+                <Form.Label>Modo de reporte</Form.Label>
+                <Form.Select value={modo} onChange={e => { setModo(e.target.value); setCursoId(''); setMateriaId(''); setDocenteOpt(null); setDocenteId(''); setBusquedaDocente(''); }}>
+                  <option value="curso">Por curso</option>
+                  <option value="materia">Por materia</option>
+                  <option value="docente">Por docente</option>
+                  <option value="anio">Por año</option>
                 </Form.Select>
               </Form.Group>
             </Col>
-            <Col md={3} sm={6} xs={12}>
-              <Form.Group>
-                <Form.Label>Materia (opcional)</Form.Label>
-                <Form.Select value={materiaId} onChange={(e)=>setMateriaId(e.target.value)}>
-                  <option value="">-- Todas --</option>
-                  {materiasOpts.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={3} sm={6} xs={12}>
-              <Form.Group>
-                <Form.Label>Docente (opcional)</Form.Label>
-                <AsyncDocenteSelect
-                  token={token}
-                  value={docenteOpt}
-                  onChange={(opt) => { setDocenteOpt(opt); setDocenteId(opt?.value || ''); }}
-                  placeholder="Seleccioná un docente"
-                  docentesList={docentesDeCurso}
-                />
-              </Form.Group>
+            
+            {/* MODO CURSO: solo select de curso */}
+            {modo === 'curso' && (
+              <Col md={3} sm={6} xs={12}>
+                <Form.Group>
+                  <Form.Label>Curso</Form.Label>
+                  <Form.Select value={cursoId} onChange={(e)=>setCursoId(e.target.value)}>
+                    <option value="">-- Seleccioná un curso --</option>
+                    {cursos.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {`${c.anio || ''}° ${c.division || ''}`.trim()}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            )}
+
+            {/* MODO MATERIA: curso opcional + materia */}
+            {modo === 'materia' && (
+              <>
+                <Col md={2} sm={6} xs={12}>
+                  <Form.Group>
+                    <Form.Label>Curso (opcional)</Form.Label>
+                    <Form.Select value={cursoId} onChange={(e)=>setCursoId(e.target.value)}>
+                      <option value="">-- Todos --</option>
+                      {cursos.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {`${c.anio || ''}° ${c.division || ''}`.trim()}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={3} sm={6} xs={12}>
+                  <Form.Group>
+                    <Form.Label>Materia</Form.Label>
+                    <Form.Select value={materiaId} onChange={(e)=>setMateriaId(e.target.value)}>
+                      <option value="">-- Seleccioná una materia --</option>
+                      {materiasOpts.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </>
+            )}
+
+            {/* MODO DOCENTE: curso opcional + materia opcional + AsyncDocenteSelect */}
+            {modo === 'docente' && (
+              <>
+                <Col md={2} sm={6} xs={12}>
+                  <Form.Group>
+                    <Form.Label>Curso (opcional)</Form.Label>
+                    <Form.Select value={cursoId} onChange={(e)=>setCursoId(e.target.value)}>
+                      <option value="">-- Todos --</option>
+                      {cursos.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {`${c.anio || ''}° ${c.division || ''}`.trim()}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={2} sm={6} xs={12}>
+                  <Form.Group>
+                    <Form.Label>Materia (opcional)</Form.Label>
+                    <Form.Select value={materiaId} onChange={(e)=>setMateriaId(e.target.value)}>
+                      <option value="">-- Todas --</option>
+                      {materiasOpts.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={4} sm={12} xs={12}>
+                  <Form.Group>
+                    <Form.Label>Docente</Form.Label>
+                    <AsyncDocenteSelect
+                      token={token}
+                      value={docenteOpt}
+                      onChange={(opt) => { setDocenteOpt(opt); setDocenteId(opt?.value || ''); }}
+                      placeholder="Buscar docente por nombre o DNI"
+                      docentesList={docentesDeCurso}
+                    />
+                  </Form.Group>
+                </Col>
+              </>
+            )}
+
+            {/* MODO AÑO: sin filtros adicionales */}
+            {modo === 'anio' && (
+              <Col md={3} sm={6} xs={12}>
+                <Form.Text className="text-muted">Mostrará el reporte completo del año seleccionado</Form.Text>
+              </Col>
+            )}
+
+            <Col md="auto" className="d-flex gap-2">
+              <Button 
+                type="button" 
+                variant="primary" 
+                disabled={cargando || (modo === 'curso' && !cursoId) || (modo === 'materia' && !materiaId) || (modo === 'docente' && !docenteId)}
+                onClick={generar}
+              >
+                {cargando ? <><Spinner size="sm" animation="border" className="me-2"/>Generando...</> : "Generar"}
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline-secondary" 
+                disabled={cargando}
+                onClick={() => { setModo('curso'); setCursoId(''); setMateriaId(''); setDocenteOpt(null); setDocenteId(''); setBusquedaDocente(''); setData(null); }}
+              >
+                Limpiar
+              </Button>
             </Col>
           </Row>
 
           <Row className="mt-4 g-2">
-            <Col md="auto">
-              <Button onClick={generar} disabled={cargando}>{cargando ? <Spinner size="sm"/> : 'Generar'}</Button>
-            </Col>
             <Col md="auto">
               <Button variant="outline-secondary" onClick={exportCSV} disabled={cargando || !data}>Exportar CSV</Button>
             </Col>
