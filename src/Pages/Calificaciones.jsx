@@ -34,6 +34,8 @@ export default function Calificaciones() {
   const [mensajeExito, setMensajeExito] = useState("");
   const [mostrarError, setMostrarError] = useState(false);
   const [mensajeError, setMensajeError] = useState("");
+  const [modoEdicion, setModoEdicion] = useState(false); // Estado para modo edición
+  const [notasEnEdicion, setNotasEnEdicion] = useState(new Set()); // IDs de notas en edición individual
   // Nota Final se muestra solo en reportes; en esta pantalla de carga no se utiliza
 
   // 1️⃣ Traer cursos disponibles (según el rol)
@@ -185,6 +187,68 @@ export default function Calificaciones() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa]);
 
+  // Función para entrar/salir del modo edición global
+  const toggleModoEdicion = () => {
+    setModoEdicion(!modoEdicion);
+    if (modoEdicion) {
+      // Al salir del modo edición, limpiar ediciones individuales
+      setNotasEnEdicion(new Set());
+    }
+  };
+
+  // Función para togglear edición individual de una nota
+  const toggleEdicionNota = (notaId) => {
+    setNotasEnEdicion((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(notaId)) {
+        nuevo.delete(notaId);
+      } else {
+        nuevo.add(notaId);
+      }
+      return nuevo;
+    });
+  };
+
+  // Función para desbloquear toda una columna de notas
+  const desbloquearColumna = (numeroNota) => {
+    const columnaBloqueada = datos.every((alumno) => {
+      const existeNota = (alumno.calificaciones || []).find((c) => c.numeroNota === numeroNota);
+      return !existeNota;
+    });
+    
+    // Si la columna está vacía, no hace falta desbloquear (ya está editable)
+    if (columnaBloqueada) return;
+    
+    // Si no estamos en modo edición, entramos
+    if (!modoEdicion) {
+      setModoEdicion(true);
+    }
+    
+    // Desbloquear todas las notas de esa columna
+    const nuevasNotas = new Set(notasEnEdicion);
+    datos.forEach((alumno) => {
+      nuevasNotas.add(`${alumno.id}-${numeroNota}`);
+    });
+    setNotasEnEdicion(nuevasNotas);
+  };
+
+  // Función para habilitar todas las notas en modo edición
+  const habilitarTodasLasNotas = () => {
+    const todasLasNotas = new Set();
+    datos.forEach((alumno) => {
+      // Habilitar las 4 notas posibles para cada alumno
+      for (let numeroNota = 1; numeroNota <= 4; numeroNota++) {
+        todasLasNotas.add(`${alumno.id}-${numeroNota}`);
+      }
+    });
+    setNotasEnEdicion(todasLasNotas);
+  };
+
+  // Función para desbloquear todas las notas
+  const desbloquearTodas = () => {
+    setNotasEnEdicion(new Set());
+  };
+
   // 4️⃣ Guardar cambios desde la tabla
   const handleGuardar = async (alumnoId, notas) => {
     try {
@@ -198,8 +262,19 @@ export default function Calificaciones() {
           await crearCalificacion(token, payload);
         }
       }
-  // Guardado individual: solo toast, sin modal
-  toast.success("Notas guardadas correctamente ", { theme: "light" });
+      // Guardado individual: solo toast, sin modal
+      toast.success("Notas guardadas correctamente ", { theme: "light" });
+      
+      // Bloquear las notas del alumno después de guardar
+      setNotasEnEdicion((prev) => {
+        const nuevo = new Set(prev);
+        for (let i = 1; i <= 4; i++) {
+          nuevo.delete(`${alumnoId}-${i}`);
+        }
+        return nuevo;
+      });
+      
+      // Recargar datos del backend para reflejar cambios
       handleBuscar();
     } catch (err) {
       console.error("Error al guardar calificaciones", err);
@@ -234,10 +309,15 @@ export default function Calificaciones() {
           }
         }
       }
-  // Guardado masivo: modal + toast
+      // Guardado masivo: modal + toast
       setMensajeExito("Todas las calificaciones fueron guardadas");
       setMostrarExito(true);
-  toast.success("Todas las calificaciones fueron guardadas", { theme: "light" });
+      toast.success("Todas las calificaciones fueron guardadas", { theme: "light" });
+      
+      // Bloquear todas las notas después de guardar masivo
+      setNotasEnEdicion(new Set());
+      
+      // Recargar datos del backend para reflejar cambios
       handleBuscar();
     } catch (err) {
       console.error("Error en guardado masivo", err);
@@ -309,6 +389,46 @@ export default function Calificaciones() {
             </Row>
           )}
 
+          {/* CONTROLES DE EDICIÓN */}
+          {datos.length > 0 && (
+            <Row className="mb-3">
+              <Col>
+                <div className="d-flex gap-2 flex-wrap">
+                  <Button
+                    variant={modoEdicion ? "warning" : "outline-primary"}
+                    size="sm"
+                    onClick={toggleModoEdicion}
+                  >
+                    {modoEdicion ? "🔓 Salir de modo edición" : "🔒 Modo edición"}
+                  </Button>
+                  {modoEdicion && (
+                    <>
+                      <Button
+                        variant="outline-success"
+                        size="sm"
+                        onClick={habilitarTodasLasNotas}
+                      >
+                        ✓ Habilitar todas las notas
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={desbloquearTodas}
+                      >
+                        ✕ Bloquear todas las notas
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <small className="text-muted d-block mt-2">
+                  {modoEdicion
+                    ? "Las notas están bloqueadas. Haz clic en una nota para editarla o usa los botones arriba para habilitar/bloquear todas."
+                    : "Las notas están bloqueadas por defecto. Entra en modo edición para modificarlas."}
+                </small>
+              </Col>
+            </Row>
+          )}
+
           {/* TABLA */}
           {datos.length > 0 && (
             <TablaCalificaciones
@@ -322,6 +442,10 @@ export default function Calificaciones() {
               onGuardar={handleGuardar}
               onEliminar={handleEliminar}
               onGuardarTodos={handleGuardarTodos}
+              modoEdicion={modoEdicion}
+              notasEnEdicion={notasEnEdicion}
+              onToggleEdicionNota={toggleEdicionNota}
+              onDesbloquearColumna={desbloquearColumna}
             />
           )}
         </Card.Body>
