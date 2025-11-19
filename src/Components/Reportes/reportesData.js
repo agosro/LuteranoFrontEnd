@@ -100,6 +100,14 @@ const reportes = [
     ruta: "/reportes/asistencia-perfecta",
     roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteAsistenciaPerfectaController
   },
+  {
+    id: 19,
+    titulo: "Inasistencias Detalladas",
+    descripcion: "Reporte detallado de inasistencias por curso o alumno, mostrando totales justificadas/no justificadas y desglose día por día.",
+    categoria: "Alumnos",
+    ruta: "/reportes/inasistencias-detalle",
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteInasistenciasDetalleController
+  },
   // {
   //   id: 11,
   //   titulo: "Alumnos que Recuperan Etapa",

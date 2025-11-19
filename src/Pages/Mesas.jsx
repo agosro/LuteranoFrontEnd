@@ -8,6 +8,7 @@ import { crearMesa, listarMesasPorCurso, eliminarMesa, finalizarMesa } from '../
 import { obtenerActaPorMesa, generarActa, actualizarActa, eliminarActa } from '../Services/ActaExamenService.js';
 import { Container, Row, Col, Card, Form, Button, Table, Spinner, Alert, Badge, Modal } from 'react-bootstrap';
 import Paginacion from '../Components/Botones/Paginacion.jsx';
+import ConfirmarAccion from '../Components/Modals/ConfirmarAccion.jsx';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs.jsx';
 import BackButton from '../Components/Botones/BackButton.jsx';
@@ -63,6 +64,9 @@ export default function Mesas() {
   const [delMesa, setDelMesa] = useState(null);
   const [delMesaLoading, setDelMesaLoading] = useState(false);
   const [delMesaError, setDelMesaError] = useState('');
+  const [showFinalizarMesa, setShowFinalizarMesa] = useState(false);
+  const [mesaAFinalizar, setMesaAFinalizar] = useState(null);
+  const [finalizarLoading, setFinalizarLoading] = useState(false);
 
   // Helpers de rol (tolera prefijo ROLE_)
   // hasRole ya no requerido en esta vista (permisos manejados vía rutas y página de gestión)
@@ -174,13 +178,26 @@ export default function Mesas() {
 
   // Eliminación ahora se realiza mediante modal de confirmación
 
-  const onFinalizar = async (m) => {
-    if (!window.confirm('¿Finalizar mesa? Esto impedirá futuras ediciones.')) return;
-  try {
-    await finalizarMesa(token, m.id);
-    await refreshMesas();
-    toast.success('Mesa finalizada');
-  } catch (e) { setMsg({ type: 'danger', text: e.message }); toast.error(e.message); }
+  const onFinalizar = (m) => {
+    setMesaAFinalizar(m);
+    setShowFinalizarMesa(true);
+  };
+
+  const confirmarFinalizar = async () => {
+    if (!mesaAFinalizar) return;
+    try {
+      setFinalizarLoading(true);
+      await finalizarMesa(token, mesaAFinalizar.id);
+      await refreshMesas();
+      toast.success('Mesa finalizada');
+      setShowFinalizarMesa(false);
+      setMesaAFinalizar(null);
+    } catch (e) {
+      setMsg({ type: 'danger', text: e.message });
+      toast.error(e.message);
+    } finally {
+      setFinalizarLoading(false);
+    }
   };
 
   const materiaNombrePorId = useMemo(() => {
@@ -630,6 +647,33 @@ export default function Mesas() {
           <Button variant="success" onClick={submitCrearMesa} disabled={crearMesaLoading}>Guardar</Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Modal Confirmar Finalizar Mesa */}
+      <ConfirmarAccion
+        show={showFinalizarMesa}
+        title="Finalizar mesa de examen"
+        message={
+          mesaAFinalizar ? (
+            <div>
+              <p>¿Confirmás finalizar esta mesa? <strong>Esta acción no se puede deshacer</strong> e impedirá futuras ediciones.</p>
+              <div className="text-muted" style={{ fontSize: '.9rem' }}>
+                <strong>Materia:</strong> {mesaAFinalizar.materiaNombre || materiaNombrePorId.get(mesaAFinalizar.materiaCursoId) || '-'}<br />
+                <strong>Fecha:</strong> {fmtDate(mesaAFinalizar.fecha)}<br />
+                <strong>Aula:</strong> {aulaNombrePorId.get(mesaAFinalizar.aulaId) || '-'}
+              </div>
+            </div>
+          ) : null
+        }
+        confirmText="Finalizar"
+        cancelText="Cancelar"
+        confirmBtnClass="btn-warning"
+        loading={finalizarLoading}
+        onConfirm={confirmarFinalizar}
+        onClose={() => {
+          setShowFinalizarMesa(false);
+          setMesaAFinalizar(null);
+        }}
+      />
     </Container>
   );
 }

@@ -54,6 +54,7 @@ import PromocionMasiva from '../Pages/PromocionMasiva.jsx';
 import ReporteDesempenoDocente from '../Pages/ReporteDesempenoDocente.jsx';
 import ReporteRankingAlumnos from '../Pages/ReporteRankingAlumnos.jsx';
 import ReporteExamenesConsecutivos from '../Pages/ReporteExamenesConsecutivos.jsx';
+import ReporteInasistenciasDetalle from '../Pages/ReporteInasistenciasDetalle.jsx';
 import ConfiguracionCicloLectivo from '../Pages/ConfiguracionCicloLectivo.jsx';
 import ReactivarAlumnos from '../Pages/ReactivarAlumnos.jsx';
 
@@ -162,6 +163,7 @@ function AppRoutes() {
           <Route path="reportes/asistencia-perfecta" element={<ReporteAsistenciaPerfecta />} />
           <Route path="reportes/disponibilidad-docente" element={<ReporteDisponibilidadDocente />} />
           <Route path="reportes/historial-alumno" element={<ReporteHistorialAlumno />} />
+          <Route path="reportes/inasistencias-detalle" element={<ReporteInasistenciasDetalle />} />
         </Route>
 
         {/* Desempeño docente -> ADMIN, DIRECTOR, PRECEPTOR (según backend) */}
