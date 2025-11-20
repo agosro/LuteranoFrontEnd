@@ -198,12 +198,10 @@ export default function Mesas() {
         turnoId: Number(crearMasivaForm.turnoId),
         cursoIds: crearMasivaForm.cursoIds.map(Number),
         tipoMesa: crearMasivaForm.tipoMesa,
+        materiaIds: crearMasivaForm.materiaIds.length > 0 ? crearMasivaForm.materiaIds.map(Number) : null,
       };
       if (crearMasivaForm.fecha) {
         payload.fechaMesa = crearMasivaForm.fecha;
-      }
-      if (crearMasivaForm.materiaIds.length > 0) {
-        payload.materiaIds = crearMasivaForm.materiaIds.map(Number);
       }
       const mesasCreadas = await crearMesasMasivas(token, payload);
       await refreshMesas();
@@ -241,6 +239,18 @@ export default function Mesas() {
       toast.error(e.message);
     } finally {
       setFinalizarLoading(false);
+    }
+  };
+
+  // Abrir gestión de fechas en nueva pestaña
+  const abrirGestionFechas = () => {
+    const url = '/mesa-de-examen/gestion-fechas';
+    const newWindow = window.open(url, '_blank');
+    if (newWindow) {
+      // Esperar a que la ventana cargue y enviar los datos
+      newWindow.addEventListener('load', () => {
+        newWindow.postMessage({ mesas: mesasFiltradas }, window.location.origin);
+      });
     }
   };
 
@@ -354,6 +364,11 @@ export default function Mesas() {
             </Col>
             <Col className="text-md-end">
               <Button variant="outline-dark" className="me-2" onClick={()=> navigate('/mesa-de-examen/historial')}>Ver historial</Button>
+              {hasSearched && mesasFiltradas.length > 0 && (
+                <Button variant="warning" className="me-2" onClick={abrirGestionFechas}>
+                  Gestión de Fechas
+                </Button>
+              )}
               <Button variant="info" className="me-2" onClick={()=> { setCrearMasivaForm({ anio: String(cicloYear), turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setShowCrearMasiva(true); }}>Crear masiva</Button>
               <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
             </Col>
@@ -839,7 +854,7 @@ export default function Mesas() {
                             setCrearMasivaForm(f => ({
                               ...f,
                               materiaIds: f.materiaIds.filter(mId => {
-                                const materia = prev.find(m => String(m.materiaId) === mId);
+                                const materia = materiasMasivas.find(m => String(m.materiaId) === mId);
                                 return !materia || String(materia.cursoId) !== id;
                               })
                             }));

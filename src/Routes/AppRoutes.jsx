@@ -19,6 +19,7 @@ import TutorDetalle from '../Pages/TutorDetalle.jsx';
 import Mesas from '../Pages/Mesas.jsx';
 import MesasHistorial from '../Pages/MesasHistorial.jsx';
 import MesaGestion from '../Pages/MesaGestion.jsx';
+import GestionFechasMesas from '../Pages/GestionFechasMesas.jsx';
 import Turnos from '../Pages/Turnos.jsx';
 import Reportes from '../Pages/Reportes.jsx';
 import ReservarEspacio from '../Pages/Reservar.jsx';
@@ -145,6 +146,7 @@ function AppRoutes() {
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="mesa-de-examen" element={<Mesas />} />
           <Route path="mesa-de-examen/:mesaId/gestionar" element={<MesaGestion />} />
+          <Route path="mesa-de-examen/gestion-fechas" element={<GestionFechasMesas />} />
         </Route>
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
           <Route path="mesa-de-examen/historial" element={<MesasHistorial />} />
