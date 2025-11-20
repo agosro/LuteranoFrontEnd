@@ -766,7 +766,7 @@ export default function ReporteExamenesConsecutivos() {
 
             {/* Título de la materia cuando ambito === 'materia' */}
             {ambito === 'materia' && materiaNombreActual && (
-              <Card className="mb-3 border-primary">
+              <Card className="mb-3">
                 <Card.Body className="text-center py-3">
                   <h3 className="mb-1">{materiaNombreActual}</h3>
                   {anioActual && <div className="text-muted">Año: {anioActual}°</div>}
