@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Row, Col, Form, Button, Spinner, Alert, Table, Badge, Collapse } from 'react-bootstrap';
-import { FileText, AlertTriangle, Info, BarChart3, PieChart, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Card, Row, Col, Form, Button, Spinner, Alert, Table, Badge } from 'react-bootstrap';
+import { FileText, AlertTriangle, Info, PieChart, ChevronDown, ChevronUp } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
@@ -11,190 +11,35 @@ import { listarCalifPorMateria } from '../Services/CalificacionesService';
 import { toast } from 'react-toastify';
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
-// Componente para renderizar mini-grilla de notas con consecutivos marcados
-const GrillaNotas = ({ caso }) => {
-  // Intentar usar detalleNotasConsecutivas si existe
-  if (caso?.detalleNotasConsecutivas && caso.detalleNotasConsecutivas.length > 0) {
-    const notas = caso.detalleNotasConsecutivas;
-    const totalConsecutivos = caso.cantidadConsecutivas || 0;
-
-    // Agrupar por etapa para mejor visualización
-    const notasPorEtapa = notas.reduce((acc, nota) => {
-      if (!acc[nota.etapa]) acc[nota.etapa] = [];
-      acc[nota.etapa].push(nota);
-      return acc;
-    }, {});
-
-    return (
-      <div className="d-flex flex-column gap-2">
-        {Object.entries(notasPorEtapa).map(([etapa, notasEtapa]) => (
-          <div key={etapa}>
-            <div className="text-muted fw-bold" style={{ fontSize: '10px', marginBottom: '4px' }}>
-              Etapa {etapa}
-            </div>
-            <div className="d-flex flex-wrap gap-1">
-              {notasEtapa.map((nota, idx) => {
-                const esDesaprobado = nota.nota < 4;
-                const esConsecutivo = nota.esConsecutivo || false;
-                
-                return (
-                  <div 
-                    key={idx}
-                    className={`badge ${esConsecutivo ? 'bg-danger' : esDesaprobado ? 'bg-secondary' : 'bg-success'}`}
-                    style={{ fontSize: '11px', minWidth: '32px', padding: '4px 6px' }}
-                    title={`Etapa ${nota.etapa} - Examen ${nota.numero}: ${nota.nota}${esConsecutivo ? ' (Consecutivo)' : ''}`}
-                  >
-                    Ex{nota.numero}: {nota.nota}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        {totalConsecutivos > 0 && (
-          <div className="d-flex align-items-center gap-2 mt-1">
-            <AlertTriangle size={14} className="text-danger" />
-            <span className="text-danger small fw-bold">
-              {totalConsecutivos} consecutivo{totalConsecutivos > 1 ? 's' : ''}
-            </span>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Parsear desde descripcionConsecutivo o construir desde datos disponibles
-  const totalConsecutivos = caso.cantidadConsecutivas || 0;
-  const notas = [];
-  
-  // Parsear desde descripcionConsecutivo si existe
-  if (caso.descripcionConsecutivo) {
-    // Formato: "Etapa 1: Examen 1 (nota: 2), Examen 2 (nota: 5), ... - X consecutivos"
-    const partes = caso.descripcionConsecutivo.split(' - ')[0]; // Remover "X consecutivos"
-    const etapas = partes.split(/Etapa \d+:/).filter(s => s.trim());
-    
-    etapas.forEach((etapaStr, etapaIdx) => {
-      const etapaNum = etapaIdx + 1;
-      // Buscar todos los "Examen X (nota: Y)"
-      const regex = /Examen (\d+) \(nota: (\d+)\)/g;
-      let match;
-      while ((match = regex.exec(etapaStr)) !== null) {
-        notas.push({
-          etapa: etapaNum,
-          numero: parseInt(match[1]),
-          nota: parseInt(match[2])
-        });
-      }
-    });
-  } else {
-    // Construir desde campos individuales disponibles
-    if (caso.etapaPrimeraNota && caso.numeroPrimeraNota && caso.primeraNota !== undefined) {
-      notas.push({
-        etapa: caso.etapaPrimeraNota,
-        numero: caso.numeroPrimeraNota,
-        nota: caso.primeraNota
-      });
-    }
-    if (caso.etapaSegundaNota && caso.numeroSegundaNota && caso.segundaNota !== undefined) {
-      notas.push({
-        etapa: caso.etapaSegundaNota,
-        numero: caso.numeroSegundaNota,
-        nota: caso.segundaNota
-      });
-    }
-  }
-
-  if (notas.length === 0) {
-    return <span className="text-muted small">{caso.detalleExamenes || 'Sin detalle disponible'}</span>;
-  }
-
-  // Identificar consecutivos: notas desaprobadas (<4) en secuencia
-  const notasOrdenadas = [...notas].sort((a, b) => {
-    if (a.etapa !== b.etapa) return a.etapa - b.etapa;
-    return a.numero - b.numero;
-  });
-
-  // Marcar consecutivos basándonos en la cantidad total
-  for (let i = 0; i < notasOrdenadas.length; i++) {
-    if (notasOrdenadas[i].nota < 4) {
-      if (i > 0 && notasOrdenadas[i - 1].nota < 4) {
-        notasOrdenadas[i].esConsecutivo = true;
-        notasOrdenadas[i - 1].esConsecutivo = true;
-      }
-    }
-  }
-
-  // Agrupar por etapa
-  const notasPorEtapa = notasOrdenadas.reduce((acc, nota) => {
-    if (!acc[nota.etapa]) acc[nota.etapa] = [];
-    acc[nota.etapa].push(nota);
-    return acc;
-  }, {});
-
-  return (
-    <div className="d-flex flex-column gap-2">
-      {Object.entries(notasPorEtapa).map(([etapa, notasEtapa]) => (
-        <div key={etapa}>
-          <div className="text-muted fw-bold" style={{ fontSize: '10px', marginBottom: '4px' }}>
-            Etapa {etapa}
-          </div>
-          <div className="d-flex flex-wrap gap-1">
-            {notasEtapa.map((nota, idx) => {
-              const esDesaprobado = nota.nota < 4;
-              const esConsecutivo = nota.esConsecutivo || false;
-              
-              return (
-                <div 
-                  key={idx}
-                  className={`badge ${esConsecutivo ? 'bg-danger' : esDesaprobado ? 'bg-secondary' : 'bg-success'}`}
-                  style={{ fontSize: '11px', minWidth: '32px', padding: '4px 6px' }}
-                  title={`Etapa ${nota.etapa} - Examen ${nota.numero}: ${nota.nota}${esConsecutivo ? ' (Consecutivo)' : ''}`}
-                >
-                  Ex{nota.numero}: {nota.nota}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-      {totalConsecutivos > 0 && (
-        <div className="d-flex align-items-center gap-2 mt-1">
-          <AlertTriangle size={14} className="text-danger" />
-          <span className="text-danger small fw-bold">
-            {totalConsecutivos} consecutivo{totalConsecutivos > 1 ? 's' : ''}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Componente para fila expandible con detalle completo
-const FilaExpandible = ({ caso, token, ambito }) => {
-  const [expanded, setExpanded] = useState(false);
+// Componente para fila simple con todas las notas inline
+const FilaExpandible = ({ caso, token, ambito, onCalificacionesLoaded }) => {
   const [calificaciones, setCalificaciones] = useState([]);
   const [loadingCalif, setLoadingCalif] = useState(false);
 
-  const cargarCalificaciones = async () => {
-    if (!caso.alumnoId || !caso.materiaId) return;
-    try {
-      setLoadingCalif(true);
-      const data = await listarCalifPorMateria(token, caso.alumnoId, caso.materiaId);
-      setCalificaciones(Array.isArray(data) ? data : []);
-    } catch {
-      toast.error('Error al cargar calificaciones');
-      setCalificaciones([]);
-    } finally {
-      setLoadingCalif(false);
-    }
-  };
-
-  const handleToggle = () => {
-    if (!expanded && calificaciones.length === 0) {
-      cargarCalificaciones();
-    }
-    setExpanded(!expanded);
-  };
+  useEffect(() => {
+    const cargarCalificaciones = async () => {
+      if (!caso.alumnoId || !caso.materiaId) return;
+      try {
+        setLoadingCalif(true);
+        const data = await listarCalifPorMateria(token, caso.alumnoId, caso.materiaId);
+        const califs = data?.calificaciones || data || [];
+        const normalizadas = Array.isArray(califs) ? califs.map(c => ({
+          ...c,
+          numeroExamen: c.numeroNota || c.numeroExamen
+        })) : [];
+        setCalificaciones(normalizadas);
+        // Notificar al padre sobre las calificaciones cargadas
+        if (onCalificacionesLoaded) {
+          onCalificacionesLoaded(caso.alumnoId, caso.materiaId, normalizadas);
+        }
+      } catch {
+        setCalificaciones([]);
+      } finally {
+        setLoadingCalif(false);
+      }
+    };
+    cargarCalificaciones();
+  }, [caso.alumnoId, caso.materiaId, token, onCalificacionesLoaded]);
 
   // Identificar notas consecutivas desaprobadas
   const identificarConsecutivas = (califs) => {
@@ -206,9 +51,17 @@ const FilaExpandible = ({ caso, token, ambito }) => {
     const marcadas = sorted.map(c => ({ ...c, esConsecutivo: false }));
     
     for (let i = 1; i < marcadas.length; i++) {
-      if (marcadas[i].nota < 4 && marcadas[i-1].nota < 4) {
-        marcadas[i].esConsecutivo = true;
-        marcadas[i-1].esConsecutivo = true;
+      const actual = marcadas[i];
+      const anterior = marcadas[i-1];
+      
+      if (actual.nota < 6 && anterior.nota < 6) {
+        const sonConsecutivas = (anterior.etapa === actual.etapa && actual.numeroExamen === anterior.numeroExamen + 1) ||
+                               (anterior.etapa === 1 && actual.etapa === 2 && anterior.numeroExamen === 4 && actual.numeroExamen === 1);
+        
+        if (sonConsecutivas) {
+          actual.esConsecutivo = true;
+          anterior.esConsecutivo = true;
+        }
       }
     }
 
@@ -217,135 +70,96 @@ const FilaExpandible = ({ caso, token, ambito }) => {
 
   const califsConMarca = useMemo(() => identificarConsecutivas(calificaciones), [calificaciones]);
   
-  // Agrupar por etapa
-  const califsPorEtapa = useMemo(() => {
-    return califsConMarca.reduce((acc, c) => {
+  const califsPlanas = useMemo(() => {
+    const etapas = Object.keys(califsConMarca.reduce((acc, c) => {
       if (!acc[c.etapa]) acc[c.etapa] = [];
       acc[c.etapa].push(c);
       return acc;
-    }, {});
+    }, {})).sort((a, b) => Number(a) - Number(b));
+    return etapas.flatMap(etapa => califsConMarca.filter(c => c.etapa === Number(etapa)));
   }, [califsConMarca]);
 
-  // Calcular puntaje y causa descriptiva
-  const puntajeCausa = useMemo(() => {
-    const puntaje = caso.puntajeRiesgo || 0;
-    const consecutivos = caso.cantidadConsecutivas || 0;
-    const causa = consecutivos > 0 ? `${consecutivos} examen${consecutivos > 1 ? 'es' : ''} consecutivo${consecutivos > 1 ? 's' : ''}` : 'Evaluando';
-    return { puntaje, causa };
-  }, [caso]);
-
   return (
-    <>
-      <tr>
-        <td><strong>{caso.alumnoNombre}</strong></td>
-        <td className="text-center">
-          <div className="d-flex flex-column gap-1 align-items-center">
-            <Badge 
-              bg={caso.estadoRiesgo === 'EMERGENCIA' ? 'dark' : caso.estadoRiesgo === 'CRÍTICO' ? 'danger' : caso.estadoRiesgo === 'ALTO' ? 'warning' : 'info'}
-              text={caso.estadoRiesgo === 'ALTO' || caso.estadoRiesgo === 'MEDIO' ? 'dark' : 'white'}
-            >
-              {caso.estadoRiesgo || 'N/A'}
-            </Badge>
-            <div className="small text-muted">
-              Puntaje: <strong>{puntajeCausa.puntaje}</strong>
-            </div>
-          </div>
-        </td>
-        {ambito === 'curso' && <td>{caso.materiaNombre || '-'}</td>}
-        {ambito === 'materia' && <td className="text-center">{caso.cursoStr}</td>}
-        {ambito === 'materia' && (
-          <td>
-            {caso.docenteNombreCompleto === 'Sin asignar' ? (
-              <span className="text-muted fst-italic">{caso.docenteNombreCompleto}</span>
-            ) : (
-              caso.docenteNombreCompleto || '-'
-            )}
-          </td>
-        )}
+    <tr>
+      <td>{caso.alumnoNombre}</td>
+      <td className="text-center">
+        <Badge 
+          bg={caso.estadoRiesgo === 'EMERGENCIA' ? 'dark' : caso.estadoRiesgo === 'CRÍTICO' ? 'danger' : caso.estadoRiesgo === 'ALTO' ? 'warning' : 'info'}
+          text={caso.estadoRiesgo === 'ALTO' || caso.estadoRiesgo === 'MEDIO' ? 'dark' : 'white'}
+          className="px-2 py-1"
+        >
+          {caso.estadoRiesgo || 'N/A'}
+        </Badge>
+      </td>
+      {ambito === 'curso' && <td>{caso.materiaNombre || '-'}</td>}
+      {ambito === 'materia' && <td className="text-center">{caso.cursoStr}</td>}
+      {ambito === 'materia' && (
         <td>
-          <div className="d-flex flex-column gap-1">
-            <GrillaNotas caso={caso} />
-            <div className="small text-muted">
-              <strong>Causa:</strong> {puntajeCausa.causa}
-            </div>
-          </div>
+          {caso.docenteNombreCompleto === 'Sin asignar' ? (
+            <span className="text-muted fst-italic">{caso.docenteNombreCompleto}</span>
+          ) : (
+            caso.docenteNombreCompleto || '-'
+          )}
         </td>
-        <td className="text-center">
-          <div className="d-flex gap-1 justify-content-center">
-            <Button 
-              size="sm" 
-              variant={expanded ? "primary" : "outline-primary"}
-              onClick={handleToggle}
-              title="Ver detalle completo de notas"
-            >
-              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline-secondary"
-              onClick={() => {
-                if (caso.alumnoId) {
-                  const url = `/reportes/notas-alumnos?alumnoId=${caso.alumnoId}&anio=${new Date().getFullYear()}&autoGenerate=true`;
-                  window.open(url, '_blank');
-                }
-              }}
-              title="Ver reporte completo de notas"
-            >
-              <FileText size={14} />
-            </Button>
-          </div>
-        </td>
-      </tr>
-      {expanded && (
-        <tr>
-          <td colSpan="100%">
-            <Collapse in={expanded}>
-              <div className="p-3 bg-light">
-                <h6 className="mb-3">Detalle completo de calificaciones</h6>
-                {loadingCalif ? (
-                  <div className="text-center py-3">
-                    <Spinner animation="border" size="sm" /> Cargando calificaciones...
-                  </div>
-                ) : calificaciones.length === 0 ? (
-                  <Alert variant="info" className="mb-0">No hay calificaciones registradas para esta materia</Alert>
-                ) : (
-                  <div>
-                    {Object.entries(califsPorEtapa).map(([etapa, califs]) => (
-                      <div key={etapa} className="mb-3">
-                        <div className="fw-bold mb-2">Etapa {etapa}</div>
-                        <div className="d-flex flex-wrap gap-2">
-                          {califs.map((c, idx) => (
-                            <div
-                              key={idx}
-                              className={`badge ${c.esConsecutivo ? 'bg-danger' : c.nota < 4 ? 'bg-secondary' : 'bg-success'} p-2`}
-                              style={{ fontSize: '13px', minWidth: '80px' }}
-                              title={c.esConsecutivo ? 'Examen consecutivo desaprobado' : ''}
-                            >
-                              <div>Examen {c.numeroExamen}</div>
-                              <div className="fw-bold">Nota: {c.nota}</div>
-                              {c.esConsecutivo && (
-                                <div className="mt-1 small">
-                                  <AlertTriangle size={12} /> Consecutivo
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    <div className="mt-3 small text-muted">
-                      <Badge bg="danger" className="me-2">Rojo</Badge> Exámenes consecutivos desaprobados | 
-                      <Badge bg="secondary" className="mx-2">Gris</Badge> Desaprobado | 
-                      <Badge bg="success" className="mx-2">Verde</Badge> Aprobado
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Collapse>
-          </td>
-        </tr>
       )}
-    </>
+      <td>
+        {caso.cantidadConsecutivas > 0 ? (
+          <span className="text-danger fw-bold">
+            {caso.cantidadConsecutivas} examen{caso.cantidadConsecutivas > 1 ? 'es' : ''} consecutivo{caso.cantidadConsecutivas > 1 ? 's' : ''}
+          </span>
+        ) : (
+          <span className="text-muted">Sin consecutivos</span>
+        )}
+      </td>
+      {loadingCalif ? (
+        <td colSpan="8" className="text-center">
+          <Spinner animation="border" size="sm" />
+        </td>
+      ) : calificaciones.length === 0 ? (
+        <td colSpan="8" className="text-center">
+          <span className="text-muted small">Sin calificaciones</span>
+        </td>
+      ) : (
+        califsPlanas.map((c, idx) => {
+          const esConsecutivo = c.esConsecutivo || false;
+          const bgColor = esConsecutivo ? '#dc3545' : '#fff';
+          const textColor = esConsecutivo ? '#fff' : '#000';
+          const borderColor = esConsecutivo ? '#c82333' : '#dee2e6';
+          return (
+            <td
+              key={`cell-${idx}`}
+              className="text-center"
+              style={{
+                backgroundColor: bgColor,
+                color: textColor,
+                fontWeight: esConsecutivo ? 'bold' : 'normal',
+                border: `1px solid ${borderColor}`,
+                padding: '8px',
+                minWidth: '45px'
+              }}
+              title={`Etapa ${c.etapa} - Examen ${c.numeroExamen}: ${c.nota}`}
+            >
+              {c.nota}
+            </td>
+          );
+        })
+      )}
+      <td className="text-center">
+        <Button 
+          size="sm" 
+          variant="outline-secondary"
+          onClick={() => {
+            if (caso.alumnoId) {
+              const url = `/reportes/notas-alumnos?alumnoId=${caso.alumnoId}&anio=${new Date().getFullYear()}&autoGenerate=true`;
+              window.open(url, '_blank');
+            }
+          }}
+          title="Ver reporte completo de notas"
+        >
+          <FileText size={14} />
+        </Button>
+      </td>
+    </tr>
   );
 };
 
@@ -367,9 +181,13 @@ export default function ReporteExamenesConsecutivos() {
   const printRef = useRef(null);
   const isInitialMount = useRef(true);
   
-  const [filtroDivision, setFiltroDivision] = useState('');
+  const [filtroDivision, setFiltroDivision] = useState("");
+  const [filtroRiesgo, setFiltroRiesgo] = useState("");
+  const [excluirConTodasNotas, setExcluirConTodasNotas] = useState(false);
+  const [excluirAprobados, setExcluirAprobados] = useState(false);
+  const [excluirE1Aprobada, setExcluirE1Aprobada] = useState(false);
+  const [excluirE2Aprobada, setExcluirE2Aprobada] = useState(false);
   const [ordenAlfabetico, setOrdenAlfabetico] = useState(false);
-  const [showGraficos, setShowGraficos] = useState(false);
   const [showComparativa, setShowComparativa] = useState(false);
   const [showResumenMaterias, setShowResumenMaterias] = useState(ambito === 'curso');
 
@@ -447,21 +265,72 @@ export default function ReporteExamenesConsecutivos() {
     } finally { setLoading(false); }
   };
 
+  // Estado para almacenar calificaciones de todos los alumnos
+  const [calificacionesPorAlumno, setCalificacionesPorAlumno] = useState({});
+
+  const handleCalificacionesLoaded = useCallback((alumnoId, materiaId, califs) => {
+    const key = `${alumnoId}-${materiaId}`;
+    setCalificacionesPorAlumno(prev => ({
+      ...prev,
+      [key]: califs
+    }));
+  }, []);
+
   const casos = useMemo(() => Array.isArray(data?.casosDetectados) ? data.casosDetectados : [], [data]);
   
   // Preparar casos para tabla - incluir información de alumno en cada fila
   const casosParaTabla = useMemo(() => {
     const rank = (r) => (r === 'EMERGENCIA' ? 4 : r === 'CRÍTICO' ? 3 : r === 'ALTO' ? 2 : r === 'MEDIO' ? 1 : 0);
     
-    // Aplicar filtro de división si existe
+    // Aplicar filtros
     let filtered = casos;
+    
+    // Filtro por división
     if (ambito === 'materia' && filtroDivision) {
-      filtered = casos.filter(c => c.division === filtroDivision);
+      filtered = filtered.filter(c => c.division === filtroDivision);
+    }
+    
+    // Filtro por nivel de riesgo
+    if (filtroRiesgo) {
+      filtered = filtered.filter(c => c.estadoRiesgo === filtroRiesgo);
     }
     
     const mapped = filtered.map(c => {
       const nombre = c?.nombreCompleto || `${c?.alumnoApellido || ''}, ${c?.alumnoNombre || ''}`.trim();
       const curso = `${c?.anio ? c.anio + '°' : ''} ${c?.division ?? ''}`.trim() || c?.cursoNombre || '-';
+      const key = `${c.alumnoId}-${c.materiaId}`;
+      const califs = calificacionesPorAlumno[key] || [];
+      
+      // Calcular si tiene todas las notas (8 notas: 4 E1 + 4 E2)
+      const notasE1 = califs.filter(cal => cal.etapa === 1).length;
+      const notasE2 = califs.filter(cal => cal.etapa === 2).length;
+      const tieneTodasNotas = notasE1 === 4 && notasE2 === 4;
+      
+      // Calcular promedio de cada etapa si tiene las 4 notas
+      let promedioAprobado = false;
+      let aproboE1 = false;
+      let aproboE2 = false;
+      let tieneE1Completa = false;
+      let tieneE2Completa = false;
+      
+      if (notasE1 === 4) {
+        tieneE1Completa = true;
+        const sumE1 = califs.filter(cal => cal.etapa === 1 && typeof cal.nota === 'number').reduce((sum, cal) => sum + cal.nota, 0);
+        const promE1 = sumE1 / 4;
+        aproboE1 = promE1 >= 6;
+      }
+      
+      if (notasE2 === 4) {
+        tieneE2Completa = true;
+        const sumE2 = califs.filter(cal => cal.etapa === 2 && typeof cal.nota === 'number').reduce((sum, cal) => sum + cal.nota, 0);
+        const promE2 = sumE2 / 4;
+        aproboE2 = promE2 >= 6;
+      }
+      
+      // Si tiene todas las notas y ambas etapas aprobadas
+      if (tieneTodasNotas && aproboE1 && aproboE2) {
+        promedioAprobado = true;
+      }
       
       // Construir descripción de exámenes
       const detalleExamenes = c.descripcionConsecutivo || (() => {
@@ -482,19 +351,42 @@ export default function ReporteExamenesConsecutivos() {
         alumnoNombre: nombre,
         cursoStr: curso,
         detalleExamenes,
-        riesgoRank: rank(c?.estadoRiesgo)
+        riesgoRank: rank(c?.estadoRiesgo),
+        tieneTodasNotas,
+        promedioAprobado,
+        tieneE1Completa,
+        tieneE2Completa,
+        aproboE1,
+        aproboE2
       };
     });
     
+    // Aplicar filtros de exclusión
+    let resultado = mapped;
+    if (excluirConTodasNotas) {
+      resultado = resultado.filter(c => !c.tieneTodasNotas);
+    }
+    if (excluirAprobados) {
+      resultado = resultado.filter(c => !c.promedioAprobado);
+    }
+    if (excluirE1Aprobada) {
+      // Excluir si aprobó E1 (aunque E2 esté incompleta, ya no está en riesgo en E1)
+      resultado = resultado.filter(c => !c.aproboE1);
+    }
+    if (excluirE2Aprobada) {
+      // Excluir si aprobó E2 (aunque E1 esté incompleta, ya no está en riesgo en E2)
+      resultado = resultado.filter(c => !c.aproboE2);
+    }
+    
     // Ordenar: primero por nivel de riesgo (mayor a menor), luego alfabéticamente por alumno
-    return mapped.sort((a, b) => {
+    return resultado.sort((a, b) => {
       if (ordenAlfabetico) {
         return a.alumnoNombre.localeCompare(b.alumnoNombre, 'es', { sensitivity: 'base' });
       }
       if (b.riesgoRank !== a.riesgoRank) return b.riesgoRank - a.riesgoRank;
       return a.alumnoNombre.localeCompare(b.alumnoNombre, 'es', { sensitivity: 'base' });
     });
-  }, [casos, ambito, filtroDivision, ordenAlfabetico]);
+  }, [casos, ambito, filtroDivision, filtroRiesgo, excluirConTodasNotas, excluirAprobados, excluirE1Aprobada, excluirE2Aprobada, ordenAlfabetico, calificacionesPorAlumno]);
   
   // Obtener opciones únicas de división para los filtros (solo cuando ambito === 'materia')
   const opcionesDivision = useMemo(() => {
@@ -678,42 +570,91 @@ export default function ReporteExamenesConsecutivos() {
   const printOnly = () => {
     if (!printRef.current) { toast.info('No hay contenido para imprimir'); return; }
     const win = window.open('', '_blank'); if (!win) return;
+    
     const css = `
-      @page { size: landscape; margin: 14mm; }
-      body { font-family: Arial, sans-serif; padding: 10px; font-size: 11px; }
-      h3 { margin: 0 0 10px 0; font-size: 18px; }
-      .sub { color: #555; font-size: 12px; margin-bottom: 10px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 10px; page-break-inside: auto; }
-      th, td { border: 1px solid #333; padding: 4px 6px; font-size: 10px; }
-      thead th { background: #f0f0f0; font-weight: bold; }
-      tr { page-break-inside: avoid; page-break-after: auto; }
-      .card { border: 1px solid #ddd; margin-bottom: 10px; padding: 8px; page-break-inside: avoid; }
-      .card-header { font-weight: bold; background: #f8f9fa; padding: 6px; margin-bottom: 6px; border-bottom: 1px solid #ddd; }
-      .badge { padding: 2px 6px; font-size: 9px; border-radius: 3px; font-weight: bold; display: inline-block; }
+      @page { size: landscape; margin: 12mm; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; font-size: 10px; color: #000; line-height: 1.2; }
+      h3 { font-size: 16px; margin: 0 0 5px 0; font-weight: bold; }
+      .header-info { font-size: 9px; color: #333; margin-bottom: 12px; padding: 8px; background: #f5f5f5; border-bottom: 2px solid #333; }
+      .materia-titulo { text-align: center; font-size: 14px; font-weight: bold; margin: 15px 0 10px 0; }
+      table { width: 100%; border-collapse: collapse; font-size: 9px; }
+      th { background: #e0e0e0; color: #000; font-weight: bold; padding: 4px; text-align: left; border: 1px solid #999; }
+      th.text-center { text-align: center; }
+      td { padding: 4px; border: 1px solid #999; }
+      td.text-center { text-align: center; }
+      tbody tr:nth-child(odd) { background: #fafafa; }
+      tbody tr:nth-child(even) { background: #fff; }
+      .badge { display: inline-block; padding: 2px 5px; font-size: 8px; border-radius: 2px; font-weight: bold; }
+      .badge.bg-dark { background: #212529; color: white; }
       .badge.bg-danger { background: #dc3545; color: white; }
-      .badge.bg-warning { background: #ffc107; color: black; }
-      .badge.bg-info { background: #0dcaf0; color: black; }
-      .badge.bg-secondary { background: #6c757d; color: white; }
-      .text-muted { color: #6c757d; }
-      .text-center { text-align: center; }
-      .h4 { font-size: 16px; margin: 0; }
-      .small { font-size: 10px; }
-      .shadow-sm { box-shadow: none !important; }
-      .d-none-print { display: none !important; }
+      .badge.bg-warning { background: #ffc107; color: #000; }
+      .badge.bg-info { background: #0dcaf0; color: #000; }
+      .text-danger { color: #dc3545; font-weight: bold; }
+      .text-muted { color: #666; }
+      .fw-bold { font-weight: bold; }
+      /* Ocultar todo lo que no sea tabla */
+      .card-header, .d-flex, .alert, .row, .form-check, button, input, select { display: none !important; }
+      .card { border: none; padding: 0; margin: 10px 0; }
+      .card-body { padding: 0; }
+      .table-responsive { width: 100%; }
+      /* Estilos especiales para etapas */
+      [style*="backgroundColor: #e3f2fd"] { background-color: #f0f0f0 !important; }
+      [style*="backgroundColor: #f3e5f5"] { background-color: #f0f0f0 !important; }
     `;
+    
     const amb = ambito === 'materia' ? `Materia: ${materiaNombreActual || materias.find(m=>String(m.value)===String(materiaId))?.label || materiaId}` : `Curso: ${cursos.find(c=>String(c.value)===String(cursoId))?.label || cursoId}`;
+    
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Exámenes consecutivos desaprobados</title><style>${css}</style></head><body>`);
     win.document.write(`<h3>Exámenes consecutivos desaprobados</h3>`);
-    win.document.write(`<div class="sub">Año: ${anio} · Ámbito: ${amb}</div>`);
+    win.document.write(`<div class="header-info">Año: ${anio} · Ámbito: ${amb}</div>`);
     
-    // Clonar el contenido y ocultar elementos interactivos
+    // Clonar el contenido
     const clone = printRef.current.cloneNode(true);
-    // Ocultar checkboxes, botones de filtro, etc
-    clone.querySelectorAll('input[type="checkbox"], button, .btn, select').forEach(el => el.style.display = 'none');
+    
+    // Remover TODO excepto el card de casos detectados
+    const allCards = clone.querySelectorAll('.card');
+    allCards.forEach(card => {
+      const headerText = card.querySelector('.card-header')?.textContent || '';
+      if (!headerText.includes('Casos detectados')) {
+        card.remove();
+      }
+    });
+    
+    // Remover el header del card de casos para dejar solo la tabla
+    clone.querySelectorAll('.card-header').forEach(header => header.remove());
+    
+    // Remover divs de filtros (d-flex con checkboxes)
+    clone.querySelectorAll('.d-flex.gap-3').forEach(div => {
+      if (div.querySelector('input[type="checkbox"]')) {
+        div.remove();
+      }
+    });
+    
+    // Remover información descriptiva antes de la tabla
+    clone.querySelectorAll('.d-flex.gap-3.mb-3').forEach(div => div.remove());
+    clone.querySelectorAll('.d-flex.gap-2').forEach(div => div.remove());
+    
+    // Eliminar todos los elementos interactivos
+    clone.querySelectorAll('input, button, .btn, select, .alert').forEach(el => el.remove());
+    
+    // Limpiar estilos inline conflictivos en tabla
+    clone.querySelectorAll('th, td').forEach(cell => {
+      // Remover solo ciertos estilos inline pero mantener texto-align
+      const style = cell.getAttribute('style') || '';
+      if (style.includes('backgroundColor')) {
+        cell.style.backgroundColor = '#f0f0f0';
+      }
+      if (style.includes('color: rgb')) {
+        cell.style.color = '#000';
+      }
+    });
     
     win.document.write(`<div>${clone.innerHTML}</div>`);
     win.document.write('</body></html>');
-    win.document.close(); win.focus(); setTimeout(() => { win.print(); win.close(); }, 300);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 300);
   };
 
   return (
@@ -762,6 +703,8 @@ export default function ReporteExamenesConsecutivos() {
           <strong>Ejemplo:</strong> Un alumno con 2 secuencias de 2 consecutivos en diferentes etapas de Matemática obtendría: 15 (secuencia) + 20 (persistencia) + 10 (notas) + 15 (etapas) = 60 puntos → <span className="badge bg-danger text-white">CRÍTICO</span>
         </div>
       </Alert>
+
+
       <div className="mb-3">
         {cicloLectivo?.id ? (
           <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
@@ -819,46 +762,7 @@ export default function ReporteExamenesConsecutivos() {
           </div>
 
           <div ref={printRef}>
-            {/* Sistema de Clasificación - Colapsable */}
-            <Card className="mb-3">
-              <Card.Header 
-                className="d-flex justify-content-between align-items-center" 
-                style={{ cursor: 'pointer' }}
-                onClick={() => setShowGraficos(!showGraficos)}
-              >
-                <div className="d-flex align-items-center gap-2">
-                  <BarChart3 size={20} className="text-primary" />
-                  <strong>Sistema de Clasificación Inteligente por Materia</strong>
-                </div>
-                {showGraficos ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-              </Card.Header>
-              {showGraficos && (
-                <Card.Body className="py-3">
-                  <div className="d-flex align-items-center gap-4 flex-wrap mb-3">
-                    <div className="d-flex align-items-center gap-2">
-                      <Badge bg="dark" className="px-3">EMERGENCIA</Badge>
-                      <span className="text-muted">80+ puntos</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <Badge bg="danger" className="px-3">CRÍTICO</Badge>
-                      <span className="text-muted">60-79 puntos</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <Badge bg="warning" text="dark" className="px-3">ALTO</Badge>
-                      <span className="text-muted">40-59 puntos</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <Badge bg="info" text="dark" className="px-3">MEDIO</Badge>
-                      <span className="text-muted">&lt;40 puntos</span>
-                    </div>
-                  </div>
-                  <div className="text-muted small d-flex align-items-start gap-2">
-                    <Info size={16} className="mt-1 flex-shrink-0" />
-                    <span>La clasificación considera múltiples factores por materia: cantidad de secuencias, persistencia temporal, gravedad de notas y patrones entre etapas.</span>
-                  </div>
-                </Card.Body>
-              )}
-            </Card>
+
 
             {/* Título de la materia cuando ambito === 'materia' */}
             {ambito === 'materia' && materiaNombreActual && (
@@ -1061,9 +965,7 @@ export default function ReporteExamenesConsecutivos() {
                 <div>
                   <strong>Casos detectados</strong> <span className="text-muted small">({casosParaTabla.length} {casosParaTabla.length === 1 ? 'caso' : 'casos'})</span>
                   <div className="mt-1 d-flex gap-3 small text-muted">
-                    <span><Badge bg="danger" className="me-1">4</Badge>Consecutivo desaprobado</span>
-                    <span><Badge bg="secondary" className="me-1">4</Badge>Desaprobado</span>
-                    <span><Badge bg="success" className="me-1">7</Badge>Aprobado</span>
+                    <span><Badge bg="danger" className="me-1">Rojo</Badge>Consecutivo desaprobado</span>
                   </div>
                 </div>
                 <div className="d-flex gap-2 align-items-center mt-2 mt-md-0 flex-wrap">
@@ -1074,14 +976,18 @@ export default function ReporteExamenesConsecutivos() {
                         <option value="">Todas</option>
                         {opcionesDivision.map(d => (<option key={d} value={d}>{d}</option>))}
                       </Form.Select>
-                      {filtroDivision && (
-                        <Button size="sm" variant="outline-secondary" onClick={() => setFiltroDivision('')}>
-                          Limpiar
-                        </Button>
-                      )}
-                      <span className="text-muted mx-2">|</span>
+                      <span className="text-muted mx-1">|</span>
                     </>
                   )}
+                  <Form.Label className="mb-0 me-1 small">Riesgo:</Form.Label>
+                  <Form.Select size="sm" style={{ width: '130px' }} value={filtroRiesgo} onChange={(e) => setFiltroRiesgo(e.target.value)}>
+                    <option value="">Todos</option>
+                    <option value="EMERGENCIA">EMERGENCIA</option>
+                    <option value="CRÍTICO">CRÍTICO</option>
+                    <option value="ALTO">ALTO</option>
+                    <option value="MEDIO">MEDIO</option>
+                  </Form.Select>
+                  <span className="text-muted mx-1">|</span>
                   <Form.Check 
                     type="checkbox"
                     id="orden-alfabetico"
@@ -1092,26 +998,90 @@ export default function ReporteExamenesConsecutivos() {
                   />
                 </div>
               </Card.Header>
-              <Card.Body className="p-0">
+              <Card.Body className="p-3">
+                <div className="d-flex gap-3 mb-3 flex-wrap align-items-center">
+                  <Form.Check 
+                    type="checkbox"
+                    id="excluir-todas-notas"
+                    label="Excluir con todas las notas cargadas (8/8)"
+                    checked={excluirConTodasNotas}
+                    onChange={(e) => setExcluirConTodasNotas(e.target.checked)}
+                    className="small"
+                  />
+                  <span className="text-muted">|</span>
+                  <Form.Check 
+                    type="checkbox"
+                    id="excluir-e1-aprobada"
+                    label="Excluir si aprobó Etapa 1 (ya no está en riesgo de E1)"
+                    checked={excluirE1Aprobada}
+                    onChange={(e) => setExcluirE1Aprobada(e.target.checked)}
+                    className="small text-primary"
+                  />
+                  <Form.Check 
+                    type="checkbox"
+                    id="excluir-e2-aprobada"
+                    label="Excluir si aprobó Etapa 2 (ya no está en riesgo de E2)"
+                    checked={excluirE2Aprobada}
+                    onChange={(e) => setExcluirE2Aprobada(e.target.checked)}
+                    className="small text-info"
+                  />
+                  <span className="text-muted">|</span>
+                  <Form.Check 
+                    type="checkbox"
+                    id="excluir-aprobados"
+                    label="Excluir si aprobó materia completa (ambas E)"
+                    checked={excluirAprobados}
+                    onChange={(e) => setExcluirAprobados(e.target.checked)}
+                    className="small text-success fw-bold"
+                  />
+                  {(filtroDivision || filtroRiesgo || excluirConTodasNotas || excluirE1Aprobada || excluirE2Aprobada || excluirAprobados) && (
+                    <Button 
+                      variant="outline-secondary" 
+                      size="sm"
+                      onClick={() => {
+                        setFiltroDivision('');
+                        setFiltroRiesgo('');
+                        setExcluirConTodasNotas(false);
+                        setExcluirE1Aprobada(false);
+                        setExcluirE2Aprobada(false);
+                        setExcluirAprobados(false);
+                      }}
+                    >
+                      Limpiar filtros
+                    </Button>
+                  )}
+                </div>
                 {casosParaTabla.length === 0 ? (
                   <div className="text-center text-muted py-4">Sin casos detectados</div>
                 ) : (
                   <div className="table-responsive">
-                    <Table striped hover className="mb-0">
+                    <Table bordered hover className="mb-0">
                       <thead className="table-light">
                         <tr>
-                          <th style={{ width: '20%' }}>Alumno</th>
-                          <th style={{ width: '12%' }} className="text-center">Riesgo</th>
-                          {ambito === 'curso' && <th style={{ width: '15%' }}>Materia</th>}
-                          {ambito === 'materia' && <th style={{ width: '10%' }} className="text-center">Curso</th>}
-                          {ambito === 'materia' && <th style={{ width: '15%' }}>Docente</th>}
-                          <th>Detalle de exámenes desaprobados</th>
-                          <th style={{ width: '10%' }} className="text-center">Acciones</th>
+                          <th rowSpan="2" style={{ verticalAlign: 'middle' }}>Alumno</th>
+                          <th rowSpan="2" className="text-center" style={{ verticalAlign: 'middle' }}>Riesgo</th>
+                          {ambito === 'curso' && <th rowSpan="2" style={{ verticalAlign: 'middle' }}>Materia</th>}
+                          {ambito === 'materia' && <th rowSpan="2" className="text-center" style={{ verticalAlign: 'middle' }}>Curso</th>}
+                          {ambito === 'materia' && <th rowSpan="2" style={{ verticalAlign: 'middle' }}>Docente</th>}
+                          <th rowSpan="2" style={{ verticalAlign: 'middle' }}>Motivo</th>
+                          <th colSpan="4" className="text-center" style={{ backgroundColor: '#e3f2fd', borderBottom: '2px solid #90caf9' }}>Etapa 1</th>
+                          <th colSpan="4" className="text-center" style={{ backgroundColor: '#f3e5f5', borderBottom: '2px solid #ce93d8' }}>Etapa 2</th>
+                          <th rowSpan="2" className="text-center" style={{ verticalAlign: 'middle' }}>Acciones</th>
+                        </tr>
+                        <tr>
+                          <th className="text-center" style={{ fontSize: '0.9rem', padding: '6px', backgroundColor: '#e3f2fd' }}>N1</th>
+                          <th className="text-center" style={{ fontSize: '0.9rem', padding: '6px', backgroundColor: '#e3f2fd' }}>N2</th>
+                          <th className="text-center" style={{ fontSize: '0.9rem', padding: '6px', backgroundColor: '#e3f2fd' }}>N3</th>
+                          <th className="text-center" style={{ fontSize: '0.9rem', padding: '6px', backgroundColor: '#e3f2fd' }}>N4</th>
+                          <th className="text-center" style={{ fontSize: '0.9rem', padding: '6px', backgroundColor: '#f3e5f5' }}>N1</th>
+                          <th className="text-center" style={{ fontSize: '0.9rem', padding: '6px', backgroundColor: '#f3e5f5' }}>N2</th>
+                          <th className="text-center" style={{ fontSize: '0.9rem', padding: '6px', backgroundColor: '#f3e5f5' }}>N3</th>
+                          <th className="text-center" style={{ fontSize: '0.9rem', padding: '6px', backgroundColor: '#f3e5f5' }}>N4</th>
                         </tr>
                       </thead>
                       <tbody>
                         {casosParaTabla.map((c, idx) => (
-                          <FilaExpandible key={idx} caso={c} token={token} ambito={ambito} />
+                          <FilaExpandible key={idx} caso={c} token={token} ambito={ambito} onCalificacionesLoaded={handleCalificacionesLoaded} />
                         ))}
                       </tbody>
                     </Table>

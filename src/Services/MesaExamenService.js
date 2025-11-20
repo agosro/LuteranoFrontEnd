@@ -76,3 +76,10 @@ export const finalizarMesa = async (token, mesaId) => {
   if (data.code < 0) throw new Error(data.mensaje || 'Error al finalizar mesa')
   return data.mesa
 };
+
+export const crearMesasMasivas = async (token, payload) => {
+  void token
+  const data = await httpClient.post('/mesas/masivas', payload)
+  if (data.code < 0) throw new Error(data.mensaje || 'Error al crear mesas masivas')
+  return data.mesas || []
+};

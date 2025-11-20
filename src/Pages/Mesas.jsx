@@ -4,7 +4,7 @@ import { listarCursos } from '../Services/CursoService.js';
 import { listarMateriasDeCurso } from '../Services/MateriaCursoService.js';
 import { listarAulas } from '../Services/AulaService.js';
 import { listarTurnos } from '../Services/TurnoExamenService.js';
-import { crearMesa, listarMesasPorCurso, eliminarMesa, finalizarMesa } from '../Services/MesaExamenService.js';
+import { crearMesa, listarMesasPorCurso, eliminarMesa, finalizarMesa, crearMesasMasivas } from '../Services/MesaExamenService.js';
 import { obtenerActaPorMesa, generarActa, actualizarActa, eliminarActa } from '../Services/ActaExamenService.js';
 import { Container, Row, Col, Card, Form, Button, Table, Spinner, Alert, Badge, Modal } from 'react-bootstrap';
 import Paginacion from '../Components/Botones/Paginacion.jsx';
@@ -54,6 +54,14 @@ export default function Mesas() {
   const [turnosPorAnio, setTurnosPorAnio] = useState(new Map()); // anio -> turnos
   const [crearMesaLoading, setCrearMesaLoading] = useState(false);
   const [crearMesaError, setCrearMesaError] = useState('');
+
+  // Creación masiva
+  const [showCrearMasiva, setShowCrearMasiva] = useState(false);
+  const [crearMasivaForm, setCrearMasivaForm] = useState({ anio: '', turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] });
+  const [crearMasivaLoading, setCrearMasivaLoading] = useState(false);
+  const [crearMasivaError, setCrearMasivaError] = useState('');
+  const [crearMasivaResultado, setCrearMasivaResultado] = useState(null);
+  const [materiasMasivas, setMateriasMasivas] = useState([]); // materias de los cursos seleccionados
 
   // Estado para modales que aún se usan
   const [mesaSel, setMesaSel] = useState(null);
@@ -174,6 +182,42 @@ export default function Mesas() {
       setCrearMesaError(e.message || 'No se pudo crear la mesa');
       toast.error(e.message);
     } finally { setCrearMesaLoading(false); }
+  };
+
+  const submitCrearMasiva = async () => {
+    setCrearMasivaError('');
+    setCrearMasivaResultado(null);
+    if (!crearMasivaForm.turnoId || crearMasivaForm.cursoIds.length === 0) {
+      setCrearMasivaError('Completá Turno y seleccioná al menos un curso');
+      toast.error('Completá Turno y seleccioná al menos un curso');
+      return;
+    }
+    try {
+      setCrearMasivaLoading(true);
+      const payload = {
+        turnoId: Number(crearMasivaForm.turnoId),
+        cursoIds: crearMasivaForm.cursoIds.map(Number),
+        tipoMesa: crearMasivaForm.tipoMesa,
+      };
+      if (crearMasivaForm.fecha) {
+        payload.fechaMesa = crearMasivaForm.fecha;
+      }
+      if (crearMasivaForm.materiaIds.length > 0) {
+        payload.materiaIds = crearMasivaForm.materiaIds.map(Number);
+      }
+      const mesasCreadas = await crearMesasMasivas(token, payload);
+      await refreshMesas();
+      setCrearMasivaResultado({ success: true, cantidad: mesasCreadas.length });
+      toast.success(`Se crearon ${mesasCreadas.length} mesas de examen`);
+      setTimeout(() => {
+        setShowCrearMasiva(false);
+        setCrearMasivaForm({ anio: '', turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] });
+        setCrearMasivaResultado(null);
+      }, 2000);
+    } catch (e) {
+      setCrearMasivaError(e.message || 'No se pudieron crear las mesas');
+      toast.error(e.message);
+    } finally { setCrearMasivaLoading(false); }
   };
 
   // Eliminación ahora se realiza mediante modal de confirmación
@@ -310,6 +354,7 @@ export default function Mesas() {
             </Col>
             <Col className="text-md-end">
               <Button variant="outline-dark" className="me-2" onClick={()=> navigate('/mesa-de-examen/historial')}>Ver historial</Button>
+              <Button variant="info" className="me-2" onClick={()=> { setCrearMasivaForm({ anio: String(cicloYear), turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setShowCrearMasiva(true); }}>Crear masiva</Button>
               <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
             </Col>
           </Row>
@@ -674,6 +719,217 @@ export default function Mesas() {
           setMesaAFinalizar(null);
         }}
       />
+
+      {/* Modal Crear Mesas Masivas */}
+      <Modal show={showCrearMasiva} onHide={()=> setShowCrearMasiva(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Crear mesas de examen masivas</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {crearMasivaError && (<Alert variant="danger" className="mb-3">{crearMasivaError}</Alert>)}
+          {crearMasivaResultado?.success && (<Alert variant="success" className="mb-3">Se crearon {crearMasivaResultado.cantidad} mesas exitosamente</Alert>)}
+          <Form>
+            <Row className="g-3">
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Año</Form.Label>
+                  <Form.Control type="number" min={2000} max={2100} value={crearMasivaForm.anio}
+                    onChange={async (e)=> {
+                      const anioNuevo = String(e.target.value);
+                      setCrearMasivaForm(f=>({...f, anio: anioNuevo, turnoId: '' }));
+                      if (!anioNuevo) return;
+                      if (!turnosPorAnio.has(anioNuevo)) {
+                        try {
+                          const ts = await listarTurnos(token, Number(anioNuevo));
+                          setTurnosPorAnio(prev => new Map(prev).set(anioNuevo, ts));
+                        } catch { /* ignore */ }
+                      }
+                    }} />
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Turno *</Form.Label>
+                  <Form.Select value={crearMasivaForm.turnoId} onChange={(e)=> setCrearMasivaForm(f=>({...f, turnoId: e.target.value}))}>
+                    <option value="">-- Seleccionar --</option>
+                    {(turnosPorAnio.get(String(crearMasivaForm.anio)) || turnos).map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Fecha mesa (opcional)</Form.Label>
+                  <Form.Control type="date" value={crearMasivaForm.fecha} onChange={(e)=> setCrearMasivaForm(f=>({...f, fecha: e.target.value}))} />
+                  <Form.Text className="text-muted">Si no indicas fecha, el backend usará la del turno</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Tipo de mesa</Form.Label>
+                  <Form.Select value={crearMasivaForm.tipoMesa} onChange={(e)=> setCrearMasivaForm(f=>({...f, tipoMesa: e.target.value}))}>
+                    <option value="EXAMEN">Examen final</option>
+                    <option value="COLOQUIO">Coloquio</option>
+                  </Form.Select>
+                  <Form.Text className="text-muted d-block mt-1">
+                    {crearMasivaForm.tipoMesa === 'COLOQUIO' 
+                      ? 'Coloquio: solo alumnos con condición COLOQUIO' 
+                      : 'Examen final: alumnos con EXAMEN o COLOQUIO (que no cerraron)'}
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Cursos *</Form.Label>
+                  <div className="border rounded p-2" style={{maxHeight: '200px', overflowY: 'auto'}}>
+                    <div className="mb-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline-secondary" 
+                        onClick={() => {
+                          if (crearMasivaForm.cursoIds.length === cursos.length) {
+                            setCrearMasivaForm(f=>({...f, cursoIds: [], materiaIds: []}));
+                            setMateriasMasivas([]);
+                          } else {
+                            setCrearMasivaForm(f=>({...f, cursoIds: cursos.map(c => String(c.id))}));
+                            // Cargar materias de todos los cursos
+                            (async () => {
+                              try {
+                                const todasMaterias = [];
+                                for (const c of cursos) {
+                                  const mats = await listarMateriasDeCurso(token, c.id);
+                                  todasMaterias.push(...mats);
+                                }
+                                setMateriasMasivas(todasMaterias);
+                              } catch { setMateriasMasivas([]); }
+                            })();
+                          }
+                        }}
+                      >
+                        {crearMasivaForm.cursoIds.length === cursos.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                      </Button>
+                    </div>
+                    {cursos.map(c => (
+                      <Form.Check 
+                        key={c.id}
+                        type="checkbox"
+                        id={`curso-${c.id}`}
+                        label={`${c.anio ?? ''}° ${c.division ?? ''}`}
+                        checked={crearMasivaForm.cursoIds.includes(String(c.id))}
+                        onChange={async (e) => {
+                          const id = String(c.id);
+                          const checked = e.target.checked;
+                          
+                          setCrearMasivaForm(f => ({
+                            ...f,
+                            cursoIds: checked 
+                              ? [...f.cursoIds, id]
+                              : f.cursoIds.filter(x => x !== id)
+                          }));
+                          
+                          // Cargar/descargar materias del curso
+                          if (checked) {
+                            try {
+                              const mats = await listarMateriasDeCurso(token, id);
+                              setMateriasMasivas(prev => [...prev, ...mats]);
+                            } catch { /* ignore */ }
+                          } else {
+                            // Remover materias de este curso
+                            setMateriasMasivas(prev => prev.filter(m => String(m.cursoId) !== id));
+                            // Limpiar materias seleccionadas de este curso
+                            setCrearMasivaForm(f => ({
+                              ...f,
+                              materiaIds: f.materiaIds.filter(mId => {
+                                const materia = prev.find(m => String(m.materiaId) === mId);
+                                return !materia || String(materia.cursoId) !== id;
+                              })
+                            }));
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <Form.Text className="text-muted d-block mt-1">
+                    Seleccionados: {crearMasivaForm.cursoIds.length > 0 ? crearMasivaForm.cursoIds.length + ' curso(s)' : 'ninguno'}
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Materias (opcional - dejar vacío para todas)</Form.Label>
+                  <div className="border rounded p-2" style={{maxHeight: '150px', overflowY: 'auto'}}>
+                    {crearMasivaForm.cursoIds.length === 0 ? (
+                      <div className="text-muted text-center py-2">Primero seleccioná al menos un curso</div>
+                    ) : (
+                      <>
+                        <div className="mb-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline-secondary"
+                            onClick={() => {
+                              const uniqueMaterias = Array.from(new Set(materiasMasivas.map(m => JSON.stringify({id: m.materiaId, nombre: m.nombreMateria}))))
+                                .map(str => JSON.parse(str));
+                              if (crearMasivaForm.materiaIds.length === uniqueMaterias.length) {
+                                setCrearMasivaForm(f=>({...f, materiaIds: []}));
+                              } else {
+                                setCrearMasivaForm(f=>({...f, materiaIds: uniqueMaterias.map(m => String(m.id))}));
+                              }
+                            }}
+                          >
+                            {crearMasivaForm.materiaIds.length > 0 ? 'Deseleccionar todas' : 'Seleccionar todas'}
+                          </Button>
+                        </div>
+                        {Array.from(new Set(materiasMasivas.map(m => JSON.stringify({id: m.materiaId, nombre: m.nombreMateria}))))
+                          .map(str => JSON.parse(str))
+                          .map(m => (
+                            <Form.Check 
+                              key={m.id}
+                              type="checkbox"
+                              id={`materia-${m.id}`}
+                              label={m.nombre}
+                              checked={crearMasivaForm.materiaIds.includes(String(m.id))}
+                              onChange={(e) => {
+                                const id = String(m.id);
+                                setCrearMasivaForm(f => ({
+                                  ...f,
+                                  materiaIds: e.target.checked 
+                                    ? [...f.materiaIds, id]
+                                    : f.materiaIds.filter(x => x !== id)
+                                }));
+                              }}
+                            />
+                          ))}
+                        {materiasMasivas.length === 0 && (
+                          <div className="text-muted text-center py-2">No hay materias para los cursos seleccionados</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <Form.Text className="text-muted d-block mt-1">
+                    {crearMasivaForm.materiaIds.length > 0 
+                      ? `Seleccionadas: ${crearMasivaForm.materiaIds.length} materia(s)` 
+                      : 'Sin filtro: se crearán mesas para todas las materias con alumnos que deban rendir'}
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+            </Row>
+          </Form>
+          <Alert variant="info" className="mt-3 mb-0" style={{fontSize: '.9rem'}}>
+            <strong>Funcionamiento:</strong> Por cada curso seleccionado, se consultará el reporte de rinden del año de la mesa.
+            Se crearán mesas solo para materias donde hay alumnos con la condición requerida:
+            <ul className="mb-0 mt-1">
+              <li><strong>Examen final:</strong> alumnos con condición EXAMEN o COLOQUIO (que no cerraron)</li>
+              <li><strong>Coloquio:</strong> solo alumnos con condición COLOQUIO</li>
+            </ul>
+            Se asigna automáticamente el docente titular si existe.
+          </Alert>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={()=> setShowCrearMasiva(false)} disabled={crearMasivaLoading}>Cancelar</Button>
+          <Button variant="primary" onClick={submitCrearMasiva} disabled={crearMasivaLoading}>
+            {crearMasivaLoading ? <><Spinner animation="border" size="sm" className="me-2" />Creando...</> : 'Crear mesas'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 }
