@@ -47,12 +47,20 @@ export default function ReporteRankingAlumnos() {
       else if (modo === 'colegio') res = await rankingColegio(token, Number(anio));
       else res = await rankingTodosCursos(token, Number(anio));
       
+      // Debug: ver qué retorna el backend
+      console.log('Respuesta del backend (modo:', modo, '):', res);
+      
       // Verificar si hay datos
-      if (modo === 'colegio' && (!res?.ranking || res.ranking.length === 0)) {
-        toast.info('No se encontraron datos para el año seleccionado');
-      } else if (modo === 'curso' && (!res?.ranking || res.ranking.length === 0)) {
-        toast.info('No se encontraron datos para el curso y año seleccionado');
-      } else if (modo === 'todos' && (!res?.cursosRanking || res.cursosRanking.length === 0)) {
+      let tieneData = false;
+      if (modo === 'colegio' && res?.ranking && res.ranking.length > 0) {
+        tieneData = true;
+      } else if (modo === 'curso' && res?.ranking && res.ranking.length > 0) {
+        tieneData = true;
+      } else if (modo === 'todos' && res?.cursosRanking && res.cursosRanking.length > 0) {
+        tieneData = true;
+      }
+      
+      if (!tieneData) {
         toast.info('No se encontraron datos para el año seleccionado');
       }
       
@@ -328,6 +336,9 @@ export default function ReporteRankingAlumnos() {
       <div className="mb-1"><Breadcrumbs /></div>
       <div className="mb-2"><BackButton /></div>
       <h2 className="mb-1">Ranking de Alumnos</h2>
+      <p className="text-muted mb-3">
+        Este reporte muestra el ranking de alumnos según sus promedios generales. Puede consultar el ranking a nivel colegio, por curso específico o comparar todos los cursos del año seleccionado.
+      </p>
       <div className="mb-3">
         {cicloLectivo?.id ? (
           <Badge bg="secondary">Ciclo lectivo: {String(cicloLectivo?.nombre || cicloLectivo?.id)}</Badge>
@@ -414,48 +425,9 @@ export default function ReporteRankingAlumnos() {
                 </Col>
               </Row>
 
-              {/* Gráficos */}
-              <Row className="g-3">
-                <Col md={modo === 'todos' ? 12 : 7}>
-                  <Card>
-                    <Card.Body>
-                      <h6 className="mb-3">Distribución de Promedios</h6>
-                      <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={kpisData.distribucion}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="rango" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="count" name="Cantidad de alumnos" fill="#0066cc">
-                            {kpisData.distribucion.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                {modo !== 'todos' && kpisData.top3Data.length > 0 && (
-                  <Col md={5}>
-                    <Card>
-                      <Card.Body>
-                        <h6 className="mb-3">Top 3 Alumnos</h6>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <BarChart data={kpisData.top3Data} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
-                            <YAxis domain={[0, 10]} />
-                            <Tooltip />
-                            <Bar dataKey="promedio" name="Promedio" fill="#ffc107" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                )}
-                {modo === 'todos' && kpisData.cursosData.length > 0 && (
+              {/* Gráfico de Promedio por Curso solo en modo 'todos' */}
+              {modo === 'todos' && kpisData.cursosData.length > 0 && (
+                <Row className="g-3">
                   <Col md={12}>
                     <Card>
                       <Card.Body>
@@ -482,8 +454,8 @@ export default function ReporteRankingAlumnos() {
                       </Card.Body>
                     </Card>
                   </Col>
-                )}
-              </Row>
+                </Row>
+              )}
             </Accordion.Body>
           </Accordion.Item>
         </Accordion>
