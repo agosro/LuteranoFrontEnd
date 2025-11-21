@@ -652,31 +652,7 @@ export default function ReporteAnualAlumno() {
                     </Card.Body>
                   </Card>
                 </Col>
-                <Col md={12}>
-                  <Card>
-                    <Card.Body>
-                      <h6 className="mb-3">Comparación de Promedios por Etapa</h6>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={kpisData.etapaComparacion} layout="horizontal">
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="etapa" />
-                          <YAxis domain={[0, 10]} />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="promedio" name="Promedio" fill="#0066cc" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                      <div className="text-center mt-2 small text-muted">
-                        <strong>E1:</strong> {kpisData.promedioE1 ?? '-'} · <strong>E2:</strong> {kpisData.promedioE2 ?? '-'}
-                        {kpisData.promedioE1 && kpisData.promedioE2 && (
-                          <span className={`ms-2 ${parseFloat(kpisData.promedioE2) > parseFloat(kpisData.promedioE1) ? 'text-success' : parseFloat(kpisData.promedioE2) < parseFloat(kpisData.promedioE1) ? 'text-danger' : 'text-muted'}`}>
-                            {parseFloat(kpisData.promedioE2) > parseFloat(kpisData.promedioE1) ? '↑ Mejoró' : parseFloat(kpisData.promedioE2) < parseFloat(kpisData.promedioE1) ? '↓ Bajó' : '→ Sin cambio'}
-                          </span>
-                        )}
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
+
               </Row>
             </Accordion.Body>
           </Accordion.Item>

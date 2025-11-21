@@ -98,7 +98,6 @@ export default function ReporteHistorialAlumno() {
     if (!historial || !resumen) return null;
 
     const ciclos = historial.historialPorCiclos || [];
-    
     // Evolución del promedio a lo largo de los años
     const evolucionPromedio = ciclos
       .filter(c => c.promedioGeneral != null)
@@ -115,33 +114,6 @@ export default function ReporteHistorialAlumno() {
       { name: 'Desaprobadas', value: resumen.totalMateriasDesaprobadas || 0, color: '#dc3545' }
     ];
 
-    // Top materias con mejor promedio (todas las iteraciones)
-    const materiasPorNombre = new Map();
-    ciclos.forEach(ciclo => {
-      (ciclo.materias || []).forEach(m => {
-        if (m.promedioGeneral != null) {
-          if (!materiasPorNombre.has(m.materiaNombre)) {
-            materiasPorNombre.set(m.materiaNombre, { 
-              materia: m.materiaNombre, 
-              suma: 0, 
-              count: 0 
-            });
-          }
-          const obj = materiasPorNombre.get(m.materiaNombre);
-          obj.suma += m.promedioGeneral;
-          obj.count += 1;
-        }
-      });
-    });
-
-    const topMaterias = Array.from(materiasPorNombre.values())
-      .map(obj => ({ 
-        materia: obj.materia, 
-        promedio: Number((obj.suma / obj.count).toFixed(2)) 
-      }))
-      .sort((a, b) => b.promedio - a.promedio)
-      .slice(0, 5); // Top 5 materias
-
     // Porcentaje de aprobación por ciclo
     const aprobacionPorCiclo = ciclos.map(c => ({
       ciclo: c.cicloNombre || `${c.cicloAnio}`,
@@ -153,22 +125,11 @@ export default function ReporteHistorialAlumno() {
     return {
       evolucionPromedio,
       distribucionMaterias,
-      topMaterias,
       aprobacionPorCiclo
     };
   }, [historial, resumen]);
 
-  const getTendenciaIcon = (tendencia) => {
-    if (tendencia === 'MEJORANDO') return <TrendingUp size={20} className="text-success" />;
-    if (tendencia === 'EMPEORANDO') return <TrendingDown size={20} className="text-danger" />;
-    return <Minus size={20} className="text-secondary" />;
-  };
-
-  const getTendenciaColor = (tendencia) => {
-    if (tendencia === 'MEJORANDO') return 'success';
-    if (tendencia === 'EMPEORANDO') return 'danger';
-    return 'secondary';
-  };
+  // Tendencia functions removed as not used
 
   const exportCSV = () => {
     if (!historial) return;
@@ -400,7 +361,7 @@ export default function ReporteHistorialAlumno() {
                 <Accordion.Body>
                   {/* KPIs principales */}
                   <Row className="g-3 mb-4">
-                    <Col md={3}>
+                    <Col md={4}>
                       <Card className="h-100 border-primary">
                         <Card.Body className="text-center">
                           <div className="text-muted small mb-1">Promedio Histórico</div>
@@ -408,7 +369,7 @@ export default function ReporteHistorialAlumno() {
                         </Card.Body>
                       </Card>
                     </Col>
-                    <Col md={3}>
+                    <Col md={4}>
                       <Card className="h-100 border-success">
                         <Card.Body className="text-center">
                           <div className="text-muted small mb-1">Materias Aprobadas</div>
@@ -416,25 +377,11 @@ export default function ReporteHistorialAlumno() {
                         </Card.Body>
                       </Card>
                     </Col>
-                    <Col md={3}>
+                    <Col md={4}>
                       <Card className="h-100 border-danger">
                         <Card.Body className="text-center">
                           <div className="text-muted small mb-1">Materias Desaprobadas</div>
                           <div className="h2 mb-0 text-danger">{resumen.totalMateriasDesaprobadas || 0}</div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                    <Col md={3}>
-                      <Card className={`h-100 border-${getTendenciaColor(resumen.tendenciaAcademica)}`}>
-                        <Card.Body className="text-center">
-                          <div className="text-muted small mb-1">Tendencia</div>
-                          <div className="d-flex align-items-center justify-content-center h2 mb-0">
-                            {getTendenciaIcon(resumen.tendenciaAcademica)}
-                            <span className={`ms-2 text-${getTendenciaColor(resumen.tendenciaAcademica)}`} style={{ fontSize: '1rem' }}>
-                              {resumen.tendenciaAcademica === 'MEJORANDO' ? 'Mejorando' : 
-                               resumen.tendenciaAcademica === 'EMPEORANDO' ? 'Empeorando' : 'Estable'}
-                            </span>
-                          </div>
                         </Card.Body>
                       </Card>
                     </Col>
@@ -465,7 +412,7 @@ export default function ReporteHistorialAlumno() {
 
                     {/* Distribución aprobadas/desaprobadas */}
                     <Col sm={12} lg={6}>
-                      <Card>
+                      <Card className="mb-3">
                         <Card.Body>
                           <h6 className="mb-3">Distribución de Materias</h6>
                           <ResponsiveContainer width="100%" height={250}>
@@ -491,6 +438,23 @@ export default function ReporteHistorialAlumno() {
                         </Card.Body>
                       </Card>
                     </Col>
+                    {/* Logros Destacados al lado */}
+                    {resumen?.logrosDestacados && resumen.logrosDestacados.length > 0 && (
+                      <Col sm={12} lg={6}>
+                        <Card className="border-success" style={{ display: 'inline-block', width: '100%', verticalAlign: 'top' }}>
+                          <Card.Header className="bg-success text-white">
+                            <strong>Logros Destacados</strong>
+                          </Card.Header>
+                          <Card.Body style={{ paddingBottom: '0.5rem', paddingTop: '0.5rem' }}>
+                            <ul className="mb-0" style={{ marginBottom: 0 }}>
+                              {resumen.logrosDestacados.map((logro, i) => (
+                                <li key={i}>{logro}</li>
+                              ))}
+                            </ul>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    )}
 
                     {/* Porcentaje de aprobación por ciclo - Solo para historial completo */}
                     {esReporteCompleto && kpisData.aprobacionPorCiclo.length > 1 && (
@@ -513,62 +477,26 @@ export default function ReporteHistorialAlumno() {
                       </Col>
                     )}
 
-                    {/* Top materias con mejor promedio */}
-                    {kpisData.topMaterias.length > 0 && (
-                      <Col sm={12} lg={6}>
-                        <Card>
+                    {/* ...removed Top 5 Materias con Mejor Promedio chart... */}
+                  </Row>
+
+                  {/* Áreas a Mejorar (solo) */}
+                  {resumen.areasAMejorar && resumen.areasAMejorar.length > 0 && (
+                    <Row className="g-3 mt-3">
+                      <Col md={6}>
+                        <Card className="border-warning">
+                          <Card.Header className="bg-warning">
+                            <strong>Áreas a Mejorar</strong>
+                          </Card.Header>
                           <Card.Body>
-                            <h6 className="mb-3">Top 5 Materias con Mejor Promedio</h6>
-                            <ResponsiveContainer width="100%" height={250}>
-                              <BarChart data={kpisData.topMaterias} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" domain={[0, 10]} />
-                                <YAxis type="category" dataKey="materia" width={120} />
-                                <Tooltip />
-                                <Bar dataKey="promedio" name="Promedio" fill="#17a2b8" />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <ul className="mb-0">
+                              {resumen.areasAMejorar.map((area, i) => (
+                                <li key={i}>{area}</li>
+                              ))}
+                            </ul>
                           </Card.Body>
                         </Card>
                       </Col>
-                    )}
-                  </Row>
-
-                  {/* Logros y áreas de mejora */}
-                  {(resumen.logrosDestacados?.length > 0 || resumen.areasAMejorar?.length > 0) && (
-                    <Row className="g-3 mt-3">
-                      {resumen.logrosDestacados && resumen.logrosDestacados.length > 0 && (
-                        <Col md={6}>
-                          <Card className="border-success">
-                            <Card.Header className="bg-success text-white">
-                              <strong>Logros Destacados</strong>
-                            </Card.Header>
-                            <Card.Body>
-                              <ul className="mb-0">
-                                {resumen.logrosDestacados.map((logro, i) => (
-                                  <li key={i}>{logro}</li>
-                                ))}
-                              </ul>
-                            </Card.Body>
-                          </Card>
-                        </Col>
-                      )}
-                      {resumen.areasAMejorar && resumen.areasAMejorar.length > 0 && (
-                        <Col md={6}>
-                          <Card className="border-warning">
-                            <Card.Header className="bg-warning">
-                              <strong>Áreas a Mejorar</strong>
-                            </Card.Header>
-                            <Card.Body>
-                              <ul className="mb-0">
-                                {resumen.areasAMejorar.map((area, i) => (
-                                  <li key={i}>{area}</li>
-                                ))}
-                              </ul>
-                            </Card.Body>
-                          </Card>
-                        </Col>
-                      )}
                     </Row>
                   )}
                 </Accordion.Body>
@@ -593,67 +521,18 @@ export default function ReporteHistorialAlumno() {
                         &nbsp;&nbsp; DNI: <strong>{historial.dni || '-'}</strong>
                       </td>
                     </tr>
-                    <tr>
-                      <td>Estado Actual: <strong>{historial.estadoActual || '-'}</strong></td>
-                      <td className="text-end">
-                        {resumen && <>Promedio Histórico: <strong>{resumen.promedioGeneralHistorico?.toFixed(2) || '-'}</strong></>}
-                      </td>
-                    </tr>
+                    {resumen && (
+                      <tr>
+                        <td colSpan={2}>
+                          Promedio Histórico: <strong>{resumen.promedioGeneralHistorico?.toFixed(2) || '-'}</strong>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
                 <div className="text-center fw-semibold mt-2">HISTORIAL ACADÉMICO COMPLETO</div>
               </Card.Body>
             </Card>
-
-            {/* Resumen estadístico */}
-            {resumen && (
-              <Card className="mb-3">
-                <Card.Header><strong>Resumen Estadístico</strong></Card.Header>
-                <Card.Body>
-                  <Row className="g-2">
-                    <Col md={6}>
-                      <div className="d-flex justify-content-between">
-                        <span>Total Ciclos Lectivos:</span>
-                        <strong>{resumen.totalCiclosLectivos || 0}</strong>
-                      </div>
-                    </Col>
-                    <Col md={6}>
-                      <div className="d-flex justify-content-between">
-                        <span>Cantidad de Repeticiones:</span>
-                        <strong>{resumen.cantidadRepeticiones || 0}</strong>
-                      </div>
-                    </Col>
-                    <Col md={6}>
-                      <div className="d-flex justify-content-between">
-                        <span>Total Materias Aprobadas:</span>
-                        <strong className="text-success">{resumen.totalMateriasAprobadas || 0}</strong>
-                      </div>
-                    </Col>
-                    <Col md={6}>
-                      <div className="d-flex justify-content-between">
-                        <span>Total Materias Desaprobadas:</span>
-                        <strong className="text-danger">{resumen.totalMateriasDesaprobadas || 0}</strong>
-                      </div>
-                    </Col>
-                    <Col md={6}>
-                      <div className="d-flex justify-content-between">
-                        <span>Promedio General Histórico:</span>
-                        <strong>{resumen.promedioGeneralHistorico?.toFixed(2) || '-'}</strong>
-                      </div>
-                    </Col>
-                    <Col md={6}>
-                      <div className="d-flex justify-content-between">
-                        <span>Tendencia Académica:</span>
-                        <strong className={`text-${getTendenciaColor(resumen.tendenciaAcademica)}`}>
-                          {resumen.tendenciaAcademica === 'MEJORANDO' ? 'Mejorando' : 
-                           resumen.tendenciaAcademica === 'EMPEORANDO' ? 'Empeorando' : 'Estable'}
-                        </strong>
-                      </div>
-                    </Col>
-                  </Row>
-                </Card.Body>
-              </Card>
-            )}
 
             {/* Historial por ciclos */}
             <h5 className="mt-4 mb-3">
@@ -661,15 +540,15 @@ export default function ReporteHistorialAlumno() {
             </h5>
             {(historial.historialPorCiclos || []).map((ciclo, idx) => (
               <Card key={idx} className="mb-3">
-                <Card.Header>
+                <Card.Header style={{ fontSize: '0.9rem' }}>
                   <strong>Ciclo {ciclo.cicloNombre || ciclo.cicloAnio}</strong>
-                  <span className="ms-3 text-muted">
+                  <span className="ms-3 text-muted" style={{ fontSize: '0.85rem' }}>
                     Curso: {ciclo.cursoAnio}° {ciclo.cursoDivision} - {ciclo.cursoNivel}
                   </span>
-                  <Badge bg="info" className="ms-2">{ciclo.estadoCiclo || ''}</Badge>
+                  <Badge bg="info" className="ms-2" style={{ fontSize: '0.75rem' }}>{ciclo.estadoCiclo || ''}</Badge>
                 </Card.Header>
-                <Card.Body>
-                  <div className="mb-3">
+                <Card.Body style={{ paddingBottom: '0.75rem', paddingTop: '0.75rem' }}>
+                  <div className="mb-2" style={{ fontSize: '0.9rem' }}>
                     <Row className="g-2">
                       <Col md={4}>
                         <span className="text-muted">Promedio General:</span>{' '}
