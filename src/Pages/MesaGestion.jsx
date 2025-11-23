@@ -28,7 +28,8 @@ export default function MesaGestion() {
   // Datos básicos
   const [materias, setMaterias] = useState([]);
   const [aulas, setAulas] = useState([]);
-  const [datosForm, setDatosForm] = useState({ materiaCursoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
+  // ...eliminada línea duplicada, solo queda la declaración con horaInicio y horaFin
+    const [datosForm, setDatosForm] = useState({ materiaCursoId: '', fecha: '', horaInicio: '', horaFin: '', aulaId: '', tipoMesa: 'EXAMEN' });
   const [datosSaving, setDatosSaving] = useState(false);
 
   // Docentes
@@ -101,7 +102,14 @@ export default function MesaGestion() {
     try {
       const m = await obtenerMesa(token, mesaId);
       setMesa(m);
-      setDatosForm({ materiaCursoId: m.materiaCursoId || '', fecha: m.fecha || '', aulaId: m.aulaId || '', tipoMesa: m.tipoMesa || 'EXAMEN' });
+      setDatosForm({
+        materiaCursoId: m.materiaCursoId || '',
+        fecha: m.fecha || '',
+        horaInicio: m.horaInicio || '',
+        horaFin: m.horaFin || '',
+        aulaId: m.aulaId || '',
+        tipoMesa: m.tipoMesa || 'EXAMEN'
+      });
       const [cursoResp, cursosAll, mats, als, asig, disp] = await Promise.all([
         obtenerCursoPorId(token, m.cursoId),
         listarCursos(token),
@@ -145,7 +153,14 @@ export default function MesaGestion() {
     try {
       const m = await obtenerMesa(token, mesaId);
       setMesa(m);
-      setDatosForm({ materiaCursoId: m.materiaCursoId || '', fecha: m.fecha || '', aulaId: m.aulaId || '', tipoMesa: m.tipoMesa || 'EXAMEN' });
+      setDatosForm({
+        materiaCursoId: m.materiaCursoId || '',
+        fecha: m.fecha || '',
+        horaInicio: m.horaInicio || '',
+        horaFin: m.horaFin || '',
+        aulaId: m.aulaId || '',
+        tipoMesa: m.tipoMesa || 'EXAMEN'
+      });
       const [cursoResp, cursosAll, mats, als, asig, disp] = await Promise.all([
         obtenerCursoPorId(token, m.cursoId),
         listarCursos(token),
@@ -242,6 +257,8 @@ export default function MesaGestion() {
       setDatosSaving(true);
       const payload = { id: mesaId };
       if (datosForm.fecha) payload.fecha = datosForm.fecha;
+      if (datosForm.horaInicio) payload.horaInicio = datosForm.horaInicio;
+      if (datosForm.horaFin) payload.horaFin = datosForm.horaFin;
       if (datosForm.materiaCursoId) payload.materiaCursoId = Number(datosForm.materiaCursoId);
       if (datosForm.aulaId) payload.aulaId = Number(datosForm.aulaId);
       if (datosForm.tipoMesa) payload.tipoMesa = datosForm.tipoMesa;
@@ -359,6 +376,7 @@ export default function MesaGestion() {
               Curso: <strong>{curso && (curso.anio || curso.division) ? `${curso.anio ?? ''}°${curso.division ?? ''}` : (mesa.curso ? `${mesa.curso.anio ?? ''}°${mesa.curso.division ?? ''}` : (mesa.cursoId ? `#${mesa.cursoId}` : '-'))}</strong>
               {' '}— Materia actual: <strong>{mesa.materiaNombre || '-'}</strong>
               {' '}— Fecha: <strong>{fmtDate(mesa.fecha)}</strong>
+              {' '}— Horario: <strong>{mesa.horaInicio ? mesa.horaInicio.slice(0,5) : '--:--'} a {mesa.horaFin ? mesa.horaFin.slice(0,5) : '--:--'}</strong>
               {' '}— Turno: <strong>{(() => {
                 if (!mesa?.fecha || !turnos.length) return '-';
                 const [y,mm,d] = String(mesa.fecha).split('-').map(Number);
@@ -418,6 +436,18 @@ export default function MesaGestion() {
                       </Form.Select>
                     </Form.Group>
                   </Col>
+                    <Col md={2}>
+                      <Form.Group>
+                        <Form.Label>Hora inicio</Form.Label>
+                        <Form.Control type="time" value={datosForm.horaInicio} onChange={e => setDatosForm(v => ({ ...v, horaInicio: e.target.value }))} disabled={mesa?.estado==='FINALIZADA'} />
+                      </Form.Group>
+                    </Col>
+                    <Col md={2}>
+                      <Form.Group>
+                        <Form.Label>Hora fin</Form.Label>
+                        <Form.Control type="time" value={datosForm.horaFin} onChange={e => setDatosForm(v => ({ ...v, horaFin: e.target.value }))} disabled={mesa?.estado==='FINALIZADA'} />
+                      </Form.Group>
+                    </Col>
                   <Col md={3}>
                     <Form.Group>
                       <Form.Label>Tipo de mesa</Form.Label>
