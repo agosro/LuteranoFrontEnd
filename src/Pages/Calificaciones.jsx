@@ -85,6 +85,9 @@ export default function Calificaciones() {
       // Reiniciar selección al cambiar curso
       setMateriaSeleccionada("");
       setAlumnosError(null);
+      // Limpiar datos previos al cambiar de curso
+      setDatos([]);
+      
       try {
         const mats = await listarMateriasDeCurso(token, cursoSeleccionado);
         
@@ -143,9 +146,49 @@ export default function Calificaciones() {
     if (!materiaSeleccionada || !cursoSeleccionado) return;
     setLoading(true);
     try {
+      // Si no hay alumnos, intentar recargarlos antes de continuar
       if (!alumnos || alumnos.length === 0) {
-        setDatos([]);
-        return;
+        console.warn("No hay alumnos cargados, intentando recargar...");
+        try {
+          const alums = await listarAlumnosPorCurso(token, cursoSeleccionado, cicloLectivo?.id ?? null);
+          if (!alums || alums.length === 0) {
+            setDatos([]);
+            toast.warning("No hay alumnos en este curso para el ciclo lectivo seleccionado");
+            return;
+          }
+          // Actualizar el estado de alumnos para futuras búsquedas
+          setAlumnos(alums);
+          setAlumnosError(null);
+          
+          // Continuar con la carga de calificaciones usando los alumnos recién obtenidos
+          const resultados = await Promise.allSettled(
+            alums.map(async (alumno) => {
+              try {
+                const califsResp = await listarCalifPorMateria(
+                  token,
+                  alumno.id,
+                  Number(materiaSeleccionada)
+                );
+                const califsArr = Array.isArray(califsResp)
+                  ? califsResp
+                  : califsResp?.calificaciones || califsResp?.lista || [];
+                const etapaNotas = califsArr.filter((c) => Number(c.etapa) === Number(etapa));
+                return { ...alumno, calificaciones: etapaNotas };
+              } catch (e) {
+                console.warn("No se pudieron traer calificaciones de", alumno.id, e);
+                return { ...alumno, calificaciones: [] };
+              }
+            })
+          );
+          const alumnosConNotas = resultados.map((r) => r.value || r.reason).filter(Boolean);
+          setDatos(alumnosConNotas);
+          return;
+        } catch (err) {
+          console.error("Error al recargar alumnos:", err);
+          setDatos([]);
+          toast.error("No se pudieron cargar los alumnos del curso");
+          return;
+        }
       }
 
       const resultados = await Promise.allSettled(

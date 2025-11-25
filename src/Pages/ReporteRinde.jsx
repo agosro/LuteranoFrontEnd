@@ -5,16 +5,18 @@ import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
-import { listarCursos } from '../Services/CursoService';
+import { listarCursos, listarCursosPorPreceptor } from '../Services/CursoService';
 import { listarRindenPorCurso } from '../Services/ReporteRindeService';
 import { listarMateriasDeCurso } from '../Services/MateriaCursoService';
 import { toast } from 'react-toastify';
 import { useEffect } from 'react';
 import { exportRindeCSV } from '../utils/exporters';
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 
 export default function ReporteRinde() {
   const { user } = useAuth();
   const token = user?.token;
+  const isNewTab = useOpenedInNewTab();
 
   const [cursos, setCursos] = useState([]);
   const [cursoId, setCursoId] = useState('');
@@ -33,13 +35,18 @@ export default function ReporteRinde() {
     if (!token) return;
     (async () => {
       try {
-        const cs = await listarCursos(token);
+        let cs = [];
+        if (user?.rol === 'ROLE_PRECEPTOR' && user?.preceptorId) {
+          cs = await listarCursosPorPreceptor(token, user.preceptorId);
+        } else {
+          cs = await listarCursos(token);
+        }
         setCursos((cs || []).map(c => ({ value: c.id, label: `${c.anio || ''} ${c.division || ''}`.trim() })));
       } catch (e) {
         console.warn('No se pudieron cargar cursos para Reporte Rinde:', e);
       }
     })();
-  }, [token]);
+  }, [token, user]);
 
   // Cargar materias del curso seleccionado
   useEffect(() => {
@@ -153,7 +160,9 @@ export default function ReporteRinde() {
     if (!filasFiltradas || filasFiltradas.length === 0) return null;
 
     const totalAlumnos = agrupadosPorAlumno.length;
-    const totalMaterias = filasFiltradas.length;
+    // Contar materias únicas (no filas)
+    const materiasUnicas = new Set(filasFiltradas.map(f => f.materiaId)).size;
+    const totalMaterias = materiasUnicas > 0 ? materiasUnicas : filasFiltradas.length;
     const totalColoquio = filasFiltradas.filter(f => f.condicion === 'COLOQUIO').length;
     const totalExamen = filasFiltradas.filter(f => f.condicion === 'EXAMEN').length;
     const promedioMateriasPorAlumno = totalAlumnos > 0 ? (totalMaterias / totalAlumnos).toFixed(1) : 0;
@@ -301,7 +310,7 @@ export default function ReporteRinde() {
   return (
     <div className="container py-3">
       <Breadcrumbs />
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <div className="d-flex align-items-center justify-content-center mb-2">
         <h2 className="m-0 text-center">Alumnos que rinden (Dic/Feb)</h2>
       </div>
@@ -366,15 +375,6 @@ export default function ReporteRinde() {
                       </Card>
                     </Col>
                     <Col sm={12} md={6} lg={3}>
-                      <Card className="h-100 border-info">
-                        <Card.Body>
-                          <div className="text-info mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Promedio por Alumno</div>
-                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{kpisData.promedioMateriasPorAlumno}</div>
-                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>materias/alumno</div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                    <Col sm={12} md={6} lg={3}>
                       <Card className="h-100 border-secondary">
                         <Card.Body>
                           <div className="text-secondary mb-1" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Coloquio / Examen</div>
@@ -397,6 +397,7 @@ export default function ReporteRinde() {
                         <Card className="h-100">
                           <Card.Header><strong>Condición: Coloquio vs Examen</strong></Card.Header>
                           <Card.Body>
+                            <p className="text-muted small mb-3"><em>Nota: Representa la cantidad de evaluaciones (coloquios y exámenes finales) a rendir. Algunos alumnos pueden tener múltiples evaluaciones, por lo que el total puede ser mayor que la cantidad de alumnos únicos.</em></p>
                             <ResponsiveContainer width="100%" height={300}>
                               <PieChart>
                                 <Pie
@@ -458,25 +459,7 @@ export default function ReporteRinde() {
                       </Col>
                     )}
 
-                    {/* Top alumnos con más materias */}
-                    {kpisData.topAlumnos.length > 0 && (
-                      <Col sm={12} lg={6}>
-                        <Card className="h-100">
-                          <Card.Header><strong>Top Alumnos con Más Materias</strong></Card.Header>
-                          <Card.Body>
-                            <ResponsiveContainer width="100%" height={Math.max(300, kpisData.topAlumnos.length * 35)}>
-                              <BarChart data={kpisData.topAlumnos} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" />
-                                <YAxis type="category" dataKey="nombre" width={120} />
-                                <Tooltip />
-                                <Bar dataKey="materias" fill="#dc3545" name="Materias a rendir" />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    )}
+
                   </Row>
                 </Accordion.Body>
               </Accordion.Item>

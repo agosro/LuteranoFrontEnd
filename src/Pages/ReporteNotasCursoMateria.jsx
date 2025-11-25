@@ -10,6 +10,7 @@ import { resumenNotasCursoPorAnio } from "../Services/ReporteNotasService";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import Estadisticas from "../Components/Reportes/Estadisticas";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 import { obtenerNotaFinalSimple } from "../Services/NotaFinalService";
 
@@ -18,6 +19,7 @@ import { obtenerNotaFinalSimple } from "../Services/NotaFinalService";
 
 export default function ReporteNotasCursoMateria() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const { cicloLectivo } = useCicloLectivo();
   const [searchParams] = useSearchParams();
@@ -250,10 +252,14 @@ export default function ReporteNotasCursoMateria() {
     return list;
   }, [filas, estado, busqueda]);
 
-  // Estadísticas rápidas del curso (sobre filas filtradas)
+  // Estadísticas rápidas del curso (sobre filas filtradas) - Usando el campo estado del backend
   const pgList = filasFiltradas.map(f => f.m.pg).filter(v => typeof v === 'number');
   const totalFilas = filasFiltradas.length; // alumno-materia visibles
-  const aprobadas = filasFiltradas.filter(f => (f.m.pg ?? 0) >= 6).length;
+  const aprobadas = filasFiltradas.filter(f => {
+    const est = String(f?.m?.estado || "").toUpperCase().trim();
+    // Desaprobado si contiene "DESAPROBADO" o similar
+    return !est.includes("DESAPROBADO") && est !== "";
+  }).length;
   const desaprobadas = totalFilas - aprobadas;
   const promedioGeneralCurso = pgList.length ? Math.round((pgList.reduce((a,b)=>a+b,0)/pgList.length)*10)/10 : null;
 
@@ -517,9 +523,9 @@ export default function ReporteNotasCursoMateria() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-2">Notas por Curso y Materia</h2>
-      <p className="text-muted mb-3">
+      <p className="text-center text-muted mb-3">
         Este reporte muestra las calificaciones detalladas por etapa (E1 y E2), promedio general (PG) y estado de los alumnos para las materias seleccionadas del curso elegido.
       </p>
       <div className="mb-3">
@@ -769,29 +775,9 @@ export default function ReporteNotasCursoMateria() {
                       </Col>
                     </Row>
 
-                    {/* Comparación E1 vs E2 - Solo cuando hay una materia y período = Todos */}
+                    {/* Comparación E1 vs E2 - Solo gráfico de aprobación */}
                     {kpisData.comparacionEtapas && (
                       <Row className="g-3 mt-3">
-                        <Col md={6}>
-                          <Card>
-                            <Card.Body>
-                              <h6 className="mb-3">Comparación de Promedios: Etapa 1 vs Etapa 2</h6>
-                              <ResponsiveContainer width="100%" height={250}>
-                                <BarChart data={kpisData.comparacionEtapas.promedios}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis dataKey="etapa" />
-                                  <YAxis domain={[0, 10]} />
-                                  <Tooltip />
-                                  <Legend />
-                                  <Bar dataKey="promedio" name="Promedio" fill="#0066cc" />
-                                </BarChart>
-                              </ResponsiveContainer>
-                              <div className="text-muted small mt-2 text-center">
-                                Comparación del rendimiento promedio entre ambas etapas
-                              </div>
-                            </Card.Body>
-                          </Card>
-                        </Col>
                         <Col md={6}>
                           <Card>
                             <Card.Body>

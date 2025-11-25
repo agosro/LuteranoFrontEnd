@@ -57,7 +57,7 @@ export default function Mesas() {
 
   // Creación masiva
   const [showCrearMasiva, setShowCrearMasiva] = useState(false);
-  const [crearMasivaForm, setCrearMasivaForm] = useState({ anio: '', turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] });
+  const [crearMasivaForm, setCrearMasivaForm] = useState({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] });
   const [crearMasivaLoading, setCrearMasivaLoading] = useState(false);
   const [crearMasivaError, setCrearMasivaError] = useState('');
   const [crearMasivaResultado, setCrearMasivaResultado] = useState(null);
@@ -75,6 +75,15 @@ export default function Mesas() {
   const [showFinalizarMesa, setShowFinalizarMesa] = useState(false);
   const [mesaAFinalizar, setMesaAFinalizar] = useState(null);
   const [finalizarLoading, setFinalizarLoading] = useState(false);
+
+  // Selección múltiple
+  const [mesasSeleccionadas, setMesasSeleccionadas] = useState(new Set());
+  const [showConfirmarDelMasivo, setShowConfirmarDelMasivo] = useState(false);
+  const [delMasivoCargando, setDelMasivoCargando] = useState(false);
+  const [showConfirmarFinalizarMasivo, setShowConfirmarFinalizarMasivo] = useState(false);
+  const [finalizarMasivoCargando, setFinalizarMasivoCargando] = useState(false);
+  const [showConfirmarActaMasivo, setShowConfirmarActaMasivo] = useState(false);
+  const [actaMasivoCargando, setActaMasivoCargando] = useState(false);
 
   // Helpers de rol (tolera prefijo ROLE_)
   // hasRole ya no requerido en esta vista (permisos manejados vía rutas y página de gestión)
@@ -198,8 +207,12 @@ export default function Mesas() {
         turnoId: Number(crearMasivaForm.turnoId),
         cursoIds: crearMasivaForm.cursoIds.map(Number),
         tipoMesa: crearMasivaForm.tipoMesa,
-        materiaIds: crearMasivaForm.materiaIds.length > 0 ? crearMasivaForm.materiaIds.map(Number) : null,
       };
+      // Solo enviar materiaIds si se seleccionaron materias específicas
+      if (crearMasivaForm.materiaIds.length > 0) {
+        payload.materiaIds = crearMasivaForm.materiaIds.map(Number);
+      }
+      // Solo enviar fecha si se ingresó
       if (crearMasivaForm.fecha) {
         payload.fechaMesa = crearMasivaForm.fecha;
       }
@@ -209,8 +222,9 @@ export default function Mesas() {
       toast.success(`Se crearon ${mesasCreadas.length} mesas de examen`);
       setTimeout(() => {
         setShowCrearMasiva(false);
-        setCrearMasivaForm({ anio: '', turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] });
+        setCrearMasivaForm({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] });
         setCrearMasivaResultado(null);
+        setMateriasMasivas([]);
       }, 2000);
     } catch (e) {
       setCrearMasivaError(e.message || 'No se pudieron crear las mesas');
@@ -239,6 +253,105 @@ export default function Mesas() {
       toast.error(e.message);
     } finally {
       setFinalizarLoading(false);
+    }
+  };
+
+  // Acciones masivas
+  const confirmarFinalizarMasivo = async () => {
+    try {
+      setFinalizarMasivoCargando(true);
+      let exitosas = 0;
+      let fallidas = 0;
+      for (const mesaId of mesasSeleccionadas) {
+        try {
+          await finalizarMesa(token, mesaId);
+          exitosas++;
+        } catch {
+          fallidas++;
+        }
+      }
+      await refreshMesas();
+      if (fallidas === 0) {
+        toast.success(`Se finalizaron ${exitosas} mesa(s)`);
+      } else {
+        toast.warning(`${exitosas} exitosas, ${fallidas} fallidas`);
+      }
+      setShowConfirmarFinalizarMasivo(false);
+      setMesasSeleccionadas(new Set());
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setFinalizarMasivoCargando(false);
+    }
+  };
+
+  const confirmarDelMasivo = async () => {
+    try {
+      setDelMasivoCargando(true);
+      let exitosas = 0;
+      let fallidas = 0;
+      for (const mesaId of mesasSeleccionadas) {
+        try {
+          await eliminarMesa(token, mesaId);
+          exitosas++;
+        } catch {
+          fallidas++;
+        }
+      }
+      await refreshMesas();
+      if (fallidas === 0) {
+        toast.success(`Se eliminaron ${exitosas} mesa(s)`);
+      } else {
+        toast.warning(`${exitosas} exitosas, ${fallidas} fallidas`);
+      }
+      setShowConfirmarDelMasivo(false);
+      setMesasSeleccionadas(new Set());
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setDelMasivoCargando(false);
+    }
+  };
+
+  const confirmarActaMasivo = async () => {
+    try {
+      setActaMasivoCargando(true);
+      let exitosas = 0;
+      let fallidas = 0;
+      for (const mesaId of mesasSeleccionadas) {
+        const mesa = mesas.find(m => m.id === mesaId);
+        if (!mesa) continue;
+        
+        const tieneAlumnos = Array.isArray(mesa.alumnos) && mesa.alumnos.length > 0;
+        const notasCompletas = tieneAlumnos && (mesa.alumnos.every(a => a.notaFinal !== null && a.notaFinal !== undefined));
+        
+        if (mesa.estado === 'FINALIZADA' && tieneAlumnos && notasCompletas) {
+          try {
+            try {
+              await obtenerActaPorMesa(token, mesaId);
+            } catch {
+              await generarActa(token, { mesaId: mesaId });
+            }
+            exitosas++;
+          } catch {
+            fallidas++;
+          }
+        } else {
+          fallidas++;
+        }
+      }
+      await refreshMesas();
+      if (fallidas === 0) {
+        toast.success(`Se generaron/obtuvieron ${exitosas} acta(s)`);
+      } else {
+        toast.warning(`${exitosas} exitosas, ${fallidas} no pudieron generarse`);
+      }
+      setShowConfirmarActaMasivo(false);
+      setMesasSeleccionadas(new Set());
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setActaMasivoCargando(false);
     }
   };
 
@@ -363,14 +476,24 @@ export default function Mesas() {
               </Row>
             </Col>
             <Col className="text-md-end">
-              <Button variant="outline-dark" className="me-2" onClick={()=> navigate('/mesa-de-examen/historial')}>Ver historial</Button>
-              {hasSearched && mesasFiltradas.length > 0 && (
-                <Button variant="warning" className="me-2" onClick={abrirGestionFechas}>
-                  Gestión de Fechas
-                </Button>
-              )}
-              <Button variant="info" className="me-2" onClick={()=> { setCrearMasivaForm({ anio: String(cicloYear), turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setShowCrearMasiva(true); }}>Crear masiva</Button>
-              <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
+              <Row className="g-2">
+                <Col sm="auto">
+                  <Button variant="outline-dark" onClick={()=> navigate('/mesa-de-examen/historial')}>Ver historial</Button>
+                </Col>
+                {hasSearched && mesasFiltradas.length > 0 && (
+                  <Col sm="auto">
+                    <Button variant="warning" onClick={abrirGestionFechas}>
+                      Gestión de Fechas
+                    </Button>
+                  </Col>
+                )}
+                <Col sm="auto">
+                  <Button variant="info" onClick={()=> { setCrearMasivaForm({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setMateriasMasivas([]); setShowCrearMasiva(true); }}>Crear masiva</Button>
+                </Col>
+                <Col sm="auto">
+                  <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
+                </Col>
+              </Row>
             </Col>
           </Row>
 
@@ -423,6 +546,19 @@ export default function Mesas() {
             </Row>
           )}
 
+          {/* Acciones masivas */}
+          {hasSearched && mesasSeleccionadas.size > 0 && (
+            <Row className="mb-3 p-3 bg-light border rounded">
+              <Col>
+                <span className="me-3"><strong>{mesasSeleccionadas.size} mesa(s) seleccionada(s)</strong></span>
+                <Button size="sm" variant="outline-primary" className="me-2" onClick={()=> setMesasSeleccionadas(new Set())}>Deseleccionar todo</Button>
+                <Button size="sm" variant="warning" className="me-2" onClick={()=> setShowConfirmarFinalizarMasivo(true)} disabled={finalizarMasivoCargando}>Finalizar</Button>
+                <Button size="sm" variant="info" className="me-2" onClick={()=> setShowConfirmarActaMasivo(true)} disabled={actaMasivoCargando}>Generar actas</Button>
+                <Button size="sm" variant="danger" onClick={()=> setShowConfirmarDelMasivo(true)} disabled={delMasivoCargando}>Eliminar</Button>
+              </Col>
+            </Row>
+          )}
+
           {/* Listado (solo después de buscar) */}
           {hasSearched && (loading ? (
             <div className="p-3"><Spinner animation="border" /></div>
@@ -431,6 +567,13 @@ export default function Mesas() {
             <Table striped hover responsive>
               <thead>
                 <tr>
+                  <th style={{width: '40px'}}><Form.Check type="checkbox" checked={mesasSeleccionadas.size === items.length && items.length > 0} onChange={(e)=> {
+                    if (e.target.checked) {
+                      setMesasSeleccionadas(new Set(items.map(m => m.id)));
+                    } else {
+                      setMesasSeleccionadas(new Set());
+                    }
+                  }} /></th>
                   <th>Fecha</th>
                   <th>Materia</th>
                   <th>Turno</th>
@@ -455,6 +598,15 @@ export default function Mesas() {
                         : '';
                   return (
                     <tr key={m.id}>
+                      <td><Form.Check type="checkbox" checked={mesasSeleccionadas.has(m.id)} onChange={(e)=> {
+                        const newSet = new Set(mesasSeleccionadas);
+                        if (e.target.checked) {
+                          newSet.add(m.id);
+                        } else {
+                          newSet.delete(m.id);
+                        }
+                        setMesasSeleccionadas(newSet);
+                      }} /></td>
                       <td>{fmtDate(m.fecha)}</td>
                       <td>{m.materiaNombre || materiaNombrePorId.get(m.materiaCursoId) || '-'}</td>
                       <td>{m.turnoNombre || turnoPorFecha(m.fecha) || '-'}</td>
@@ -498,7 +650,7 @@ export default function Mesas() {
                 })}
                 {mesasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="text-center py-4 text-muted">No hay mesas para este curso</td>
+                    <td colSpan={9} className="text-center py-4 text-muted">No hay mesas para este curso</td>
                   </tr>
                 )}
               </tbody>
@@ -745,40 +897,26 @@ export default function Mesas() {
           {crearMasivaResultado?.success && (<Alert variant="success" className="mb-3">Se crearon {crearMasivaResultado.cantidad} mesas exitosamente</Alert>)}
           <Form>
             <Row className="g-3">
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Año</Form.Label>
-                  <Form.Control type="number" min={2000} max={2100} value={crearMasivaForm.anio}
-                    onChange={async (e)=> {
-                      const anioNuevo = String(e.target.value);
-                      setCrearMasivaForm(f=>({...f, anio: anioNuevo, turnoId: '' }));
-                      if (!anioNuevo) return;
-                      if (!turnosPorAnio.has(anioNuevo)) {
-                        try {
-                          const ts = await listarTurnos(token, Number(anioNuevo));
-                          setTurnosPorAnio(prev => new Map(prev).set(anioNuevo, ts));
-                        } catch { /* ignore */ }
-                      }
-                    }} />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
+              <Col md={6}>
                 <Form.Group>
                   <Form.Label>Turno *</Form.Label>
                   <Form.Select value={crearMasivaForm.turnoId} onChange={(e)=> setCrearMasivaForm(f=>({...f, turnoId: e.target.value}))}>
                     <option value="">-- Seleccionar --</option>
-                    {(turnosPorAnio.get(String(crearMasivaForm.anio)) || turnos).map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                    {turnos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                   </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Fecha mesa (opcional)</Form.Label>
-                  <Form.Control type="date" value={crearMasivaForm.fecha} onChange={(e)=> setCrearMasivaForm(f=>({...f, fecha: e.target.value}))} />
-                  <Form.Text className="text-muted">Si no indicas fecha, el backend usará la del turno</Form.Text>
+                  <Form.Text className="text-muted">
+                    El año lectivo se determina automáticamente según el turno
+                  </Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Fecha mesa (opcional)</Form.Label>
+                  <Form.Control type="date" value={crearMasivaForm.fecha} onChange={(e)=> setCrearMasivaForm(f=>({...f, fecha: e.target.value}))} />
+                  <Form.Text className="text-muted">Si no se indica, se pueden ajustar las fechas luego</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={12}>
                 <Form.Group>
                   <Form.Label>Tipo de mesa</Form.Label>
                   <Form.Select value={crearMasivaForm.tipoMesa} onChange={(e)=> setCrearMasivaForm(f=>({...f, tipoMesa: e.target.value}))}>
@@ -787,8 +925,8 @@ export default function Mesas() {
                   </Form.Select>
                   <Form.Text className="text-muted d-block mt-1">
                     {crearMasivaForm.tipoMesa === 'COLOQUIO' 
-                      ? 'Coloquio: solo alumnos con condición COLOQUIO' 
-                      : 'Examen final: alumnos con EXAMEN o COLOQUIO (que no cerraron)'}
+                      ? 'Coloquio: solo alumnos con condición de coloquio del año actual' 
+                      : 'Examen final: alumnos regulares y previas de años anteriores'}
                   </Form.Text>
                 </Form.Group>
               </Col>
@@ -870,7 +1008,7 @@ export default function Mesas() {
               </Col>
               <Col md={12}>
                 <Form.Group>
-                  <Form.Label>Materias (opcional - dejar vacío para todas)</Form.Label>
+                  <Form.Label>Materias (opcional)</Form.Label>
                   <div className="border rounded p-2" style={{maxHeight: '150px', overflowY: 'auto'}}>
                     {crearMasivaForm.cursoIds.length === 0 ? (
                       <div className="text-muted text-center py-2">Primero seleccioná al menos un curso</div>
@@ -921,27 +1059,80 @@ export default function Mesas() {
                   </div>
                   <Form.Text className="text-muted d-block mt-1">
                     {crearMasivaForm.materiaIds.length > 0 
-                      ? `Seleccionadas: ${crearMasivaForm.materiaIds.length} materia(s)` 
-                      : 'Sin filtro: se crearán mesas para todas las materias con alumnos que deban rendir'}
+                      ? `Filtrar por: ${crearMasivaForm.materiaIds.length} materia(s)` 
+                      : 'Sin filtro: se procesarán todas las materias de los cursos seleccionados'}
                   </Form.Text>
                 </Form.Group>
               </Col>
             </Row>
           </Form>
           <Alert variant="info" className="mt-3 mb-0" style={{fontSize: '.9rem'}}>
-            <strong>Funcionamiento:</strong> Por cada curso seleccionado, se consultará el reporte de rinden del año de la mesa.
-            Se crearán mesas solo para materias donde hay alumnos con la condición requerida:
-            <ul className="mb-0 mt-1">
-              <li><strong>Examen final:</strong> alumnos con condición EXAMEN o COLOQUIO (que no cerraron)</li>
-              <li><strong>Coloquio:</strong> solo alumnos con condición COLOQUIO</li>
+            <strong>¿Cómo funciona?</strong>
+            <ul className="mb-1 mt-1">
+              <li>El sistema consulta el reporte de rinden del año lectivo determinado por el turno</li>
+              <li>Solo crea mesas donde haya alumnos que deban rendir según su condición</li>
+              <li><strong>Examen final:</strong> incluye alumnos regulares y previas de años anteriores</li>
+              <li><strong>Coloquio:</strong> solo alumnos con condición de coloquio del año actual</li>
+              <li>Se asigna automáticamente el docente titular de la materia</li>
+              <li>Para exámenes finales, las divisiones de la misma materia comparten jurado, fecha y horario</li>
             </ul>
-            Se asigna automáticamente el docente titular si existe.
           </Alert>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={()=> setShowCrearMasiva(false)} disabled={crearMasivaLoading}>Cancelar</Button>
           <Button variant="primary" onClick={submitCrearMasiva} disabled={crearMasivaLoading}>
             {crearMasivaLoading ? <><Spinner animation="border" size="sm" className="me-2" />Creando...</> : 'Crear mesas'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal Confirmar Eliminar Masivo */}
+      <Modal show={showConfirmarDelMasivo} onHide={()=>setShowConfirmarDelMasivo(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Eliminar mesas</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>¿Confirmás eliminar las <strong>{mesasSeleccionadas.size} mesa(s)</strong> seleccionadas?</p>
+          <p className="text-muted mb-0">Esta acción no se puede deshacer.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={()=>setShowConfirmarDelMasivo(false)} disabled={delMasivoCargando}>Cancelar</Button>
+          <Button variant="danger" onClick={confirmarDelMasivo} disabled={delMasivoCargando}>
+            {delMasivoCargando ? <><Spinner animation="border" size="sm" className="me-2" />Eliminando...</> : 'Eliminar'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal Confirmar Finalizar Masivo */}
+      <Modal show={showConfirmarFinalizarMasivo} onHide={()=>setShowConfirmarFinalizarMasivo(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Finalizar mesas</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>¿Confirmás finalizar las <strong>{mesasSeleccionadas.size} mesa(s)</strong> seleccionadas?</p>
+          <p className="text-muted mb-0"><strong>Esta acción no se puede deshacer</strong> e impedirá futuras ediciones.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={()=>setShowConfirmarFinalizarMasivo(false)} disabled={finalizarMasivoCargando}>Cancelar</Button>
+          <Button variant="warning" onClick={confirmarFinalizarMasivo} disabled={finalizarMasivoCargando}>
+            {finalizarMasivoCargando ? <><Spinner animation="border" size="sm" className="me-2" />Finalizando...</> : 'Finalizar'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal Confirmar Generar Actas Masivo */}
+      <Modal show={showConfirmarActaMasivo} onHide={()=>setShowConfirmarActaMasivo(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Generar actas</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>¿Generarás actas para las <strong>{mesasSeleccionadas.size} mesa(s)</strong> seleccionadas?</p>
+          <p className="text-muted mb-0">Solo se generarán actas para mesas finalizadas con notas completas.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={()=>setShowConfirmarActaMasivo(false)} disabled={actaMasivoCargando}>Cancelar</Button>
+          <Button variant="info" onClick={confirmarActaMasivo} disabled={actaMasivoCargando}>
+            {actaMasivoCargando ? <><Spinner animation="border" size="sm" className="me-2" />Generando...</> : 'Generar'}
           </Button>
         </Modal.Footer>
       </Modal>

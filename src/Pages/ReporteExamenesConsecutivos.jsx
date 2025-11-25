@@ -4,6 +4,7 @@ import { FileText, AlertTriangle, Info, PieChart, ChevronDown, ChevronUp } from 
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { listarCursos } from '../Services/CursoService';
 import { listarMaterias } from '../Services/MateriaService';
 import { porMateria, porCurso } from '../Services/ReporteExamenesConsecutivosService';
@@ -165,6 +166,7 @@ const FilaExpandible = ({ caso, token, ambito, onCalificacionesLoaded }) => {
 
 export default function ReporteExamenesConsecutivos() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const rol = user?.rol;
   const { cicloLectivo } = useCicloLectivo();
@@ -660,9 +662,9 @@ export default function ReporteExamenesConsecutivos() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-1">Exámenes consecutivos desaprobados</h2>
-      <p className="text-muted mb-3">
+      <p className="text-center text-muted mb-3">
         Este reporte identifica alumnos en riesgo académico de no promover debido a exámenes consecutivos desaprobados{['ROLE_ADMIN', 'ROLE_DIRECTOR'].includes(rol) && ', permitiendo detectar patrones y casos que se repiten en materias específicas'}, facilitando la intervención temprana del equipo docente.
       </p>
 

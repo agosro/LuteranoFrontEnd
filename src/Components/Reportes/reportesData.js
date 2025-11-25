@@ -22,7 +22,7 @@ const reportes = [
     descripcion: "Lista de alumnos que desaprobaron dos instancias de evaluación consecutivas, con filtros por curso y materia.",
     categoria: "Alumnos",
     ruta: "/reportes/examenes-consecutivos",
-    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR", "ROLE_DOCENTE"] // ReporteExamenesConsecutivosController - endpoint /materia permite DOCENTE
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_DOCENTE"] // ReporteExamenesConsecutivosController - endpoint /materia permite DOCENTE
   },
   {
     id: 2,
@@ -90,7 +90,7 @@ const reportes = [
     descripcion: "Ordenamiento de alumnos por promedio general, mostrando los mejores rendimientos académicos por curso.",
     categoria: "Alumnos",
     ruta: "/reportes/ranking-alumnos",
-    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_PRECEPTOR"] // ReporteRankingAlumnoController
+    roles: ["ROLE_ADMIN", "ROLE_DIRECTOR",] // ReporteRankingAlumnoController
   },
   {
     id: 10,

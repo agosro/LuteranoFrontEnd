@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Container, Row, Col, Card, Table, Form, Button, Alert, Spinner, Badge, Nav } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Form, Button, Alert, Spinner, Badge, Nav, Modal, ListGroup } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useAuth } from '../Context/AuthContext';
 import { actualizarMesa } from '../Services/MesaExamenService';
@@ -22,12 +22,19 @@ export default function GestionFechasMesas() {
   const [guardando, setGuardando] = useState(false);
   const [tipoMesaActiva, setTipoMesaActiva] = useState('EXAMEN'); // 'EXAMEN' o 'COLOQUIO'
 
+  // Modal de selección de docentes
+  const [showModalDocentes, setShowModalDocentes] = useState(false);
+  const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
+  const [docentesSeleccionados, setDocentesSeleccionados] = useState([]);
+
   // Controles de distribución
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
   const [turnosPorDia, setTurnosPorDia] = useState(3);
   const [horaInicio, setHoraInicio] = useState('09:00');
   const [intervaloMinutos, setIntervaloMinutos] = useState(120);
+  const [asignarAulasAleatorias, setAsignarAulasAleatorias] = useState(true);
+  const [asignarDocentesAleatorios, setAsignarDocentesAleatorios] = useState(true);
 
   // Escuchar mensajes de la ventana padre
   useEffect(() => {
@@ -126,6 +133,35 @@ export default function GestionFechasMesas() {
     return resultado;
   };
 
+  const asignarDocentesAleatoriamente = (mesas, docentesDisponibles) => {
+    // Para exámenes finales: siempre incluir el titular + 2 aleatorios
+    // El titular se encuentra en el grupo de docentes disponibles
+    
+    if (!Array.isArray(docentesDisponibles) || docentesDisponibles.length === 0) {
+      return [];
+    }
+
+    // Seleccionar el titular (primer docente, que es el de la materia)
+    const titular = docentesDisponibles[0];
+    
+    // Si solo hay un docente (el titular), devolverlo solo
+    if (docentesDisponibles.length === 1) {
+      return [titular];
+    }
+
+    // Seleccionar 2 docentes aleatorios adicionales (excluyendo el titular)
+    const doctoresAleatorios = docentesDisponibles.slice(1);
+    const docSeleccionados = [titular];
+
+    for (let i = 0; i < Math.min(2, doctoresAleatorios.length); i++) {
+      const indiceAleatorio = Math.floor(Math.random() * doctoresAleatorios.length);
+      docSeleccionados.push(doctoresAleatorios[indiceAleatorio]);
+      doctoresAleatorios.splice(indiceAleatorio, 1);
+    }
+
+    return docSeleccionados;
+  };
+
   const distribuirFechas = () => {
     if (!fechaInicio || !fechaFin) {
       toast.warn('Debe especificar fecha de inicio y fin');
@@ -156,10 +192,20 @@ export default function GestionFechasMesas() {
       return;
     }
 
-    // Agrupar por materia (cada grupo = 1 turno)
+    // Agrupar por materia y turno para exámenes finales, solo por materia+curso para coloquios
     const gruposPorMateria = new Map();
     mesas.forEach(mesa => {
-      const key = mesa.materiaNombre;
+      // Para exámenes finales: agrupar por materia + turno (se sincronizan entre divisiones)
+      // Para coloquios: agrupar por materia + curso (cada curso es completamente independiente)
+      let key;
+      if (mesa.tipoMesa === 'EXAMEN') {
+        // Examen final: todas las divisiones de la misma materia y turno van juntas
+        key = `EXAMEN|${mesa.materiaNombre}|${mesa.turnoNombre || 'SIN_TURNO'}`;
+      } else {
+        // Coloquio: cada curso maneja su mesa por separado (fecha y jurado independientes)
+        key = `COLOQUIO|${mesa.materiaNombre}|${mesa.cursoAnio}${mesa.cursoDivision}`;
+      }
+      
       if (!gruposPorMateria.has(key)) {
         gruposPorMateria.set(key, []);
       }
@@ -182,7 +228,7 @@ export default function GestionFechasMesas() {
 
     // Algoritmo de distribución con verificación de conflictos
     const mesasActualizadas = [];
-    const turnosPorDiaArray = []; // Array de turnos: [{ fecha, hora, docentesOcupados: Set }]
+    const turnosPorDiaArray = []; // Array de turnos: [{ fecha, hora, docentesOcupados: Set, aulasOcupadas: Set }]
 
     gruposConDocentes.forEach(grupo => {
       let asignado = false;
@@ -196,16 +242,34 @@ export default function GestionFechasMesas() {
         
         if (!hayConflicto) {
           // No hay conflicto, asignar a este turno
+          // Buscar un aula disponible para este turno (solo si está habilitada la opción)
+          const aulaDisponible = asignarAulasAleatorias 
+            ? aulas.find(aula => !turno.aulasOcupadas.has(aula.id))
+            : null;
+          
           grupo.mesas.forEach(mesa => {
+            // Asignar docentes aleatorios si es EXAMEN y la opción está habilitada
+            const docentesAsignados = asignarDocentesAleatorios && mesa.tipoMesa === 'EXAMEN'
+              ? asignarDocentesAleatoriamente(grupo.mesas, grupo.docentes)
+              : mesa.docentesIds;
+            
             mesasActualizadas.push({
               ...mesa,
               fecha: turno.fecha,
-              hora: turno.hora
+              hora: turno.hora,
+              aulaId: aulaDisponible?.id || null,
+              docentesIds: docentesAsignados
             });
           });
           
           // Agregar docentes de este grupo al turno
           grupo.docentes.forEach(dId => turno.docentesOcupados.add(dId));
+          
+          // Agregar aula al turno si se asignó
+          if (asignarAulasAleatorias && aulaDisponible) {
+            turno.aulasOcupadas.add(aulaDisponible.id);
+          }
+          
           asignado = true;
         }
       }
@@ -233,20 +297,34 @@ export default function GestionFechasMesas() {
         horaBase.setMinutes(horaBase.getMinutes() + (turnoEnDia * intervaloMinutos));
         const hora = horaBase.toTimeString().substring(0, 5);
         
+        // Buscar aula disponible (solo si está habilitada la opción)
+        const aulasOcupadas = new Set();
+        const aulaDisponible = asignarAulasAleatorias
+          ? aulas.find(aula => !aulasOcupadas.has(aula.id))
+          : null;
+        
         // Crear nuevo turno
         const nuevoTurno = {
           fecha,
           hora,
-          docentesOcupados: new Set(grupo.docentes)
+          docentesOcupados: new Set(grupo.docentes),
+          aulasOcupadas: (asignarAulasAleatorias && aulaDisponible) ? new Set([aulaDisponible.id]) : new Set()
         };
         turnosPorDiaArray.push(nuevoTurno);
         
         // Asignar mesas al nuevo turno
         grupo.mesas.forEach(mesa => {
+          // Asignar docentes aleatorios si es EXAMEN y la opción está habilitada
+          const docentesAsignados = asignarDocentesAleatorios && mesa.tipoMesa === 'EXAMEN'
+            ? asignarDocentesAleatoriamente(grupo.mesas, grupo.docentes)
+            : mesa.docentesIds;
+          
           mesasActualizadas.push({
             ...mesa,
             fecha,
-            hora
+            hora,
+            aulaId: aulaDisponible?.id || null,
+            docentesIds: docentesAsignados
           });
         });
       }
@@ -254,7 +332,19 @@ export default function GestionFechasMesas() {
 
     setMesas(mesasActualizadas);
     const diasUtilizados = new Set(turnosPorDiaArray.map(t => t.fecha)).size;
-    toast.success(`Fechas distribuidas: ${turnosPorDiaArray.length} turnos en ${diasUtilizados} días (sin conflictos de docentes)`);
+    const cantidadGrupos = gruposConDocentes.length;
+    const mesasExamen = mesasActualizadas.filter(m => m.tipoMesa === 'EXAMEN').length;
+    const mesasColoquio = mesasActualizadas.filter(m => m.tipoMesa === 'COLOQUIO').length;
+    const mesasConAula = mesasActualizadas.filter(m => m.aulaId).length;
+    
+    let detalles = [`${turnosPorDiaArray.length} turnos en ${diasUtilizados} días`];
+    if (asignarAulasAleatorias) detalles.push(`${mesasConAula} aulas asignadas`);
+    detalles.push(`${cantidadGrupos} grupos (${mesasExamen} ex., ${mesasColoquio} col.)`);
+    
+    toast.success(
+      `Distribución completa: ${detalles.join(' | ')}`,
+      { autoClose: 5000 }
+    );
   };
 
   const aplicarMismaFecha = () => {
@@ -316,6 +406,40 @@ export default function GestionFechasMesas() {
     setMesas(prev => prev.map(m => 
       m.id === mesaId ? { ...m, [campo]: valor } : m
     ));
+  };
+
+  const abrirModalDocentes = (mesa) => {
+    setMesaSeleccionada(mesa);
+    setDocentesSeleccionados(mesa.docentesIds || []);
+    setShowModalDocentes(true);
+  };
+
+  const cerrarModalDocentes = () => {
+    setShowModalDocentes(false);
+    setMesaSeleccionada(null);
+    setDocentesSeleccionados([]);
+  };
+
+  const toggleDocente = (docenteId) => {
+    const maxDocentes = mesaSeleccionada?.tipoMesa === 'COLOQUIO' ? 1 : 3;
+    
+    if (docentesSeleccionados.includes(docenteId)) {
+      setDocentesSeleccionados(prev => prev.filter(id => id !== docenteId));
+    } else {
+      if (docentesSeleccionados.length >= maxDocentes) {
+        toast.warn(`${mesaSeleccionada?.tipoMesa === 'COLOQUIO' ? 'Coloquio solo permite 1 docente' : 'Máximo 3 docentes para examen final'}`);
+        return;
+      }
+      setDocentesSeleccionados(prev => [...prev, docenteId]);
+    }
+  };
+
+  const confirmarDocentes = () => {
+    if (mesaSeleccionada) {
+      handleCambio(mesaSeleccionada.id, 'docentesIds', docentesSeleccionados);
+      toast.success('Docentes actualizados');
+      cerrarModalDocentes();
+    }
   };
 
   const guardarCambios = async () => {
@@ -389,6 +513,18 @@ export default function GestionFechasMesas() {
           </Button>
         </Col>
       </Row>
+
+      {/* Alerta informativa sobre sincronización */}
+      <Alert variant="info" className="mb-3">
+        <Alert.Heading as="h6">ℹ️ Sincronización automática</Alert.Heading>
+        <p className="mb-1" style={{fontSize: '.9rem'}}>
+          <strong>Exámenes finales:</strong> Las mesas de la misma materia y turno (ej: Inglés I de 1°A, 1°B, 1°C en FEBRERO 2026) 
+          comparten automáticamente fecha, horario, aula y jurado. Al modificar una, se sincronizan todas.
+        </p>
+        <p className="mb-0" style={{fontSize: '.9rem'}}>
+          <strong>Coloquios:</strong> Cada curso maneja su mesa de forma independiente.
+        </p>
+      </Alert>
 
       {/* Pestañas para separar tipo de mesa */}
       <Nav variant="tabs" className="mb-3">
@@ -468,7 +604,9 @@ export default function GestionFechasMesas() {
                 />
               </Form.Group>
             </Col>
-            <Col md={2} className="d-flex align-items-end">
+          </Row>
+          <Row className="g-2">
+            <Col xs="auto">
               <Button 
                 variant="primary" 
                 onClick={distribuirFechas}
@@ -477,8 +615,6 @@ export default function GestionFechasMesas() {
                 Distribuir por materia
               </Button>
             </Col>
-          </Row>
-          <Row className="g-2">
             <Col xs="auto">
               <Button 
                 variant="outline-primary" 
@@ -497,16 +633,39 @@ export default function GestionFechasMesas() {
                 Distribuir horas
               </Button>
             </Col>
+            <Col xs="auto" className="ms-auto">
+              <Form.Check 
+                type="checkbox"
+                id="asignarAulas"
+                label="Asignar aulas aleatorias"
+                checked={asignarAulasAleatorias}
+                onChange={(e) => setAsignarAulasAleatorias(e.target.checked)}
+              />
+            </Col>
+            <Col xs="auto">
+              <Form.Check 
+                type="checkbox"
+                id="asignarDocentes"
+                label="Asignar docentes aleatorios (EXAMEN)"
+                checked={asignarDocentesAleatorios}
+                onChange={(e) => setAsignarDocentesAleatorios(e.target.checked)}
+                title="Solo para exámenes finales. El titular siempre se asigna."
+              />
+            </Col>
           </Row>
           <Alert variant="info" className="mt-3 mb-0" style={{fontSize: '.85rem'}}>
-            <strong>Distribución por materia:</strong> Agrupa las mesas por materia. Cada materia = 1 turno.
-            Todas las mesas de una misma materia van juntas (mismo día y hora). 
-            <strong>Ejemplo con 3 turnos por día:</strong>
-            <ul className="mb-0 mt-1">
-              <li>Día 1 - 9:00hs: Matemática (3°A, 3°B, 3°C)</li>
-              <li>Día 1 - 11:00hs: Historia (3°A, 3°B)</li>
-              <li>Día 1 - 13:00hs: Lengua (3°A, 3°B, 3°C)</li>
-              <li>Día 2 - 9:00hs: Física (3°A, 3°B)...</li>
+            <strong>¿Cómo funciona la distribución automática?</strong>
+            <ul className="mb-1 mt-2">
+              <li><strong>Exámenes finales (EXAMEN):</strong> Se sincronizan automáticamente por materia + turno.
+                Las divisiones comparten fecha, hora, aula y jurado.</li>
+              <li><strong>Coloquios (COLOQUIO):</strong> Cada curso es independiente (no se sincronizan).</li>
+              <li><strong>Conflictos de docentes:</strong> Se evitan detectando si un docente ya está asignado en otro horario.</li>
+              <li><strong>Opciones de asignación:</strong>
+                <ul className="mb-0 mt-1">
+                  <li><strong>Aulas aleatorias:</strong> Asigna una aula por turno, rotando entre disponibles.</li>
+                  <li><strong>Docentes aleatorios (EXAMEN):</strong> Agrega 2 docentes aleatorios + el titular (que siempre está).</li>
+                </ul>
+              </li>
             </ul>
           </Alert>
         </Card.Body>
@@ -517,6 +676,12 @@ export default function GestionFechasMesas() {
         <Alert variant="warning">No hay {tipoMesaActiva === 'EXAMEN' ? 'exámenes finales' : 'coloquios'} para gestionar</Alert>
       ) : (
         <>
+          {tipoMesaActiva === 'EXAMEN' && (
+            <Alert variant="warning" className="mb-3" style={{fontSize: '.85rem'}}>
+              <strong>⚠️ Recordatorio:</strong> Al modificar fecha, horario, aula o docentes de un examen final, 
+              se sincronizarán automáticamente todas las divisiones de esa materia (ej: 1°A, 1°B, 1°C).
+            </Alert>
+          )}
           <div style={{overflowX: 'auto'}}>
             <Table bordered hover size="sm">
               <thead className="table-light">
@@ -533,13 +698,19 @@ export default function GestionFechasMesas() {
               <tbody>
                 {mesasFiltradas.map((mesa, idx) => {
                   const esPrimeraDeLaMateria = idx === 0 || mesasFiltradas[idx - 1].materiaNombre !== mesa.materiaNombre;
-                  const docentesDisponibles = docentesPorMesa.get(mesa.id) || [];
                   const maxDocentes = mesa.tipoMesa === 'COLOQUIO' ? 1 : 3;
+                  const esExamenFinal = mesa.tipoMesa === 'EXAMEN';
+                  const rowStyle = esExamenFinal && esPrimeraDeLaMateria ? { borderTop: '2px solid #0d6efd' } : {};
                   
                   return (
-                    <tr key={mesa.id}>
+                    <tr key={mesa.id} style={rowStyle}>
                       <td className={esPrimeraDeLaMateria ? 'fw-bold' : ''}>
-                        {esPrimeraDeLaMateria ? mesa.materiaNombre : ''}
+                        {esPrimeraDeLaMateria ? (
+                          <>
+                            {mesa.materiaNombre}
+                            {esExamenFinal && <Badge bg="primary" className="ms-2" style={{fontSize: '.7rem'}}>SINCRONIZADO</Badge>}
+                          </>
+                        ) : ''}
                       </td>
                       <td>{mesa.cursoAnio}° {mesa.cursoDivision}</td>
                       <td>
@@ -571,39 +742,17 @@ export default function GestionFechasMesas() {
                         </Form.Select>
                       </td>
                       <td>
-                        <Form.Select
-                          size="sm"
-                          multiple
-                          value={mesa.docentesIds || []}
-                          onChange={(e) => {
-                            const selected = Array.from(e.target.selectedOptions, opt => Number(opt.value));
-                            if (selected.length > maxDocentes) {
-                              toast.warn(`${mesa.tipoMesa === 'COLOQUIO' ? 'Coloquio solo permite 1 docente' : 'Máximo 3 docentes para examen final'}`);
-                              return;
-                            }
-                            handleCambio(mesa.id, 'docentesIds', selected);
-                          }}
-                          style={{height: '70px'}}
-                        >
-                          {docentesDisponibles.map(d => {
-                            const esDocenteMateria = d.daLaMateria;
-                            const tieneConflicto = d.tieneConflictoHorario;
-                            return (
-                              <option 
-                                key={d.id} 
-                                value={d.id}
-                                style={{
-                                  fontWeight: esDocenteMateria ? 'bold' : 'normal',
-                                  color: tieneConflicto ? '#dc3545' : (esDocenteMateria ? '#0d6efd' : 'inherit')
-                                }}
-                              >
-                                {d.apellido}, {d.nombre} {esDocenteMateria ? '(Titular)' : ''} {tieneConflicto ? '⚠️' : ''}
-                              </option>
-                            );
-                          })}
-                        </Form.Select>
-                        <Form.Text className="d-block" style={{fontSize: '0.75rem'}}>
-                          {mesa.tipoMesa === 'COLOQUIO' ? 'Máx: 1 docente' : 'Máx: 3 docentes'} | Seleccionados: {(mesa.docentesIds || []).length}
+                        <div className="d-grid">
+                          <Button 
+                            variant="outline-primary" 
+                            size="sm"
+                            onClick={() => abrirModalDocentes(mesa)}
+                          >
+                            📋 Seleccionar ({(mesa.docentesIds || []).length}/{maxDocentes})
+                          </Button>
+                        </div>
+                        <Form.Text className="d-block mt-1 text-center" style={{fontSize: '0.75rem'}}>
+                          {mesa.tipoMesa === 'COLOQUIO' ? 'Máx: 1 docente (titular)' : 'Máx: 3 (al menos 1 titular)'}
                         </Form.Text>
                       </td>
                       <td>
@@ -643,6 +792,90 @@ export default function GestionFechasMesas() {
           </div>
         </>
       )}
+
+      {/* Modal de Selección de Docentes */}
+      <Modal show={showModalDocentes} onHide={cerrarModalDocentes} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            Seleccionar Docentes - {mesaSeleccionada?.materiaNombre} ({mesaSeleccionada?.cursoAnio}° {mesaSeleccionada?.cursoDivision})
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {mesaSeleccionada && (
+            <>
+              <Alert variant="info" className="mb-3">
+                <strong>{mesaSeleccionada.tipoMesa === 'COLOQUIO' ? 'Coloquio:' : 'Examen final:'}</strong>
+                {' '}Máximo {mesaSeleccionada.tipoMesa === 'COLOQUIO' ? '1 docente' : '3 docentes'}.
+                {' '}{mesaSeleccionada.tipoMesa === 'COLOQUIO' ? 'Debe ser titular de la materia.' : 'Al menos uno debe ser titular de la materia.'}
+              </Alert>
+              
+              <div className="mb-2">
+                <strong>Docentes seleccionados: {docentesSeleccionados.length} / {mesaSeleccionada.tipoMesa === 'COLOQUIO' ? 1 : 3}</strong>
+              </div>
+
+              <ListGroup>
+                {(docentesPorMesa.get(mesaSeleccionada.id) || []).map(docente => {
+                  const estaSeleccionado = docentesSeleccionados.includes(docente.id);
+                  const esDocenteMateria = docente.daLaMateria;
+                  const tieneConflicto = docente.tieneConflictoHorario;
+                  
+                  return (
+                    <ListGroup.Item 
+                      key={docente.id}
+                      action
+                      onClick={() => toggleDocente(docente.id)}
+                      active={estaSeleccionado}
+                      className="d-flex justify-content-between align-items-center"
+                    >
+                      <div className="d-flex align-items-center">
+                        <Form.Check 
+                          type="checkbox"
+                          checked={estaSeleccionado}
+                          onChange={() => {}}
+                          className="me-3"
+                        />
+                        <div>
+                          <strong>{docente.apellido}, {docente.nombre}</strong>
+                          {esDocenteMateria && (
+                            <Badge bg="primary" className="ms-2">Titular</Badge>
+                          )}
+                          {tieneConflicto && (
+                            <Badge bg="danger" className="ms-2">⚠️ Conflicto horario</Badge>
+                          )}
+                          {docente.nombreMateria && !esDocenteMateria && (
+                            <div className="text-muted" style={{fontSize: '.85rem'}}>
+                              Dicta: {docente.nombreMateria}
+                            </div>
+                          )}
+                          {tieneConflicto && docente.detalleConflicto && (
+                            <div className="text-danger" style={{fontSize: '.85rem'}}>
+                              {docente.detalleConflicto}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </ListGroup.Item>
+                  );
+                })}
+              </ListGroup>
+
+              {(docentesPorMesa.get(mesaSeleccionada.id) || []).length === 0 && (
+                <Alert variant="warning" className="mt-3">
+                  No hay docentes disponibles para esta mesa. Verifique que la mesa tenga fecha y horario asignados.
+                </Alert>
+              )}
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={cerrarModalDocentes}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={confirmarDocentes}>
+            Confirmar Selección
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 }

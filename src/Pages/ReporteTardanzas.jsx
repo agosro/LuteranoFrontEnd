@@ -6,16 +6,18 @@ import { BarChart3, ChevronDown, ChevronUp, Calendar, AlertCircle } from 'lucide
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
-import { listarCursos } from '../Services/CursoService';
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
+import { listarCursos, listarCursosPorPreceptor } from '../Services/CursoService';
 import { listarTardanzasPorCurso, listarTardanzasTodos } from '../Services/ReporteTardanzaService';
 import { toast } from 'react-toastify';
 
 export default function ReporteTardanzas() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const navigate = useNavigate();
 
-  const [modo, setModo] = useState('todos'); // 'todos' | 'curso'
+  const [modo, setModo] = useState(user?.rol === 'ROLE_PRECEPTOR' ? 'curso' : 'todos'); // 'todos' | 'curso'
   const [cursos, setCursos] = useState([]);
   const [cursoId, setCursoId] = useState('');
   const [desde, setDesde] = useState('');
@@ -30,13 +32,18 @@ export default function ReporteTardanzas() {
     if (!token) return;
     (async () => {
       try {
-        const cs = await listarCursos(token);
+        let cs = [];
+        if (user?.rol === 'ROLE_PRECEPTOR' && user?.preceptorId) {
+          cs = await listarCursosPorPreceptor(token, user.preceptorId);
+        } else {
+          cs = await listarCursos(token);
+        }
         setCursos((cs || []).map(c => ({ value: c.id, label: `${c.anio || ''} ${c.division || ''}`.trim() })));
       } catch (e) {
         console.warn('No se pudieron cargar cursos para filtros de tardanza:', e);
       }
     })();
-  }, [token]);
+  }, [token, user]);
 
   const fetchReporte = async () => {
     try {
@@ -295,7 +302,7 @@ export default function ReporteTardanzas() {
   return (
     <div className="container py-3">
       <Breadcrumbs />
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <div className="d-flex align-items-center justify-content-center mb-2">
         <h2 className="m-0 text-center">Reporte de Tardanzas</h2>
       </div>
@@ -308,9 +315,20 @@ export default function ReporteTardanzas() {
           <div className="row g-3 align-items-end">
             <div className="col-sm-3">
               <label className="form-label">Modo</label>
-              <select className="form-select" value={modo} onChange={(e) => setModo(e.target.value)}>
-                <option value="todos">Todos los cursos</option>
-                <option value="curso">Por curso</option>
+              <select 
+                className="form-select" 
+                value={modo} 
+                onChange={(e) => setModo(e.target.value)}
+                disabled={user?.rol === 'ROLE_PRECEPTOR'}
+              >
+                {user?.rol === 'ROLE_PRECEPTOR' ? (
+                  <option value="curso">Por curso</option>
+                ) : (
+                  <>
+                    <option value="todos">Todos los cursos</option>
+                    <option value="curso">Por curso</option>
+                  </>
+                )}
               </select>
             </div>
             {modo === 'curso' && (
