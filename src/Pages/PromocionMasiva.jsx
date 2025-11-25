@@ -133,7 +133,12 @@ export default function PromocionMasiva() {
             <Col md={2} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Año</Form.Label>
-                <Form.Control type="number" value={form.anio} disabled />
+                <Form.Control
+                  type="number"
+                  value={form.anio}
+                  onChange={handleChange('anio')}
+                  disabled={cargando}
+                />
               </Form.Group>
             </Col>
             <Col md={3} sm={6} xs={12}>
@@ -147,13 +152,13 @@ export default function PromocionMasiva() {
                 <Form.Label>Máx. repeticiones</Form.Label>
                 <Form.Control
                   type="number"
-                  min={1}
+                  min={0}
                   max={5}
                   value={form.maxRepeticiones}
                   disabled={cargando}
                   onChange={(e) => {
                     const n = Number(e.target.value);
-                    const clamped = Number.isNaN(n) ? 1 : Math.min(5, Math.max(1, Math.floor(n)));
+                    const clamped = Number.isNaN(n) ? 0 : Math.min(5, Math.max(0, Math.floor(n)));
                     setForm((v) => ({ ...v, maxRepeticiones: clamped }));
                   }}
                 />

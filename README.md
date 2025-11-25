@@ -101,7 +101,7 @@ El frontend utiliza variables de entorno cargadas por **Vite**. Para evitar hard
    ```
 2. Ajustar la URL del backend si no es `http://localhost:8080`:
    ```env
-   VITE_API_URL=http://localhost:8080
+   VITE_API_URL=http://181.1.232.29:8080
    ```
 3. Iniciar el backend (Spring Boot) en el puerto configurado.
 4. Correr el frontend con Vite; las peticiones se hacen a rutas que comienzan con `/api` y el **proxy de desarrollo** las redirige automáticamente a `VITE_API_URL`.

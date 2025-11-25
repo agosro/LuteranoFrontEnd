@@ -11,6 +11,7 @@ import { obtenerCursoPorId, listarCursos } from '../Services/CursoService.js';
 import { listarAulas } from '../Services/AulaService.js';
 import { listarDocentesAsignados, listarDocentesDisponibles, asignarDocentes } from '../Services/MesaExamenDocenteService.js';
 import { listarRindenPorCurso, listarTodosLosAlumnosPorCurso } from '../Services/ReporteRindeService.js';
+import { obtenerAlumnosElegibles } from '../Services/ElegibilidadMesaExamenService.js';
 import { listarTurnos } from '../Services/TurnoExamenService.js';
 
 export default function MesaGestion() {
@@ -28,7 +29,8 @@ export default function MesaGestion() {
   // Datos básicos
   const [materias, setMaterias] = useState([]);
   const [aulas, setAulas] = useState([]);
-  const [datosForm, setDatosForm] = useState({ materiaCursoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
+  // ...eliminada línea duplicada, solo queda la declaración con horaInicio y horaFin
+    const [datosForm, setDatosForm] = useState({ materiaCursoId: '', fecha: '', horaInicio: '', horaFin: '', aulaId: '', tipoMesa: 'EXAMEN' });
   const [datosSaving, setDatosSaving] = useState(false);
 
   // Docentes
@@ -57,51 +59,60 @@ export default function MesaGestion() {
 
   const recargarAlumnos = useCallback(async (mesa, tipoMesaOverride = null) => {
     try {
-      const anio = new Date().getFullYear();
-      const mats = await listarMateriasDeCurso(token, mesa.cursoId);
-      const mat = mats.find(mt => Number(mt.materiaCursoId) === Number(mesa.materiaCursoId));
-      const materiaId = mat?.materiaId;
-      
-      // Usar el servicio correcto según el toggle
-      const servicioReporte = mostrarTodos ? listarTodosLosAlumnosPorCurso : listarRindenPorCurso;
-      const rep = await servicioReporte(token, { cursoId: mesa.cursoId, anio });
-      const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
-      const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
-      
-      // Si mostrarTodos está activado, no filtrar por condición de mesa
-      let filtradasPorTipo = filtradas;
-      if (!mostrarTodos) {
-        // Filtrar por tipo de mesa solo cuando mostrarTodos está desactivado
-        const tipoMesa = tipoMesaOverride || mesa.tipoMesa || 'EXAMEN';
-        filtradasPorTipo = tipoMesa === 'COLOQUIO' 
-          ? filtradas.filter(f => f.condicion === 'COLOQUIO')
-          : filtradas;
+      if (mostrarTodos) {
+        // Modo mostrar todos: lógica anterior
+        const anio = new Date().getFullYear();
+        const mats = await listarMateriasDeCurso(token, mesa.cursoId);
+        const mat = mats.find(mt => Number(mt.materiaCursoId) === Number(mesa.materiaCursoId));
+        const materiaId = mat?.materiaId;
+        const rep = await listarTodosLosAlumnosPorCurso(token, { cursoId: mesa.cursoId, anio });
+        const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
+        const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
+        const lista = filtradas.map(r => ({ 
+          id: Number(r.alumnoId), 
+          alumnoId: Number(r.alumnoId), 
+          dni: r.dni, 
+          apellido: r.apellido, 
+          nombre: r.nombre, 
+          condicion: r.condicion,
+          estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
+        }));
+        setElegibles(lista);
+        const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
+        setConvSeleccionados(actuales);
+      } else {
+        // Modo elegibles: usar endpoint nuevo
+        const lista = await obtenerAlumnosElegibles(token, mesa.id || mesaId);
+        setElegibles(lista.map(r => ({
+          id: Number(r.alumnoId),
+          alumnoId: Number(r.alumnoId),
+          apellido: r.apellido,
+          nombre: r.nombre,
+          condicion: r.condicion,
+          dni: r.dni || '',
+          estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
+        })));
+        const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
+        setConvSeleccionados(actuales);
       }
-      
-      const lista = filtradasPorTipo.map(r => ({ 
-        id: Number(r.alumnoId), 
-        alumnoId: Number(r.alumnoId), 
-        dni: r.dni, 
-        apellido: r.apellido, 
-        nombre: r.nombre, 
-        condicion: r.condicion,
-        estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
-      }));
-      
-      setElegibles(lista);
-      const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
-      setConvSeleccionados(actuales);
     } catch {
       setElegibles([]);
       setConvSeleccionados(new Set());
     }
-  }, [token, mostrarTodos]);
+  }, [token, mostrarTodos, mesaId]);
 
   const refreshSinAlumnos = useCallback(async () => {
     try {
       const m = await obtenerMesa(token, mesaId);
       setMesa(m);
-      setDatosForm({ materiaCursoId: m.materiaCursoId || '', fecha: m.fecha || '', aulaId: m.aulaId || '', tipoMesa: m.tipoMesa || 'EXAMEN' });
+      setDatosForm({
+        materiaCursoId: m.materiaCursoId || '',
+        fecha: m.fecha || '',
+        horaInicio: m.horaInicio || '',
+        horaFin: m.horaFin || '',
+        aulaId: m.aulaId || '',
+        tipoMesa: m.tipoMesa || 'EXAMEN'
+      });
       const [cursoResp, cursosAll, mats, als, asig, disp] = await Promise.all([
         obtenerCursoPorId(token, m.cursoId),
         listarCursos(token),
@@ -145,7 +156,14 @@ export default function MesaGestion() {
     try {
       const m = await obtenerMesa(token, mesaId);
       setMesa(m);
-      setDatosForm({ materiaCursoId: m.materiaCursoId || '', fecha: m.fecha || '', aulaId: m.aulaId || '', tipoMesa: m.tipoMesa || 'EXAMEN' });
+      setDatosForm({
+        materiaCursoId: m.materiaCursoId || '',
+        fecha: m.fecha || '',
+        horaInicio: m.horaInicio || '',
+        horaFin: m.horaFin || '',
+        aulaId: m.aulaId || '',
+        tipoMesa: m.tipoMesa || 'EXAMEN'
+      });
       const [cursoResp, cursosAll, mats, als, asig, disp] = await Promise.all([
         obtenerCursoPorId(token, m.cursoId),
         listarCursos(token),
@@ -242,6 +260,8 @@ export default function MesaGestion() {
       setDatosSaving(true);
       const payload = { id: mesaId };
       if (datosForm.fecha) payload.fecha = datosForm.fecha;
+      if (datosForm.horaInicio) payload.horaInicio = datosForm.horaInicio;
+      if (datosForm.horaFin) payload.horaFin = datosForm.horaFin;
       if (datosForm.materiaCursoId) payload.materiaCursoId = Number(datosForm.materiaCursoId);
       if (datosForm.aulaId) payload.aulaId = Number(datosForm.aulaId);
       if (datosForm.tipoMesa) payload.tipoMesa = datosForm.tipoMesa;
@@ -359,6 +379,7 @@ export default function MesaGestion() {
               Curso: <strong>{curso && (curso.anio || curso.division) ? `${curso.anio ?? ''}°${curso.division ?? ''}` : (mesa.curso ? `${mesa.curso.anio ?? ''}°${mesa.curso.division ?? ''}` : (mesa.cursoId ? `#${mesa.cursoId}` : '-'))}</strong>
               {' '}— Materia actual: <strong>{mesa.materiaNombre || '-'}</strong>
               {' '}— Fecha: <strong>{fmtDate(mesa.fecha)}</strong>
+              {' '}— Horario: <strong>{mesa.horaInicio ? mesa.horaInicio.slice(0,5) : '--:--'} a {mesa.horaFin ? mesa.horaFin.slice(0,5) : '--:--'}</strong>
               {' '}— Turno: <strong>{(() => {
                 if (!mesa?.fecha || !turnos.length) return '-';
                 const [y,mm,d] = String(mesa.fecha).split('-').map(Number);
@@ -418,6 +439,18 @@ export default function MesaGestion() {
                       </Form.Select>
                     </Form.Group>
                   </Col>
+                    <Col md={2}>
+                      <Form.Group>
+                        <Form.Label>Hora inicio</Form.Label>
+                        <Form.Control type="time" value={datosForm.horaInicio} onChange={e => setDatosForm(v => ({ ...v, horaInicio: e.target.value }))} disabled={mesa?.estado==='FINALIZADA'} />
+                      </Form.Group>
+                    </Col>
+                    <Col md={2}>
+                      <Form.Group>
+                        <Form.Label>Hora fin</Form.Label>
+                        <Form.Control type="time" value={datosForm.horaFin} onChange={e => setDatosForm(v => ({ ...v, horaFin: e.target.value }))} disabled={mesa?.estado==='FINALIZADA'} />
+                      </Form.Group>
+                    </Col>
                   <Col md={3}>
                     <Form.Group>
                       <Form.Label>Tipo de mesa</Form.Label>
