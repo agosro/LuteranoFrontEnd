@@ -11,6 +11,7 @@ import { obtenerCursoPorId, listarCursos } from '../Services/CursoService.js';
 import { listarAulas } from '../Services/AulaService.js';
 import { listarDocentesAsignados, listarDocentesDisponibles, asignarDocentes } from '../Services/MesaExamenDocenteService.js';
 import { listarRindenPorCurso, listarTodosLosAlumnosPorCurso } from '../Services/ReporteRindeService.js';
+import { obtenerAlumnosElegibles } from '../Services/ElegibilidadMesaExamenService.js';
 import { listarTurnos } from '../Services/TurnoExamenService.js';
 
 export default function MesaGestion() {
@@ -58,45 +59,47 @@ export default function MesaGestion() {
 
   const recargarAlumnos = useCallback(async (mesa, tipoMesaOverride = null) => {
     try {
-      const anio = new Date().getFullYear();
-      const mats = await listarMateriasDeCurso(token, mesa.cursoId);
-      const mat = mats.find(mt => Number(mt.materiaCursoId) === Number(mesa.materiaCursoId));
-      const materiaId = mat?.materiaId;
-      
-      // Usar el servicio correcto según el toggle
-      const servicioReporte = mostrarTodos ? listarTodosLosAlumnosPorCurso : listarRindenPorCurso;
-      const rep = await servicioReporte(token, { cursoId: mesa.cursoId, anio });
-      const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
-      const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
-      
-      // Si mostrarTodos está activado, no filtrar por condición de mesa
-      let filtradasPorTipo = filtradas;
-      if (!mostrarTodos) {
-        // Filtrar por tipo de mesa solo cuando mostrarTodos está desactivado
-        const tipoMesa = tipoMesaOverride || mesa.tipoMesa || 'EXAMEN';
-        filtradasPorTipo = tipoMesa === 'COLOQUIO' 
-          ? filtradas.filter(f => f.condicion === 'COLOQUIO')
-          : filtradas;
+      if (mostrarTodos) {
+        // Modo mostrar todos: lógica anterior
+        const anio = new Date().getFullYear();
+        const mats = await listarMateriasDeCurso(token, mesa.cursoId);
+        const mat = mats.find(mt => Number(mt.materiaCursoId) === Number(mesa.materiaCursoId));
+        const materiaId = mat?.materiaId;
+        const rep = await listarTodosLosAlumnosPorCurso(token, { cursoId: mesa.cursoId, anio });
+        const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
+        const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
+        const lista = filtradas.map(r => ({ 
+          id: Number(r.alumnoId), 
+          alumnoId: Number(r.alumnoId), 
+          dni: r.dni, 
+          apellido: r.apellido, 
+          nombre: r.nombre, 
+          condicion: r.condicion,
+          estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
+        }));
+        setElegibles(lista);
+        const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
+        setConvSeleccionados(actuales);
+      } else {
+        // Modo elegibles: usar endpoint nuevo
+        const lista = await obtenerAlumnosElegibles(token, mesa.id || mesaId);
+        setElegibles(lista.map(r => ({
+          id: Number(r.alumnoId),
+          alumnoId: Number(r.alumnoId),
+          apellido: r.apellido,
+          nombre: r.nombre,
+          condicion: r.condicion,
+          dni: r.dni || '',
+          estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
+        })));
+        const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
+        setConvSeleccionados(actuales);
       }
-      
-      const lista = filtradasPorTipo.map(r => ({ 
-        id: Number(r.alumnoId), 
-        alumnoId: Number(r.alumnoId), 
-        dni: r.dni, 
-        apellido: r.apellido, 
-        nombre: r.nombre, 
-        condicion: r.condicion,
-        estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
-      }));
-      
-      setElegibles(lista);
-      const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
-      setConvSeleccionados(actuales);
     } catch {
       setElegibles([]);
       setConvSeleccionados(new Set());
     }
-  }, [token, mostrarTodos]);
+  }, [token, mostrarTodos, mesaId]);
 
   const refreshSinAlumnos = useCallback(async () => {
     try {
