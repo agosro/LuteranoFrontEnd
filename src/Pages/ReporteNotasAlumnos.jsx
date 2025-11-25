@@ -16,6 +16,7 @@ import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import Estadisticas from "../Components/Reportes/Estadisticas";
 import { useCicloLectivo } from "../Context/CicloLectivoContext";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 
 // Contract expected from backend (approx):
 // Contrato backend confirmado:
@@ -25,6 +26,7 @@ import { useCicloLectivo } from "../Context/CicloLectivoContext";
 
 export default function ReporteNotasAlumnos() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const location = useLocation();
   
@@ -500,9 +502,9 @@ export default function ReporteNotasAlumnos() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-2">Notas de un Alumno</h2>
-      <p className="text-muted mb-3">
+      <p className="text-center text-muted mb-3">
         Consultá el detalle completo de calificaciones por materia, incluyendo las notas de cada etapa, promedios y estado de aprobación.
       </p>
 

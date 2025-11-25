@@ -10,6 +10,7 @@ import { resumenNotasCursoPorAnio } from "../Services/ReporteNotasService";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import Estadisticas from "../Components/Reportes/Estadisticas";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 import { obtenerNotaFinalSimple } from "../Services/NotaFinalService";
 
@@ -18,6 +19,7 @@ import { obtenerNotaFinalSimple } from "../Services/NotaFinalService";
 
 export default function ReporteNotasCursoMateria() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const { cicloLectivo } = useCicloLectivo();
   const [searchParams] = useSearchParams();
@@ -521,9 +523,9 @@ export default function ReporteNotasCursoMateria() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-2">Notas por Curso y Materia</h2>
-      <p className="text-muted mb-3">
+      <p className="text-center text-muted mb-3">
         Este reporte muestra las calificaciones detalladas por etapa (E1 y E2), promedio general (PG) y estado de los alumnos para las materias seleccionadas del curso elegido.
       </p>
       <div className="mb-3">

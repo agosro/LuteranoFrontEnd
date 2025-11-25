@@ -4,17 +4,19 @@ import AsyncAlumnoSelect from "../Components/Controls/AsyncAlumnoSelect";
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { useLocation, useSearchParams } from "react-router-dom";
 import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
 import { obtenerHistorialActualAlumno } from "../Services/HistorialCursoService";
 import { isoToDisplay } from "../utils/fechas";
 import { getTituloCurso } from "../utils/cursos";
-import { listarCursos } from "../Services/CursoService";
+import { listarCursos, listarCursosPorPreceptor } from "../Services/CursoService";
 import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 
 export default function ReporteLegajoAlumno() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -97,7 +99,12 @@ export default function ReporteLegajoAlumno() {
     async function loadCursos() {
       try {
         setLoadingCursos(true);
-        const lista = await listarCursos(token);
+        let lista = [];
+        if (user?.rol === 'ROLE_PRECEPTOR' && user?.preceptorId) {
+          lista = await listarCursosPorPreceptor(token, user.preceptorId);
+        } else {
+          lista = await listarCursos(token);
+        }
         if (active) setCursos(lista || []);
       } catch (e) {
         console.error(e);
@@ -107,7 +114,7 @@ export default function ReporteLegajoAlumno() {
     }
     if (token) loadCursos();
     return () => { active = false; };
-  }, [token]);
+  }, [token, user]);
 
   // Derivar opciones de año y división a partir de cursos
   const aniosCursoOptions = useMemo(() => {
@@ -248,9 +255,9 @@ export default function ReporteLegajoAlumno() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-2">Legajo de Alumno</h2>
-      <p className="text-muted mb-3">
+      <p className="text-center text-muted mb-3">
         Consultá el legajo completo de un alumno con sus datos personales, de contacto e información académica.
       </p>
       <div className="mb-3">

@@ -19,7 +19,7 @@ export default function PromocionMasiva() {
     anio: anioActual,
     cicloLectivoId: 0,
     cicloLectivoNombre: '',
-    maxRepeticiones: 2,
+    maxRepeticiones: 0,
     dryRun: false,
   });
 
@@ -72,7 +72,7 @@ export default function PromocionMasiva() {
       const payload = {
         anio: anio,
         cicloLectivoId: cicloId,
-        maxRepeticiones: Math.min(5, Math.max(1, Number(form.maxRepeticiones) || 2)),
+        maxRepeticiones: Math.min(5, Math.max(0, Number(form.maxRepeticiones))),
         dryRun: !!form.dryRun,
       };
 
@@ -129,7 +129,20 @@ export default function PromocionMasiva() {
              Ejecutá la promoción o simulación de todos los alumnos del ciclo lectivo seleccionado según las reglas académicas vigentes.
            </p>
 
-          <Row className="g-3 align-items-end">
+          <Alert variant="info" className="mt-3 mb-4" style={{fontSize: '.85rem'}}>
+              <h6 className="mb-2">¿Qué es "Máx. repeticiones"?</h6>
+              <p className="mb-1 mt-2">Número máximo de veces que un alumno puede repetir el mismo curso. Una vez superado este límite, será excluido automáticamente de la institución.</p>
+              <div className="mb-1 mt-2">
+                <strong>Ejemplos:</strong>
+                <ul className="mb-1 mt-2">
+                  <li><strong>0:</strong> Sin límite de repeticiones (los alumnos repiten indefinidamente)</li>
+                  <li><strong>1:</strong> Máximo 1 repetición permitida por alumno</li>
+                  <li><strong>3:</strong> Máximo 3 repeticiones permitidas por alumno</li>
+                </ul>
+              </div>
+            </Alert>
+
+          <Row className="g-3 align-items-end mt-4">
             <Col md={2} sm={6} xs={12}>
               <Form.Group>
                 <Form.Label>Año</Form.Label>

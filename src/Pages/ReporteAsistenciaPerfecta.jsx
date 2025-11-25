@@ -5,17 +5,17 @@ import { BarChart3, FileText, GraduationCap } from 'lucide-react';
 import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { obtenerAsistenciaPerfecta } from "../Services/ReporteAsistenciaPerfectaService";
-import { listarCursos } from "../Services/CursoService";
-import { useNavigate } from "react-router-dom";
+import { listarCursos, listarCursosPorPreceptor } from "../Services/CursoService";
 
 export default function ReporteAsistenciaPerfecta() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
-  const navigate = useNavigate();
 
   const [anio, setAnio] = useState(new Date().getFullYear());
-  const [modo, setModo] = useState('todos'); // 'todos' | 'curso' | 'top'
+  const [modo, setModo] = useState(user?.rol === 'ROLE_PRECEPTOR' ? 'curso' : 'todos'); // 'todos' | 'curso' | 'top'
   const [soloConPerfectos, setSoloConPerfectos] = useState(true); // aplica a 'todos'
   const [topNPorCurso, setTopNPorCurso] = useState('todos'); // 'todos' | '3' | '5' | '10'
   const [cursosOpts, setCursosOpts] = useState([]);
@@ -37,14 +37,19 @@ export default function ReporteAsistenciaPerfecta() {
     let active = true;
     (async () => {
       try {
-        const lista = await listarCursos(token);
+        let lista = [];
+        if (user?.rol === 'ROLE_PRECEPTOR' && user?.preceptorId) {
+          lista = await listarCursosPorPreceptor(token, user.preceptorId);
+        } else {
+          lista = await listarCursos(token);
+        }
         if (active) setCursosOpts((lista || []).map(c => ({ value: String(c.id), label: `${c.anio || ''} ${c.division || ''}`.trim(), raw: c })));
       } catch {
         // noop
       }
     })();
     return () => { active = false; };
-  }, [token]);
+  }, [token, user]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -53,6 +58,17 @@ export default function ReporteAsistenciaPerfecta() {
     try {
       setLoading(true);
       const res = await obtenerAsistenciaPerfecta(token, anio);
+      
+      // Si es preceptor, filtrar solo los cursos asignados
+      if (user?.rol === 'ROLE_PRECEPTOR' && cursosOpts.length > 0) {
+        const cursosIds = new Set(cursosOpts.map(c => String(c.value)));
+        if (res?.cursos) {
+          res.cursos = res.cursos.filter(c => cursosIds.has(String(c?.curso?.id)));
+          // Recalcular total
+          res.totalAlumnosPerfectos = res.cursos.reduce((acc, c) => acc + (c?.totalPerfectos || 0), 0);
+        }
+      }
+      
       setData(res);
       if (res?.code && res.code < 0) setError(res.mensaje || "Error en el reporte");
     } catch (err) {
@@ -309,13 +325,14 @@ export default function ReporteAsistenciaPerfecta() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-3">Alumnos con Asistencia Perfecta</h2>
       
-      <p className="text-muted small mb-3">
+      <p className="text-muted mb-4">
         Este reporte lista los alumnos que no registran inasistencias ni tardanzas durante el año seleccionado. 
         Podés ver el listado completo, filtrar por curso específico o consultar el ranking de cursos con más alumnos de asistencia perfecta.
       </p>
+      
 
       <Card className="mb-4">
         <Card.Body>
@@ -323,10 +340,16 @@ export default function ReporteAsistenciaPerfecta() {
             <Row className="g-3">
               <Col md={3}>
                 <Form.Label>Modo</Form.Label>
-                <Form.Select value={modo} onChange={(e) => setModo(e.target.value)}>
-                  <option value="todos">Todos</option>
-                  <option value="curso">Por curso</option>
-                  <option value="top">Top cursos</option>
+                <Form.Select value={modo} onChange={(e) => setModo(e.target.value)} disabled={user?.rol === 'ROLE_PRECEPTOR'}>
+                  {user?.rol === 'ROLE_PRECEPTOR' ? (
+                    <option value="curso">Por curso</option>
+                  ) : (
+                    <>
+                      <option value="todos">Todos</option>
+                      <option value="curso">Por curso</option>
+                      <option value="top">Top cursos</option>
+                    </>
+                  )}
                 </Form.Select>
               </Col>
               <Col md={2}>
@@ -434,148 +457,7 @@ export default function ReporteAsistenciaPerfecta() {
                     </Col>
                   </Row>
 
-                  {/* Gráficos contextuales según modo */}
-                  <Row className="g-3">
-                    {/* Comparación Curso Seleccionado vs Promedio - Solo en modo "Por Curso" */}
-                    {modo === 'curso' && kpisData.comparacionCurso && (
-                      <>
-                        <Col sm={12}>
-                          <Alert variant="info" className="mb-3">
-                            <strong>{kpisData.cursoSeleccionado.nombre}</strong> tiene <strong>{kpisData.cursoSeleccionado.perfectos}</strong> alumno(s) con asistencia perfecta.
-                            Posición en ranking: <strong>#{kpisData.cursoSeleccionado.posicion}</strong> de {kpisData.cursoSeleccionado.totalCursos} cursos.
-                          </Alert>
-                        </Col>
-                        <Col sm={12} lg={6}>
-                          <Card className="h-100">
-                            <Card.Header><strong>Comparación con Promedio Institucional</strong></Card.Header>
-                            <Card.Body>
-                              <ResponsiveContainer width="100%" height={250}>
-                                <BarChart data={kpisData.comparacionCurso}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis dataKey="categoria" />
-                                  <YAxis />
-                                  <Tooltip />
-                                  <Bar dataKey="valor" name="Alumnos perfectos" fill="#0066cc" />
-                                </BarChart>
-                              </ResponsiveContainer>
-                            </Card.Body>
-                          </Card>
-                        </Col>
-                      </>
-                    )}
-
-                    {/* Distribución por Curso - Solo en modo "Todos" sin filtro Top N */}
-                    {modo === 'todos' && topNPorCurso === 'todos' && kpisData.distribucionPorCurso.length > 0 && (
-                      <Col sm={12} lg={6}>
-                        <Card className="h-100">
-                          <Card.Header><strong>Distribución por Curso (1°, 2°, 3°...)</strong></Card.Header>
-                          <Card.Body>
-                            <ResponsiveContainer width="100%" height={250}>
-                              <BarChart data={kpisData.distribucionPorCurso}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="anio" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="total" name="Total perfectos" fill="#17a2b8" />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    )}
-
-                    {/* Top cursos con más perfectos - Solo en modo "Todos" sin filtro Top N y modo "Top Cursos" */}
-                    {kpisData.topCursos.length > 0 && modo !== 'curso' && (modo === 'top' || (modo === 'todos' && topNPorCurso === 'todos')) && (
-                      <Col sm={12} lg={6}>
-                        <Card className="h-100">
-                          <Card.Header><strong>Top 10 Cursos con Más Perfectos</strong></Card.Header>
-                          <Card.Body>
-                            <ResponsiveContainer width="100%" height={Math.max(300, kpisData.topCursos.length * 35)}>
-                              <BarChart data={kpisData.topCursos} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" />
-                                <YAxis type="category" dataKey="curso" width={80} />
-                                <Tooltip />
-                                <Bar dataKey="perfectos" fill="#28a745" name="Alumnos perfectos" />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    )}
-
-                    {/* Distribución: cursos con/sin perfectos */}
-                    {kpisData.distribucionData.length > 0 && (
-                      <Col sm={12} lg={6}>
-                        <Card className="h-100">
-                          <Card.Header><strong>Cursos con/sin Perfectos</strong></Card.Header>
-                          <Card.Body>
-                            <ResponsiveContainer width="100%" height={300}>
-                              <PieChart>
-                                <Pie
-                                  data={kpisData.distribucionData}
-                                  dataKey="value"
-                                  nameKey="name"
-                                  cx="50%"
-                                  cy="50%"
-                                  outerRadius={80}
-                                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
-                                >
-                                  {kpisData.distribucionData.map((entry, idx) => (
-                                    <Cell key={`cell-${idx}`} fill={entry.color} />
-                                  ))}
-                                </Pie>
-                                <Tooltip />
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    )}
-
-                    {/* Distribución por rangos de perfectos */}
-                    <Col sm={12} lg={6}>
-                      <Card className="h-100">
-                        <Card.Header><strong>Distribución por Cantidad de Perfectos</strong></Card.Header>
-                        <Card.Body>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={kpisData.rangosData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="rango" />
-                              <YAxis />
-                              <Tooltip />
-                              <Bar dataKey="count" name="Cantidad de cursos">
-                                {kpisData.rangosData.map((entry, idx) => (
-                                  <Cell key={`cell-${idx}`} fill={entry.color} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-
-                    {/* Perfectos por nivel */}
-                    {kpisData.nivelesData.length > 0 && (
-                      <Col sm={12} lg={6}>
-                        <Card className="h-100">
-                          <Card.Header><strong>Perfectos por Nivel</strong></Card.Header>
-                          <Card.Body>
-                            <ResponsiveContainer width="100%" height={300}>
-                              <BarChart data={kpisData.nivelesData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="nivel" />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                <Bar dataKey="perfectos" fill="#007bff" name="Total perfectos" />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    )}
-                  </Row>
+                  {/* Gráficos eliminados, solo KPIs */}
                 </Accordion.Body>
               </Accordion.Item>
             </Accordion>
@@ -650,15 +532,7 @@ export default function ReporteAsistenciaPerfecta() {
                       )}
                       {(modo === 'curso' ? alumnosCurso : alumnosTodos).map((a, i) => (
                         <tr key={a?.id ?? i}>
-                          <td>
-                            <button 
-                              className="btn btn-link p-0 text-start text-decoration-none" 
-                              onClick={() => navigate(`/alumno/${a?.id}`)}
-                              style={{ border: 'none', background: 'none', color: 'inherit', cursor: 'pointer' }}
-                            >
-                              {a?.nombre}
-                            </button>
-                          </td>
+                          <td>{a?.nombre}</td>
                           <td>{a?.dni ?? '-'}</td>
                           <td>{a?.cursoEtiqueta ?? '-'}</td>
                           <td>{a?.nivel ?? '-'}</td>

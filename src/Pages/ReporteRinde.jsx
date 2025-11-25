@@ -5,16 +5,18 @@ import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
-import { listarCursos } from '../Services/CursoService';
+import { listarCursos, listarCursosPorPreceptor } from '../Services/CursoService';
 import { listarRindenPorCurso } from '../Services/ReporteRindeService';
 import { listarMateriasDeCurso } from '../Services/MateriaCursoService';
 import { toast } from 'react-toastify';
 import { useEffect } from 'react';
 import { exportRindeCSV } from '../utils/exporters';
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 
 export default function ReporteRinde() {
   const { user } = useAuth();
   const token = user?.token;
+  const isNewTab = useOpenedInNewTab();
 
   const [cursos, setCursos] = useState([]);
   const [cursoId, setCursoId] = useState('');
@@ -33,13 +35,18 @@ export default function ReporteRinde() {
     if (!token) return;
     (async () => {
       try {
-        const cs = await listarCursos(token);
+        let cs = [];
+        if (user?.rol === 'ROLE_PRECEPTOR' && user?.preceptorId) {
+          cs = await listarCursosPorPreceptor(token, user.preceptorId);
+        } else {
+          cs = await listarCursos(token);
+        }
         setCursos((cs || []).map(c => ({ value: c.id, label: `${c.anio || ''} ${c.division || ''}`.trim() })));
       } catch (e) {
         console.warn('No se pudieron cargar cursos para Reporte Rinde:', e);
       }
     })();
-  }, [token]);
+  }, [token, user]);
 
   // Cargar materias del curso seleccionado
   useEffect(() => {
@@ -303,7 +310,7 @@ export default function ReporteRinde() {
   return (
     <div className="container py-3">
       <Breadcrumbs />
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <div className="d-flex align-items-center justify-content-center mb-2">
         <h2 className="m-0 text-center">Alumnos que rinden (Dic/Feb)</h2>
       </div>

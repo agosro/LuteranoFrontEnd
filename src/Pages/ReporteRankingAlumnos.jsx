@@ -5,20 +5,23 @@ import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
-import { listarCursos } from '../Services/CursoService';
-import { rankingCurso, rankingColegio, rankingTodosCursos } from '../Services/ReporteRankingAlumnoService';
+import { listarCursos, listarCursosPorPreceptor } from '../Services/CursoService';
+import { rankingCurso, rankingTodosCursos } from '../Services/ReporteRankingAlumnoService';
 import { toast } from 'react-toastify';
 import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 
 export default function ReporteRankingAlumnos() {
   const { user } = useAuth();
   const token = user?.token;
   const { cicloLectivo } = useCicloLectivo();
+  const isNewTab = useOpenedInNewTab();
 
   const [anio, setAnio] = useState(new Date().getFullYear());
-  const [modo, setModo] = useState('colegio'); // 'colegio' | 'curso' | 'todos'
+  const [modo, setModo] = useState(user?.rol === 'ROLE_PRECEPTOR' ? 'curso' : 'curso'); // 'curso' | 'todos'
   const [cursos, setCursos] = useState([]);
   const [cursoId, setCursoId] = useState('');
+  const [top, setTop] = useState(3);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,13 +31,18 @@ export default function ReporteRankingAlumnos() {
     if (!token) return;
     (async () => {
       try {
-        const cs = await listarCursos(token);
+        let cs = [];
+        if (user?.rol === 'ROLE_PRECEPTOR' && user?.preceptorId) {
+          cs = await listarCursosPorPreceptor(token, user.preceptorId);
+        } else {
+          cs = await listarCursos(token);
+        }
         setCursos((cs || []).map(c => ({ value: c.id, label: `${c.anio || ''} ${c.division || ''}`.trim(), raw: c })));
       } catch {
         // noop
       }
     })();
-  }, [token]);
+  }, [token, user]);
 
   const onGenerar = async () => {
     setError(''); setData(null);
@@ -43,18 +51,15 @@ export default function ReporteRankingAlumnos() {
     try {
       setLoading(true);
       let res;
-      if (modo === 'curso') res = await rankingCurso(token, Number(cursoId), Number(anio));
-      else if (modo === 'colegio') res = await rankingColegio(token, Number(anio));
-      else res = await rankingTodosCursos(token, Number(anio));
+      if (modo === 'curso') res = await rankingCurso(token, Number(cursoId), Number(anio), Number(top));
+      else res = await rankingTodosCursos(token, Number(anio), Number(top));
       
       // Debug: ver qué retorna el backend
       console.log('Respuesta del backend (modo:', modo, '):', res);
       
       // Verificar si hay datos
       let tieneData = false;
-      if (modo === 'colegio' && res?.ranking && res.ranking.length > 0) {
-        tieneData = true;
-      } else if (modo === 'curso' && res?.ranking && res.ranking.length > 0) {
+      if (modo === 'curso' && res?.ranking && res.ranking.length > 0) {
         tieneData = true;
       } else if (modo === 'todos' && res?.cursosRanking && res.cursosRanking.length > 0) {
         tieneData = true;
@@ -76,7 +81,6 @@ export default function ReporteRankingAlumnos() {
   const rankingCursoItems = useMemo(() => Array.isArray(data?.ranking) ? data.ranking : [], [data]);
   const cursoNombre = useMemo(() => data?.cursoNombre || (cursos.find(c=>String(c.value)===String(cursoId))?.label) || '', [data, cursos, cursoId]);
 
-  const rankingColegioItems = useMemo(() => Array.isArray(data?.ranking) ? data.ranking : [], [data]);
   const todosCursosItems = useMemo(() => Array.isArray(data?.cursosRanking) ? data.cursosRanking : [], [data]);
 
   // KPIs y gráficos
@@ -86,10 +90,7 @@ export default function ReporteRankingAlumnos() {
     let promedios = [];
     let totalAlumnos = 0;
 
-    if (modo === 'colegio') {
-      promedios = rankingColegioItems.map(r => r.promedio).filter(v => typeof v === 'number');
-      totalAlumnos = rankingColegioItems.length;
-    } else if (modo === 'curso') {
+    if (modo === 'curso') {
       promedios = rankingCursoItems.map(r => r.promedio).filter(v => typeof v === 'number');
       totalAlumnos = rankingCursoItems.length;
     } else {
@@ -124,14 +125,9 @@ export default function ReporteRankingAlumnos() {
       else if (nota >= 9) distribucion[4].count++;
     });
 
-    // Top 3 alumnos para pie chart
+    // Top alumnos para pie chart
     let top3Data = [];
-    if (modo === 'colegio' && rankingColegioItems.length > 0) {
-      top3Data = rankingColegioItems.slice(0, 3).map((r, idx) => ({
-        name: `${idx + 1}° ${r.apellido || ''}, ${r.nombre || ''}`.trim(),
-        promedio: typeof r.promedio === 'number' ? parseFloat(r.promedio.toFixed(2)) : 0
-      }));
-    } else if (modo === 'curso' && rankingCursoItems.length > 0) {
+    if (modo === 'curso' && rankingCursoItems.length > 0) {
       top3Data = rankingCursoItems.slice(0, 3).map((r, idx) => ({
         name: `${idx + 1}° ${r.apellido || ''}, ${r.nombre || ''}`.trim(),
         promedio: typeof r.promedio === 'number' ? parseFloat(r.promedio.toFixed(2)) : 0
@@ -161,19 +157,12 @@ export default function ReporteRankingAlumnos() {
       top3Data,
       cursosData
     };
-  }, [data, modo, rankingColegioItems, rankingCursoItems, todosCursosItems]);
+  }, [data, modo, rankingCursoItems, todosCursosItems]);
 
   const exportCSV = () => {
     try {
       const lines = [];
-      if (modo === 'colegio') {
-        lines.push(['Puesto','Alumno','DNI','Curso','Promedio']);
-        (rankingColegioItems || []).forEach((r, idx) => {
-          const name = `${r.apellido || ''}, ${r.nombre || ''}`.trim();
-          const curso = r.curso ? `${r.curso.anio ?? ''} ${r.curso.division ?? ''}`.trim() : '';
-          lines.push([idx + 1, name, r.dni ?? '', curso, (typeof r.promedio === 'number' ? r.promedio.toFixed(2) : r.promedio || '')]);
-        });
-      } else if (modo === 'curso') {
+      if (modo === 'curso') {
         lines.push(['Curso', cursoNombre]);
         lines.push(['Año', anio]);
         lines.push([]);
@@ -295,7 +284,6 @@ export default function ReporteRankingAlumnos() {
     `;
     const sub = () => {
       if (modo === 'curso') return `Año: ${anio} · Curso: ${cursoNombre || cursoId}`;
-      if (modo === 'colegio') return `Año: ${anio} · Ámbito: Colegio`;
       return `Año: ${anio} · Ámbito: Todos los cursos`;
     };
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Ranking de Alumnos</title><style>${css}</style></head><body>`);
@@ -334,9 +322,9 @@ export default function ReporteRankingAlumnos() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-1">Ranking de Alumnos</h2>
-      <p className="text-muted mb-3">
+      <p className="text-center text-muted mb-3">
         Este reporte muestra el ranking de alumnos según sus promedios generales. Puede consultar el ranking a nivel colegio, por curso específico o comparar todos los cursos del año seleccionado.
       </p>
       <div className="mb-3">
@@ -352,10 +340,19 @@ export default function ReporteRankingAlumnos() {
           <Row className="g-3 align-items-end">
             <Col md={3} sm={6} xs={12}>
               <Form.Label>Ámbito</Form.Label>
-              <Form.Select value={modo} onChange={(e)=>setModo(e.target.value)}>
-                <option value="colegio">Colegio</option>
-                <option value="curso">Por curso</option>
-                <option value="todos">Todos los cursos</option>
+              <Form.Select 
+                value={modo} 
+                onChange={(e)=>setModo(e.target.value)}
+                disabled={user?.rol === 'ROLE_PRECEPTOR'}
+              >
+                {user?.rol === 'ROLE_PRECEPTOR' ? (
+                  <option value="curso">Por curso</option>
+                ) : (
+                  <>
+                    <option value="curso">Por curso</option>
+                    <option value="todos">Todos los cursos</option>
+                  </>
+                )}
               </Form.Select>
             </Col>
             <Col md={2} sm={6} xs={12}>
@@ -363,7 +360,7 @@ export default function ReporteRankingAlumnos() {
               <Form.Control type="number" value={anio} onChange={(e)=>setAnio(Number(e.target.value))} />
             </Col>
             {modo === 'curso' && (
-              <Col md={3} sm={6} xs={12}>
+              <Col md={2} sm={6} xs={12}>
                 <Form.Label>Curso</Form.Label>
                 <Form.Select value={cursoId} onChange={(e)=>setCursoId(e.target.value)}>
                   <option value="">Seleccione</option>
@@ -371,6 +368,10 @@ export default function ReporteRankingAlumnos() {
                 </Form.Select>
               </Col>
             )}
+            <Col md={2} sm={6} xs={12}>
+              <Form.Label>Top</Form.Label>
+              <Form.Control type="number" min="1" value={top} onChange={(e)=>setTop(Number(e.target.value))} />
+            </Col>
             <Col md="auto">
               <Button onClick={onGenerar} disabled={loading}>{loading ? <Spinner size="sm" /> : 'Generar'}</Button>
             </Col>
@@ -469,39 +470,6 @@ export default function ReporteRankingAlumnos() {
           </div>
 
           <div ref={printRef}>
-            {modo === 'colegio' && (
-              <Card>
-                <Card.Header><strong>Top alumnos — Colegio</strong></Card.Header>
-                <Card.Body className="p-0">
-                  <Table striped hover responsive size="sm" className="mb-0">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Alumno</th>
-                        <th>DNI</th>
-                        <th>Curso</th>
-                        <th className="text-end">Promedio</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(rankingColegioItems || []).length === 0 && (
-                        <tr><td colSpan={5} className="text-center text-muted py-3">Sin datos</td></tr>
-                      )}
-                      {(rankingColegioItems || []).map((r, idx) => (
-                        <tr key={idx}>
-                          <td>{idx + 1}</td>
-                          <td>{`${r.apellido || ''}, ${r.nombre || ''}`.trim()}</td>
-                          <td>{r.dni ?? '-'}</td>
-                          <td>{r.curso ? `${r.curso.anio ?? ''} ${r.curso.division ?? ''}`.trim() : '-'}</td>
-                          <td className="text-end"><Badge bg="light" text="dark">{typeof r.promedio === 'number' ? r.promedio.toFixed(2) : (r.promedio || '-')}</Badge></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Card.Body>
-              </Card>
-            )}
-
             {modo === 'curso' && (
               <Card>
                 <Card.Header><strong>Top alumnos — Curso {cursoNombre || cursoId}</strong></Card.Header>

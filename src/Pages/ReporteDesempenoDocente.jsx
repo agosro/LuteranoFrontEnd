@@ -6,6 +6,7 @@ import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import AsyncDocenteSelect from '../Components/Controls/AsyncDocenteSelect';
 import { listarCursos } from '../Services/CursoService';
 import { listarMaterias } from '../Services/MateriaService';
@@ -16,6 +17,7 @@ import { toast } from 'react-toastify';
 
 export default function ReporteDesempenoDocente() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const [searchParams] = useSearchParams();
   const autoGenerar = searchParams.get('auto') === 'true';
@@ -659,14 +661,14 @@ export default function ReporteDesempenoDocente() {
     <Container className="py-4">
       <div className="mb-3">
         <Breadcrumbs />
-        <div className="mt-2"><BackButton /></div>
+        <div className="mt-2"><BackButton hidden={isNewTab} /></div>
       </div>
 
       <Card className="shadow-sm">
         <Card.Body>
           <h3 className="mb-3">Reporte de desempeño docente</h3>
           
-          <p className="text-muted small mb-3">
+          <p className="text-muted mb-3">
             Este reporte analiza el rendimiento académico de los docentes según los resultados de sus alumnos. 
             Incluye porcentajes de aprobación, promedios generales y estado de desempeño por materia y curso.
           </p>

@@ -7,11 +7,14 @@ import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
 import { useCicloLectivo } from "../Context/CicloLectivoContext";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { useSearchParams } from "react-router-dom";
 import { obtenerHistorialCompleto, obtenerHistorialPorCiclo } from "../Services/ReporteHistorialAlumnoService";
+import { listarCursosPorPreceptor } from "../Services/CursoService";
 
 export default function ReporteHistorialAlumno() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const { cicloLectivo } = useCicloLectivo();
   const token = user?.token;
   const [searchParams] = useSearchParams();
@@ -27,6 +30,46 @@ export default function ReporteHistorialAlumno() {
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
   const printRef = useRef(null);
+  
+  // Para preceptores: cargar sus cursos asignados
+  const [cursosPreceptor, setCursosPreceptor] = useState([]);
+  
+  useEffect(() => {
+    if (!token || !user) return;
+    if (user.rol === 'ROLE_PRECEPTOR' && user.preceptorId) {
+      (async () => {
+        try {
+          const lista = await listarCursosPorPreceptor(token, user.preceptorId);
+          setCursosPreceptor(lista || []);
+        } catch (e) {
+          console.warn('No se pudieron cargar cursos del preceptor:', e);
+        }
+      })();
+    }
+  }, [token, user]);
+  
+  // Filtrar opciones de año y división según cursos del preceptor
+  const aniosDisponibles = useMemo(() => {
+    if (user?.rol !== 'ROLE_PRECEPTOR') {
+      return [1, 2, 3, 4, 5, 6];
+    }
+    const anios = [...new Set(cursosPreceptor.map(c => c.anio).filter(Boolean))];
+    return anios.sort((a, b) => a - b);
+  }, [user, cursosPreceptor]);
+  
+  const divisionesDisponibles = useMemo(() => {
+    if (user?.rol !== 'ROLE_PRECEPTOR') {
+      return ['A', 'B', 'C', 'D'];
+    }
+    if (!cursoAnioSel) return [];
+    const divisiones = [...new Set(
+      cursosPreceptor
+        .filter(c => String(c.anio) === String(cursoAnioSel))
+        .map(c => c.division)
+        .filter(Boolean)
+    )];
+    return divisiones.sort();
+  }, [user, cursosPreceptor, cursoAnioSel]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -265,11 +308,11 @@ export default function ReporteHistorialAlumno() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-2">
         {tipoReporte === "completo" ? "Historial Académico Completo" : `Historial Académico - Ciclo ${cicloLectivo?.anio || ''}`}
       </h2>
-      <p className="text-muted mb-3">
+      <p className="text-center text-muted mb-3">
         {tipoReporte === "completo" 
           ? "Este reporte muestra el historial académico completo del alumno a través de todos los ciclos lectivos, incluyendo estadísticas, tendencias, logros destacados y áreas de mejora."
           : "Este reporte muestra el desempeño académico del alumno en el ciclo lectivo seleccionado, con estadísticas y análisis de materias."
@@ -284,7 +327,7 @@ export default function ReporteHistorialAlumno() {
                 <Form.Label>Año (opcional)</Form.Label>
                 <Form.Select value={cursoAnioSel} onChange={(e)=>setCursoAnioSel(e.target.value)}>
                   <option value="">Todos</option>
-                  {[1, 2, 3, 4, 5, 6].map(an => (
+                  {aniosDisponibles.map(an => (
                     <option key={an} value={an}>{an}</option>
                   ))}
                 </Form.Select>
@@ -293,7 +336,7 @@ export default function ReporteHistorialAlumno() {
                 <Form.Label>División (opcional)</Form.Label>
                 <Form.Select value={divisionSel} onChange={(e)=>setDivisionSel(e.target.value)} disabled={!cursoAnioSel}>
                   <option value="">Todas</option>
-                  {['A', 'B', 'C', 'D'].map(d => (
+                  {divisionesDisponibles.map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </Form.Select>

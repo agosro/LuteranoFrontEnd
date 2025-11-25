@@ -7,10 +7,12 @@ import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useAuth } from "../Context/AuthContext";
 import { useSearchParams } from "react-router-dom";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { obtenerDisponibilidadDocente } from "../Services/ReporteDisponibilidadService";
 
 export default function ReporteDisponibilidadDocente() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const [searchParams] = useSearchParams();
   const autoGenerar = searchParams.get('auto') === 'true';
@@ -272,10 +274,10 @@ export default function ReporteDisponibilidadDocente() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-3">Disponibilidad Docente</h2>
       
-      <p className="text-muted small mb-3">
+      <p className="text-center text-muted mb-3">
         Este reporte muestra la disponibilidad horaria semanal de un docente, indicando los bloques ocupados y libres. 
         También incluye el detalle de las materias que dicta y los cursos asignados.
       </p>

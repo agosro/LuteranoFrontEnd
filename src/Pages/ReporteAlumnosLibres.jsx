@@ -6,15 +6,17 @@ import { BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
-import { listarCursos } from '../Services/CursoService';
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
+import { listarCursos, listarCursosPorPreceptor } from '../Services/CursoService';
 import { fetchAlumnosLibres } from '../Services/ReporteAlumnosLibresService';
 import { toast } from 'react-toastify';
 
 export default function ReporteAlumnosLibres() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
 
-  const [modo, setModo] = useState('todos'); // 'todos' | 'curso'
+  const [modo, setModo] = useState(user?.rol === 'ROLE_PRECEPTOR' ? 'curso' : 'todos'); // 'todos' | 'curso'
   const [cursos, setCursos] = useState([]);
   const [cursoId, setCursoId] = useState('');
   const [anio, setAnio] = useState(String(new Date().getFullYear()));
@@ -26,13 +28,18 @@ export default function ReporteAlumnosLibres() {
     if (!token) return;
     (async () => {
       try {
-        const cs = await listarCursos(token);
+        let cs = [];
+        if (user?.rol === 'ROLE_PRECEPTOR' && user?.preceptorId) {
+          cs = await listarCursosPorPreceptor(token, user.preceptorId);
+        } else {
+          cs = await listarCursos(token);
+        }
         setCursos((cs || []).map(c => ({ value: c.id, label: `${c.anio || ''} ${c.division || ''}`.trim() })));
       } catch (e) {
         console.warn('No se pudieron cargar cursos para filtros de libres:', e);
       }
     })();
-  }, [token]);
+  }, [token, user]);
 
   const aniosPosibles = useMemo(() => {
     const y = new Date().getFullYear();
@@ -296,7 +303,7 @@ export default function ReporteAlumnosLibres() {
   return (
     <div className="container py-3">
       <Breadcrumbs />
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <div className="d-flex align-items-center justify-content-center mb-3">
         <h2 className="m-0 text-center">Reporte de Alumnos Libres por Inasistencias</h2>
       </div>
@@ -310,9 +317,20 @@ export default function ReporteAlumnosLibres() {
           <div className="row g-3 align-items-end">
             <div className="col-sm-3">
               <label className="form-label">Modo</label>
-              <select className="form-select" value={modo} onChange={(e) => setModo(e.target.value)}>
-                <option value="todos">Todos los cursos</option>
-                <option value="curso">Por curso</option>
+              <select 
+                className="form-select" 
+                value={modo} 
+                onChange={(e) => setModo(e.target.value)}
+                disabled={user?.rol === 'ROLE_PRECEPTOR'}
+              >
+                {user?.rol === 'ROLE_PRECEPTOR' ? (
+                  <option value="curso">Por curso</option>
+                ) : (
+                  <>
+                    <option value="todos">Todos los cursos</option>
+                    <option value="curso">Por curso</option>
+                  </>
+                )}
               </select>
             </div>
             {modo === 'curso' && (
@@ -342,7 +360,6 @@ export default function ReporteAlumnosLibres() {
       <div className="row g-2 mb-2">
         <div className="col-auto"><span className="badge text-bg-secondary">Total alumnos libres: {items.length}</span></div>
         <div className="col-auto"><span className="badge text-bg-info">Mostrando: {totalFilas}</span></div>
-        <div className="col-auto"><span className="badge text-bg-warning text-dark">Promedio inasistencias: {promedioInasist}</span></div>
       </div>
 
       {/* KPIs y Gráficos desplegables */}
@@ -356,7 +373,7 @@ export default function ReporteAlumnosLibres() {
             <Accordion.Body>
               {/* KPIs en Cards */}
               <Row className="g-3 mb-4">
-                <Col md={3}>
+                <Col md={4}>
                   <Card className="h-100 border-danger">
                     <Card.Body className="text-center">
                       <div className="text-muted small mb-1">Total Alumnos Libres</div>
@@ -364,15 +381,7 @@ export default function ReporteAlumnosLibres() {
                     </Card.Body>
                   </Card>
                 </Col>
-                <Col md={3}>
-                  <Card className="h-100 border-warning">
-                    <Card.Body className="text-center">
-                      <div className="text-muted small mb-1">Promedio Inasistencias</div>
-                      <div className="h2 mb-0 text-warning">{kpisData.promedioInasist}</div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
+                <Col md={4}>
                   <Card className="h-100 border-danger">
                     <Card.Body className="text-center">
                       <div className="text-muted small mb-1">Máxima Inasistencias</div>
@@ -380,7 +389,7 @@ export default function ReporteAlumnosLibres() {
                     </Card.Body>
                   </Card>
                 </Col>
-                <Col md={3}>
+                <Col md={4}>
                   <Card className="h-100 border-success">
                     <Card.Body className="text-center">
                       <div className="text-muted small mb-1">Mínima Inasistencias</div>

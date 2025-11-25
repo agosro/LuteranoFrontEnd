@@ -5,13 +5,33 @@ import { BarChart3, Calendar } from 'lucide-react';
 import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import AsyncAlumnoSelect from '../Components/Controls/AsyncAlumnoSelect';
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { useAuth } from '../Context/AuthContext';
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from '../Services/CursoService';
 import { obtenerInasistenciasPorCurso, obtenerInasistenciasPorAlumno } from '../Services/ReporteInasistenciasDetalleService';
 import { toast } from 'react-toastify';
 
+// Estado colors for different attendance states
+const ESTADO_COLORS = {
+  'AUSENTE': '#dc3545',      // Red
+  'TARDE': '#ffc107',        // Yellow/Orange
+  'CON_LICENCIA': '#ffc107', // Yellow/Orange (same as TARDE)
+  'JUSTIFICADO': '#28a745'   // Green
+};
+
+const ESTADO_BADGE_BG = {
+  'AUSENTE': 'danger',
+  'TARDE': 'warning',
+  'CON_LICENCIA': 'warning',
+  'JUSTIFICADO': 'success'
+};
+
+// Estados to filter out (should not be displayed in detalle)
+const ESTADOS_EXCLUIDOS = ['PRESENTE', 'RETIRO'];
+
 export default function ReporteInasistenciasDetalle() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
 
   const [modo, setModo] = useState('curso'); // 'curso' | 'alumno'
@@ -25,6 +45,7 @@ export default function ReporteInasistenciasDetalle() {
   const [data, setData] = useState(null);
   const [cargando, setCargando] = useState(false);
   const printRef = useRef(null);
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
   
   // Para modo alumno: filtros de curso para cargar alumnos
   const [alumnoModoAnio, setAlumnoModoAnio] = useState('');
@@ -181,11 +202,23 @@ export default function ReporteInasistenciasDetalle() {
     };
   }, [data]);
 
+  // Datos ordenados según total de inasistencias
+  const sortedData = useMemo(() => {
+    if (!data || !Array.isArray(data)) return [];
+    const arr = [...data];
+    arr.sort((a, b) => {
+      const at = (a?.totalJustificadas || 0) + (a?.totalNoJustificadas || 0);
+      const bt = (b?.totalJustificadas || 0) + (b?.totalNoJustificadas || 0);
+      return sortOrder === 'asc' ? at - bt : bt - at;
+    });
+    return arr;
+  }, [data, sortOrder]);
+
   const exportCSV = () => {
-    if (!data || !Array.isArray(data) || data.length === 0) return;
+    if (!sortedData || !Array.isArray(sortedData) || sortedData.length === 0) return;
     
     const header = ["Alumno", "DNI", "Justificadas", "No Justificadas", "Total"];
-    const rows = data.map(a => {
+    const rows = sortedData.map(a => {
       const alumno = `${(a?.apellido || '').trim()} ${(a?.nombre || '').trim()}`.trim();
       const j = a?.totalJustificadas || 0;
       const nj = a?.totalNoJustificadas || 0;
@@ -195,10 +228,10 @@ export default function ReporteInasistenciasDetalle() {
 
     // Agregar detalle por fecha si existe
     const detalleRows = [];
-    if (data[0]?.detalles && data[0].detalles.length > 0) {
+    if (sortedData[0]?.detalles && sortedData[0].detalles.length > 0) {
       detalleRows.push(['', '', '', '', '']);
       detalleRows.push(['Detalle por Fecha']);
-      data.forEach(a => {
+      sortedData.forEach(a => {
         const alumno = `${(a?.apellido || '').trim()} ${(a?.nombre || '').trim()}`.trim();
         detalleRows.push([alumno]);
         detalleRows.push(['Fecha', 'Estado', 'Observación']);
@@ -225,7 +258,7 @@ export default function ReporteInasistenciasDetalle() {
   };
 
   const printOnlyTable = () => {
-    if (!data || !Array.isArray(data) || data.length === 0) return;
+    if (!sortedData || !Array.isArray(sortedData) || sortedData.length === 0) return;
     const win = window.open('', '_blank');
     if (!win) return;
     const css = `
@@ -339,7 +372,7 @@ export default function ReporteInasistenciasDetalle() {
     win.document.write(`<table>`);
     win.document.write(`<thead><tr><th>Alumno</th><th>DNI</th><th style="text-align:right">Justificadas</th><th style="text-align:right">No Justificadas</th><th style="text-align:right">Total</th></tr></thead>`);
     win.document.write(`<tbody>`);
-    data.forEach(alumno => {
+    sortedData.forEach(alumno => {
       const nombreCompleto = `${(alumno?.apellido || '').trim()} ${(alumno?.nombre || '').trim()}`.trim() || '-';
       const j = alumno?.totalJustificadas || 0;
       const nj = alumno?.totalNoJustificadas || 0;
@@ -361,7 +394,7 @@ export default function ReporteInasistenciasDetalle() {
   };
 
   const printWithDetail = () => {
-    if (!data || !Array.isArray(data) || data.length === 0) return;
+    if (!sortedData || !Array.isArray(sortedData) || sortedData.length === 0) return;
     const win = window.open('', '_blank');
     if (!win) return;
     const css = `
@@ -485,25 +518,28 @@ export default function ReporteInasistenciasDetalle() {
     }
     
     // Tabla con detalle para cada alumno
-    data.forEach(alumno => {
+    sortedData.forEach(alumno => {
       const nombreCompleto = `${(alumno?.apellido || '').trim()} ${(alumno?.nombre || '').trim()}`.trim() || '-';
       const j = alumno?.totalJustificadas || 0;
       const nj = alumno?.totalNoJustificadas || 0;
       const total = j + nj;
       const detalle = alumno?.detalles || [];
+      // Filter out PRESENTE and RETIRO states
+      const detalleFiltered = detalle.filter(d => !ESTADOS_EXCLUIDOS.includes(d?.estado));
       
       win.document.write(`<div class="alumno-section">`);
       win.document.write(`<div class="alumno-header">${nombreCompleto} (DNI: ${alumno?.dni || ''}) - Justificadas: ${j} | No Justificadas: ${nj} | Total: ${total}</div>`);
       
-      if (detalle.length > 0) {
+      if (detalleFiltered.length > 0) {
         win.document.write(`<table>`);
         win.document.write(`<thead><tr><th>Fecha</th><th>Estado</th><th>Observación</th></tr></thead>`);
         win.document.write(`<tbody>`);
-        detalle.forEach(dia => {
-          const bgColor = dia?.estado === 'AUSENTE' ? 'badge-danger' : 'badge-success';
+        detalleFiltered.forEach(dia => {
+          const estado = dia?.estado || '';
+          const bgColor = ESTADO_COLORS[estado] || '#6c757d';
           win.document.write(`<tr>`);
           win.document.write(`<td>${dia?.fecha || '-'}</td>`);
-          win.document.write(`<td><span class="badge ${bgColor}">${dia?.estado || '-'}</span></td>`);
+          win.document.write(`<td><span class="badge" style="background-color: ${bgColor}; color: white;">${estado}</span></td>`);
           win.document.write(`<td>${dia?.observacion || '-'}</td>`);
           win.document.write(`</tr>`);
         });
@@ -524,7 +560,7 @@ export default function ReporteInasistenciasDetalle() {
   return (
     <div className="container py-3">
       <Breadcrumbs />
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <div className="d-flex align-items-center justify-content-center mb-3">
         <h2 className="m-0 text-center">Reporte Detallado de Inasistencias</h2>
       </div>
@@ -634,7 +670,6 @@ export default function ReporteInasistenciasDetalle() {
             <div className="col-auto"><Badge bg="info">Total inasistencias: {kpisData.totalInasistencias}</Badge></div>
             <div className="col-auto"><Badge bg="primary" className="text-white">Justificadas: {kpisData.totalInasistenciasJustificadas}</Badge></div>
             <div className="col-auto"><Badge bg="danger">No justificadas: {kpisData.totalInasistenciasNoJustificadas}</Badge></div>
-            <div className="col-auto"><Badge bg="warning" className="text-dark">Promedio: {kpisData.promedioInasist}</Badge></div>
           </div>
 
           {/* KPIs y Gráficos desplegables */}
@@ -732,34 +767,18 @@ export default function ReporteInasistenciasDetalle() {
                   </Col>
                 </Row>
 
-                {/* Top 5 */}
-                {kpisData.top5.length > 0 && (
-                  <Row className="g-3 mt-2">
-                    <Col md={12}>
-                      <Card>
-                        <Card.Body>
-                          <h6 className="mb-3">Top 5 Alumnos con Más Inasistencias</h6>
-                          <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={kpisData.top5} layout="horizontal">
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis type="number" />
-                              <YAxis dataKey="nombre" type="category" width={150} />
-                              <Tooltip />
-                              <Legend />
-                              <Bar dataKey="justificadas" stackId="a" fill="#17a2b8" name="Justificadas" />
-                              <Bar dataKey="noJustificadas" stackId="a" fill="#dc3545" name="No Justificadas" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  </Row>
-                )}
               </Accordion.Body>
             </Accordion.Item>
           </Accordion>
 
-          <div className="d-flex justify-content-end gap-2 mb-3">
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <div className="me-auto d-flex align-items-center">
+              <label className="me-2 mb-0 small">Orden</label>
+              <select className="form-select form-select-sm" style={{width: '180px'}} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                <option value="desc">Más a menos (total)</option>
+                <option value="asc">Menos a más (total)</option>
+              </select>
+            </div>
             <button className="btn btn-outline-secondary btn-sm" onClick={exportCSV}>Exportar CSV</button>
             <button className="btn btn-outline-secondary btn-sm" onClick={printOnlyTable}>Imprimir / PDF (Resumen)</button>
             <button className="btn btn-outline-primary btn-sm" onClick={printWithDetail}>Imprimir / PDF (Con Detalle)</button>
@@ -781,15 +800,17 @@ export default function ReporteInasistenciasDetalle() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(!data || !Array.isArray(data) || data.length === 0) && (
+                    {(!sortedData || !Array.isArray(sortedData) || sortedData.length === 0) && (
                       <tr><td colSpan={6} className="text-center text-muted py-3">Sin datos</td></tr>
                     )}
-                    {Array.isArray(data) && data.map((alumno, idx) => {
+                    {sortedData && sortedData.map((alumno, idx) => {
                       const nombreCompleto = `${(alumno?.apellido || '').trim()} ${(alumno?.nombre || '').trim()}`.trim() || '-';
                       const j = alumno?.totalJustificadas || 0;
                       const nj = alumno?.totalNoJustificadas || 0;
                       const total = j + nj;
                       const detalle = alumno?.detalles || [];
+                      // Filter out PRESENTE and RETIRO states
+                      const detalleFiltered = detalle.filter(d => !ESTADOS_EXCLUIDOS.includes(d?.estado));
 
                       return (
                         <React.Fragment key={idx}>
@@ -800,7 +821,7 @@ export default function ReporteInasistenciasDetalle() {
                             <td className="text-end"><Badge bg="danger">{nj}</Badge></td>
                             <td className="text-end"><Badge bg="dark">{total}</Badge></td>
                             <td className="text-center">
-                              {detalle.length > 0 && (
+                              {detalleFiltered.length > 0 && (
                                 <button 
                                   className="btn btn-sm btn-outline-secondary"
                                   type="button"
@@ -808,12 +829,12 @@ export default function ReporteInasistenciasDetalle() {
                                   data-bs-target={`#detalle-${idx}`}
                                 >
                                   <Calendar size={14} className="me-1" />
-                                  Ver detalle ({detalle.length})
+                                  Ver detalle ({detalleFiltered.length})
                                 </button>
                               )}
                             </td>
                           </tr>
-                          {detalle.length > 0 && (
+                          {detalleFiltered.length > 0 && (
                             <tr className="collapse" id={`detalle-${idx}`}>
                               <td colSpan={6} className="bg-light">
                                 <div className="p-3">
@@ -828,17 +849,21 @@ export default function ReporteInasistenciasDetalle() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {detalle.map((dia, diaIdx) => (
-                                          <tr key={diaIdx}>
-                                            <td>{dia?.fecha || '-'}</td>
-                                            <td>
-                                              <Badge bg={dia?.estado === 'AUSENTE' ? 'danger' : 'success'}>
-                                                {dia?.estado || '-'}
-                                              </Badge>
-                                            </td>
-                                            <td>{dia?.observacion || '-'}</td>
-                                          </tr>
-                                        ))}
+                                        {detalleFiltered.map((dia, diaIdx) => {
+                                          const estado = dia?.estado || '';
+                                          const badgeBg = ESTADO_BADGE_BG[estado] || 'secondary';
+                                          return (
+                                            <tr key={diaIdx}>
+                                              <td>{dia?.fecha || '-'}</td>
+                                              <td>
+                                                <Badge bg={badgeBg}>
+                                                  {estado}
+                                                </Badge>
+                                              </td>
+                                              <td>{dia?.observacion || '-'}</td>
+                                            </tr>
+                                          );
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>

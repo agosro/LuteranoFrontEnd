@@ -7,6 +7,7 @@ import Breadcrumbs from "../Components/Botones/Breadcrumbs";
 import BackButton from "../Components/Botones/BackButton";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
+import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
 import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
 // import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
@@ -15,6 +16,7 @@ import { listarMaterias } from "../Services/MateriaService";
 
 export default function ReporteAnualAlumno() {
   const { user } = useAuth();
+  const isNewTab = useOpenedInNewTab();
   const token = user?.token;
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -429,9 +431,9 @@ export default function ReporteAnualAlumno() {
   return (
     <div className="container mt-4">
       <div className="mb-1"><Breadcrumbs /></div>
-      <div className="mb-2"><BackButton /></div>
+      <div className="mb-2"><BackButton hidden={isNewTab} /></div>
       <h2 className="mb-2">Informe Anual de Alumno</h2>
-      <p className="text-muted mb-3">
+      <p className="text-center text-muted mb-3">
         Este informe muestra el rendimiento escolar completo del alumno durante el año seleccionado, incluyendo calificaciones por materia, promedios por etapa, inasistencias y materias previas.
       </p>
 
