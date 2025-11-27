@@ -976,13 +976,6 @@ export default function Mesas() {
                   </Form.Text>
                 </Form.Group>
               </Col>
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Fecha mesa (opcional)</Form.Label>
-                  <Form.Control type="date" value={crearMasivaForm.fecha} onChange={(e)=> setCrearMasivaForm(f=>({...f, fecha: e.target.value}))} />
-                  <Form.Text className="text-muted">Si no se indica, se pueden ajustar las fechas luego</Form.Text>
-                </Form.Group>
-              </Col>
               <Col md={12}>
                 <Form.Group>
                   <Form.Label>Tipo de mesa</Form.Label>
