@@ -479,6 +479,14 @@ export default function Mesas() {
     return map;
   }, [aulas]);
 
+  const fechasDisponibles = useMemo(() => {
+    const fechas = new Set();
+    mesas.forEach(m => {
+      if (m.fecha) fechas.add(m.fecha);
+    });
+    return Array.from(fechas).sort();
+  }, [mesas]);
+
   const fmtDate = (iso) => {
     if (!iso) return '-';
     const [y,m,d] = String(iso).split('-');
@@ -636,7 +644,10 @@ export default function Mesas() {
               <Col md={3} sm={6} xs={12}>
                 <Form.Group>
                   <Form.Label>Fecha</Form.Label>
-                  <Form.Control type="date" value={tablaFiltroFecha} onChange={(e)=> { setTablaFiltroFecha(e.target.value); setPagina(1); }} />
+                  <Form.Select value={tablaFiltroFecha} onChange={(e)=> { setTablaFiltroFecha(e.target.value); setPagina(1); }}>
+                    <option value="">Todas</option>
+                    {fechasDisponibles.map(f => <option key={f} value={f}>{fmtDate(f)}</option>)}
+                  </Form.Select>
                 </Form.Group>
               </Col>
               <Col md={3} sm={6} xs={12}>
