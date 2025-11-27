@@ -10,7 +10,7 @@ import { listarMateriasDeCurso } from '../Services/MateriaCursoService.js';
 import { obtenerCursoPorId, listarCursos } from '../Services/CursoService.js';
 import { listarAulas } from '../Services/AulaService.js';
 import { listarDocentesAsignados, listarDocentesDisponibles, asignarDocentes } from '../Services/MesaExamenDocenteService.js';
-import { listarRindenPorCurso, listarTodosLosAlumnosPorCurso } from '../Services/ReporteRindeService.js';
+import { listarRindenPorCurso } from '../Services/ReporteRindeService.js';
 import { obtenerAlumnosElegibles } from '../Services/ElegibilidadMesaExamenService.js';
 import { listarTurnos } from '../Services/TurnoExamenService.js';
 
@@ -43,7 +43,6 @@ export default function MesaGestion() {
   const [elegibles, setElegibles] = useState([]);
   const [convSeleccionados, setConvSeleccionados] = useState(new Set());
   const [convSaving, setConvSaving] = useState(false);
-  const [mostrarTodos, setMostrarTodos] = useState(false); // Toggle para mostrar todos vs solo elegibles
   const [filtroCondicion, setFiltroCondicion] = useState(''); // '' | 'COLOQUIO' | 'EXAMEN'
 
   // Notas
@@ -57,49 +56,26 @@ export default function MesaGestion() {
     return `${d.padStart(2,'0')}-${m.padStart(2,'0')}-${y}`;
   };
 
-  const recargarAlumnos = useCallback(async (mesa, tipoMesaOverride = null) => {
+  const recargarAlumnos = useCallback(async (mesa) => {
     try {
-      if (mostrarTodos) {
-        // Modo mostrar todos: lógica anterior
-        const anio = new Date().getFullYear();
-        const mats = await listarMateriasDeCurso(token, mesa.cursoId);
-        const mat = mats.find(mt => Number(mt.materiaCursoId) === Number(mesa.materiaCursoId));
-        const materiaId = mat?.materiaId;
-        const rep = await listarTodosLosAlumnosPorCurso(token, { cursoId: mesa.cursoId, anio });
-        const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
-        const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
-        const lista = filtradas.map(r => ({ 
-          id: Number(r.alumnoId), 
-          alumnoId: Number(r.alumnoId), 
-          dni: r.dni, 
-          apellido: r.apellido, 
-          nombre: r.nombre, 
-          condicion: r.condicion,
-          estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
-        }));
-        setElegibles(lista);
-        const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
-        setConvSeleccionados(actuales);
-      } else {
-        // Modo elegibles: usar endpoint nuevo
-        const lista = await obtenerAlumnosElegibles(token, mesa.id || mesaId);
-        setElegibles(lista.map(r => ({
-          id: Number(r.alumnoId),
-          alumnoId: Number(r.alumnoId),
-          apellido: r.apellido,
-          nombre: r.nombre,
-          condicion: r.condicion,
-          dni: r.dni || '',
-          estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
-        })));
-        const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
-        setConvSeleccionados(actuales);
-      }
+      // Usar endpoint de elegibles
+      const lista = await obtenerAlumnosElegibles(token, mesa.id || mesaId);
+      setElegibles(lista.map(r => ({
+        id: Number(r.alumnoId),
+        alumnoId: Number(r.alumnoId),
+        apellido: r.apellido,
+        nombre: r.nombre,
+        condicion: r.condicion,
+        dni: r.dni || '',
+        estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
+      })));
+      const actuales = new Set((mesa.alumnos||[]).map(a => Number(a.alumnoId)));
+      setConvSeleccionados(actuales);
     } catch {
       setElegibles([]);
       setConvSeleccionados(new Set());
     }
-  }, [token, mostrarTodos, mesaId]);
+  }, [token, mesaId]);
 
   const refreshSinAlumnos = useCallback(async () => {
     try {
@@ -134,6 +110,21 @@ export default function MesaGestion() {
       setAulas(Array.isArray(als) ? als : []);
       setDocAsignados(Array.isArray(asig) ? asig : []);
       setDocDisponibles(Array.isArray(disp) ? disp : []);
+      // Inicializar docentes seleccionados con los asignados
+      let docentesAsignadosIds = new Set(
+        Array.isArray(asig) ? asig.map(d => Number(d.id || d.docenteId)) : []
+      );
+      
+      // Si no hay docentes asignados aún, pero hay docentes disponibles y la mesa tiene materia
+      // automáticamente pre-seleccionar el docente titular (esDocenteMateria=true)
+      if (docentesAsignadosIds.size === 0 && Array.isArray(disp) && disp.length > 0) {
+        const docTitular = disp.find(d => d.esDocenteMateria === true);
+        if (docTitular) {
+          docentesAsignadosIds.add(Number(docTitular.id || docTitular.docenteId));
+        }
+      }
+      
+      setDocSeleccionados(docentesAsignadosIds);
 
       // Notas
       const initNotas = {};
@@ -185,8 +176,22 @@ export default function MesaGestion() {
       setAulas(als);
       setDocAsignados(asig);
       setDocDisponibles(disp);
-      const pre = new Set(asig.map(d => Number(d.id)));
-      setDocSeleccionados(pre);
+      // Inicializar docentes seleccionados con los asignados
+      let docentesAsignadosIds = new Set(
+        Array.isArray(asig) ? asig.map(d => Number(d.id || d.docenteId)) : []
+      );
+      
+      // Si no hay docentes asignados aún, pero hay docentes disponibles y la mesa tiene materia
+      // automáticamente pre-seleccionar el docente titular (esDocenteMateria=true)
+      if (docentesAsignadosIds.size === 0 && Array.isArray(disp) && disp.length > 0) {
+        const docTitular = disp.find(d => d.esDocenteMateria === true);
+        if (docTitular) {
+          docentesAsignadosIds.add(Number(docTitular.id || docTitular.docenteId));
+
+        }
+      }
+      
+      setDocSeleccionados(docentesAsignadosIds);
 
       // Convocados elegibles por curso/año/materia y turnos del año
       try {
@@ -195,21 +200,15 @@ export default function MesaGestion() {
         const mat = mats.find(mt => Number(mt.materiaCursoId) === Number(m.materiaCursoId));
         const materiaId = mat?.materiaId;
         
-        // Usar el servicio correcto según el toggle
-        const servicioReporte = mostrarTodos ? listarTodosLosAlumnosPorCurso : listarRindenPorCurso;
-        const rep = await servicioReporte(token, { cursoId: m.cursoId, anio });
+        const rep = await listarRindenPorCurso(token, { cursoId: m.cursoId, anio });
         const filas = Array.isArray(rep) ? rep : (Array.isArray(rep?.filas) ? rep.filas : []);
         const filtradas = materiaId ? filas.filter(f => Number(f.materiaId) === Number(materiaId)) : filas;
         
-        // Si mostrarTodos está activado, no filtrar por condición de mesa
-        let filtradasPorTipo = filtradas;
-        if (!mostrarTodos) {
-          // Filtrar por tipo de mesa solo cuando mostrarTodos está desactivado
-          const tipoMesa = m.tipoMesa || 'EXAMEN';
-          filtradasPorTipo = tipoMesa === 'COLOQUIO' 
-            ? filtradas.filter(f => f.condicion === 'COLOQUIO')
-            : filtradas;
-        }
+        // Filtrar por tipo de mesa
+        const tipoMesa = m.tipoMesa || 'EXAMEN';
+        const filtradasPorTipo = tipoMesa === 'COLOQUIO' 
+          ? filtradas.filter(f => f.condicion === 'COLOQUIO')
+          : filtradas;
         
         const lista = filtradasPorTipo.map(r => ({ 
           id: Number(r.alumnoId), 
@@ -221,8 +220,9 @@ export default function MesaGestion() {
           estadoAcademico: r.estadoAcademico || 'DEBE_RENDIR'
         }));
         setElegibles(lista);
-        const actuales = new Set((m.alumnos||[]).map(a => Number(a.alumnoId)));
+        const actuales = new Set((m.alumnos||[]).map(a => Number(a.alumnoId || a.id)));
         setConvSeleccionados(actuales);
+  
         try {
           const ts = await listarTurnos(token, anio);
           setTurnos(Array.isArray(ts) ? ts : []);
@@ -244,16 +244,9 @@ export default function MesaGestion() {
     } finally {
       setLoading(false);
     }
-  }, [mesaId, token, mostrarTodos]);
+  }, [mesaId, token]);
 
   useEffect(() => { refresh(); }, [refresh]);
-
-  // Recargar alumnos cuando cambie el toggle
-  useEffect(() => {
-    if (mesa) {
-      recargarAlumnos(mesa);
-    }
-  }, [mostrarTodos, mesa, recargarAlumnos]);
 
   const guardarDatos = async () => {
     try {
@@ -301,7 +294,7 @@ export default function MesaGestion() {
       setDocSaving(true);
       const ids = Array.from(docSeleccionados);
       await asignarDocentes(token, mesaId, ids);
-      await refresh();
+      await refreshSinAlumnos();
       toast.success('Docentes actualizados');
     } catch (e) {
       toast.error(e.message);
@@ -320,7 +313,7 @@ export default function MesaGestion() {
       if (aAgregar.length) await agregarConvocados(token, mesaId, aAgregar);
       const aQuitar = Array.from(actuales).filter(id => !convSeleccionados.has(id));
       for (const id of aQuitar) { await quitarConvocado(token, mesaId, id); }
-      await refresh();
+      await recargarAlumnos(mesaActual);
       toast.success('Convocados actualizados');
     } catch (e) {
       toast.error(e.message);
@@ -414,11 +407,20 @@ export default function MesaGestion() {
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label>Materia</Form.Label>
-                      <Form.Select value={datosForm.materiaCursoId} onChange={(e)=> setDatosForm(v=>({...v, materiaCursoId: e.target.value}))} disabled={mesa?.estado==='FINALIZADA'}>
+                      <Form.Select value={datosForm.materiaCursoId} disabled>
                         <option value="">-- Seleccionar --</option>
-                        {materias.map(mt => (
-                          <option key={mt.materiaCursoId} value={mt.materiaCursoId}>{mt.nombreMateria}</option>
-                        ))}
+                        {/* Mostrar la materia actual aunque materias esté vacío */}
+                        {(() => {
+                          if (materias && materias.length > 0) {
+                            return materias.map(mt => (
+                              <option key={mt.materiaCursoId} value={mt.materiaCursoId}>{mt.nombreMateria}</option>
+                            ));
+                          } else if (mesa && mesa.materiaCursoId && mesa.materiaNombre) {
+                            return <option value={mesa.materiaCursoId}>{mesa.materiaNombre}</option>;
+                          } else {
+                            return null;
+                          }
+                        })()}
                       </Form.Select>
                     </Form.Group>
                   </Col>
@@ -538,16 +540,7 @@ export default function MesaGestion() {
 
               <Tab eventKey="convocados" title="Convocados">
                 <div className="mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <p className="text-muted mb-0">Marcá los alumnos a convocar para esta mesa.</p>
-                    <Form.Check 
-                      type="switch"
-                      label="Mostrar todos los alumnos (incluye aprobados)"
-                      checked={mostrarTodos}
-                      disabled={mesa?.estado==='FINALIZADA'}
-                      onChange={(e) => setMostrarTodos(e.target.checked)}
-                    />
-                  </div>
+                  <p className="text-muted mb-2">Marcá los alumnos a convocar para esta mesa.</p>
                   <Row className="g-2 align-items-end">
                     <Col md={4}>
                       <Form.Group>
@@ -610,7 +603,6 @@ export default function MesaGestion() {
                         <th>Apellido</th>
                         <th>Nombre</th>
                         <th>Condición</th>
-                        {mostrarTodos && <th>Estado Académico</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -636,25 +628,12 @@ export default function MesaGestion() {
                             <td>{al.apellido}</td>
                             <td>{al.nombre}</td>
                             <td>{(al.condicion ?? '').toString()}</td>
-                            {mostrarTodos && (
-                              <td>
-                                <Badge bg={
-                                  al.estadoAcademico === 'PROMOCIONADO' ? 'success' :
-                                  al.estadoAcademico === 'APROBADO_MESA' ? 'info' : 
-                                  'warning'
-                                }>
-                                  {al.estadoAcademico === 'PROMOCIONADO' ? 'Promocionado' :
-                                   al.estadoAcademico === 'APROBADO_MESA' ? 'Aprobado por Mesa' :
-                                   'Debe Rendir'}
-                                </Badge>
-                              </td>
-                            )}
                           </tr>
                         );
                       })}
                       {elegibles.filter(al => !filtroCondicion || al.condicion === filtroCondicion).length===0 && (
-                        <tr><td colSpan={mostrarTodos ? 6 : 5} className="text-center py-3 text-muted">
-                          No hay alumnos {filtroCondicion ? `con condición ${filtroCondicion}` : (mostrarTodos ? 'registrados' : 'elegibles')}
+                        <tr><td colSpan={5} className="text-center py-3 text-muted">
+                          No hay alumnos {filtroCondicion ? `con condición ${filtroCondicion}` : 'elegibles'}
                         </td></tr>
                       )}
                     </tbody>

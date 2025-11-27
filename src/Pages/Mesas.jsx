@@ -50,7 +50,7 @@ export default function Mesas() {
 
   // Estado antiguo de creación inline eliminado; nuevo modal de creación:
   const [showCrearMesa, setShowCrearMesa] = useState(false);
-  const [crearMesaForm, setCrearMesaForm] = useState({ anio: '', cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
+  const [crearMesaForm, setCrearMesaForm] = useState({ anio: '', cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' });
   const [turnosPorAnio, setTurnosPorAnio] = useState(new Map()); // anio -> turnos
   const [crearMesaLoading, setCrearMesaLoading] = useState(false);
   const [crearMesaError, setCrearMesaError] = useState('');
@@ -182,11 +182,13 @@ export default function Mesas() {
         tipoMesa: crearMesaForm.tipoMesa,
       };
       if (crearMesaForm.aulaId) payload.aulaId = Number(crearMesaForm.aulaId);
+      if (crearMesaForm.horaInicio) payload.horaInicio = crearMesaForm.horaInicio;
+      if (crearMesaForm.horaFin) payload.horaFin = crearMesaForm.horaFin;
       await crearMesa(token, payload);
       await refreshMesas();
       toast.success('Mesa creada');
       setShowCrearMesa(false);
-      setCrearMesaForm({ cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' });
+      setCrearMesaForm({ cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' });
     } catch (e) {
       setCrearMesaError(e.message || 'No se pudo crear la mesa');
       toast.error(e.message);
@@ -441,7 +443,7 @@ export default function Mesas() {
           {alcance === 'ALL' && (
             <div className="mb-2">
               <Alert variant="info" className="py-2 mb-0">
-                Mostrando solo mesas del año {cicloYear}. Para ver años anteriores, usá el botón "Historial".
+                Mostrando solo mesas del Ciclo Lectivo {cicloYear}. Para ver ciclos anteriores, usá el botón "Historial".
               </Alert>
             </div>
           )}
@@ -491,7 +493,7 @@ export default function Mesas() {
                   <Button variant="info" onClick={()=> { setCrearMasivaForm({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setMateriasMasivas([]); setShowCrearMasiva(true); }}>Crear masiva</Button>
                 </Col>
                 <Col sm="auto">
-                  <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', tipoMesa: 'EXAMEN' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
+                  <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
                 </Col>
               </Row>
             </Col>
@@ -576,6 +578,7 @@ export default function Mesas() {
                   }} /></th>
                   <th>Fecha</th>
                   <th>Materia</th>
+                  <th>Curso</th>
                   <th>Turno</th>
                   <th>Aula</th>
                   <th>Tipo</th>
@@ -596,6 +599,12 @@ export default function Mesas() {
                       : !notasCompletas
                         ? 'Faltan notas finales en algunos alumnos'
                         : '';
+                  // Obtener nombre del curso
+                  let cursoStr = '-';
+                  if (m.curso) {
+                    const c = m.curso;
+                    cursoStr = `${c.anio ?? ''}°${c.division ?? ''}`.trim();
+                  }
                   return (
                     <tr key={m.id}>
                       <td><Form.Check type="checkbox" checked={mesasSeleccionadas.has(m.id)} onChange={(e)=> {
@@ -609,6 +618,7 @@ export default function Mesas() {
                       }} /></td>
                       <td>{fmtDate(m.fecha)}</td>
                       <td>{m.materiaNombre || materiaNombrePorId.get(m.materiaCursoId) || '-'}</td>
+                      <td>{cursoStr}</td>
                       <td>{m.turnoNombre || turnoPorFecha(m.fecha) || '-'}</td>
                       <td>{aulaNombrePorId.get(m.aulaId) || '-'}</td>
                       <td>
@@ -650,7 +660,7 @@ export default function Mesas() {
                 })}
                 {mesasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center py-4 text-muted">No hay mesas para este curso</td>
+                    <td colSpan={10} className="text-center py-4 text-muted">No hay mesas para este curso</td>
                   </tr>
                 )}
               </tbody>
@@ -834,6 +844,18 @@ export default function Mesas() {
                   </Form.Select>
                 </Form.Group>
               </Col>
+              <Col md={3}>
+                <Form.Group>
+                  <Form.Label>Hora inicio (opcional)</Form.Label>
+                  <Form.Control type="time" value={crearMesaForm.horaInicio || ''} onChange={(e)=> setCrearMesaForm(f=>({...f, horaInicio: e.target.value}))} />
+                </Form.Group>
+              </Col>
+              <Col md={3}>
+                <Form.Group>
+                  <Form.Label>Hora fin (opcional)</Form.Label>
+                  <Form.Control type="time" value={crearMesaForm.horaFin || ''} onChange={(e)=> setCrearMesaForm(f=>({...f, horaFin: e.target.value}))} />
+                </Form.Group>
+              </Col>
               <Col md={6}>
                 <Form.Group>
                   <Form.Label>Tipo de mesa</Form.Label>
@@ -851,7 +873,7 @@ export default function Mesas() {
             </Row>
           </Form>
           <div className="mt-2 text-muted" style={{fontSize: '.85rem'}}>
-            Debe seleccionar un Curso y su Materia asociada. La Fecha debe caer dentro del rango del Turno.
+            Debe seleccionar un Curso y su Materia asociada. La Fecha debe caer dentro del rango del Turno. Los campos de Hora, Aula y detalles se pueden editar después en la gestión de la mesa.
           </div>
         </Modal.Body>
         <Modal.Footer>

@@ -8,6 +8,7 @@ import { useAuth } from "../Context/AuthContext";
 import { listarAlumnos, listarAlumnosEgresados, listarAlumnosExcluidos } from "../Services/AlumnoService";
 import { listarDocentes } from "../Services/DocenteService";
 import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "../Services/CursoService";
+import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { listarReservas } from "../Services/ReservaService";
 import { listarAsistenciaCursoPorFecha } from "../Services/AsistenciaAlumnoService";
 import { listarMateriasDeCurso } from "../Services/MateriaCursoService";
@@ -220,44 +221,89 @@ function DashboardDocente({ token, idDocente }) {
   const { data, loading, refresh } = useCachedFetch(`docenteDashboard-${idDocente}`, async () => {
     const cursos = await listarCursosPorDocente(token, idDocente)
     
-    // Cargar materias de cada curso
+    // Cargar materias y alumnos de cada curso
     const materiasData = await Promise.all(
       cursos.map(c => listarMateriasDeCurso(token, c.id).catch(() => []))
     )
+    const alumnosData = await Promise.all(
+      cursos.map(c => listarAlumnosPorCurso(token, c.id).catch(() => []))
+    )
     
-    const totalMaterias = materiasData.flat().length
-    const totalAlumnos = cursos.reduce((acc,c)=>acc+(c.alumnos?.length||0),0)
+    // Obtener solo las materias que el docente dicta (filtrar como en Calificaciones)
+    const materiasDelDocente = []
+    materiasData.forEach((materias, cursoIdx) => {
+      materias.forEach(m => {
+        // Filtrar solo las materias que este docente dicta
+        if (m.docente?.id === idDocente || m.docenteId === idDocente) {
+          materiasDelDocente.push({
+            nombre: m.nombreMateria || m.nombre || `Materia ${m.id}`,
+            curso: `${cursos[cursoIdx].anio}° ${cursos[cursoIdx].division}`,
+            id: m.id,
+            nombreMateria: m.nombreMateria || m.nombre
+          })
+        }
+      })
+    })
     
-    // Distribución de alumnos por curso
-    const alumnosPorCurso = cursos
-      .map(c => ({ name: `${c.anio}° ${c.division}`, value: c.alumnos?.length || 0 }))
-      .filter(x => x.value > 0)
+    // Obtener materias únicas (por nombre)
+    const materiasUnicas = new Map()
+    materiasDelDocente.forEach(m => {
+      if (!materiasUnicas.has(m.nombreMateria)) {
+        materiasUnicas.set(m.nombreMateria, { nombre: m.nombre, cursos: [m.curso] })
+      } else {
+        const existing = materiasUnicas.get(m.nombreMateria)
+        if (!existing.cursos.includes(m.curso)) {
+          existing.cursos.push(m.curso)
+        }
+      }
+    })
+    
+    const totalMaterias = materiasUnicas.size
+    // Sumar correctamente los alumnos de todos los cursos a cargo
+    const totalAlumnos = alumnosData.reduce((acc, alumnos) => {
+      return acc + (Array.isArray(alumnos) ? alumnos.length : 0)
+    }, 0);
+    
+    // Convertir a array para la gráfica
+    const materiasList = Array.from(materiasUnicas.entries()).map(([nombre, data]) => ({
+      name: nombre,
+      value: data.cursos.length
+    }))
     
     return { 
       cursos, 
       totalMaterias,
       totalAlumnos,
-      alumnosPorCurso
+      materiasList,
+      materiasDelDocente
     }
   }, 4*60_000)
 
   if (loading || !data) return <LoadingSkeleton blocks={3} />;
-  const { cursos, totalMaterias, totalAlumnos, alumnosPorCurso } = data
+  const { cursos, totalMaterias, totalAlumnos, materiasDelDocente } = data
 
   return (
     <>
       <div className="row g-4 mb-4">
         <div className="col-md-3"><KpiCard title="Mis Cursos" value={cursos.length} /></div>
-        <div className="col-md-3"><KpiCard title="Materias" value={totalMaterias} color="#20c997" /></div>
+        <div className="col-md-3"><KpiCard title="Materias asignadas" value={totalMaterias} color="#20c997" /></div>
         <div className="col-md-3"><KpiCard title="Alumnos totales" value={totalAlumnos} color="#6f42c1" /></div>
       </div>
       <div className="row g-4">
         <div className="col-md-6">
-          <ChartCard title="Distribución de alumnos por curso" right={<RefreshButton onClick={refresh} />}>
-            {alumnosPorCurso.length > 0 ? (
-              <SimpleBar data={alumnosPorCurso} />
+          <ChartCard title="Materias asignadas" right={<RefreshButton onClick={refresh} />}>
+            {materiasDelDocente.length > 0 ? (
+              <ul className="list-group list-group-flush">
+                {Array.from(
+                  new Map(materiasDelDocente.map(m => [m.nombre + m.curso, m])).values()
+                ).map((m, i) => (
+                  <li key={i} className="list-group-item">
+                    {m.nombre} <span className="text-muted">({m.curso})</span>
+                  </li>
+                ))}
+              </ul>
             ) : (
-              <div className="text-muted">Sin datos</div>
+              <div className="text-muted">Sin materias asignadas</div>
             )}
           </ChartCard>
         </div>
@@ -267,7 +313,7 @@ function DashboardDocente({ token, idDocente }) {
               {cursos.map((c, i) => (
                 <li key={i} className="list-group-item d-flex justify-content-between align-items-center">
                   <span>{c.anio}° {c.division}</span>
-                  <span className="badge bg-primary">{c.alumnos?.length || 0}</span>
+                  <span className="badge bg-primary">{c.alumnos?.length || 0} alumnos</span>
                 </li>
               ))}
             </ul>

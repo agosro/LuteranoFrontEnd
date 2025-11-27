@@ -189,7 +189,7 @@ function AppRoutes() {
         </Route>
 
         {/* Asistencia -> ADMIN, PRECEPTOR (alumnos). Docentes -> ADMIN */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_PRECEPTOR']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_PRECEPTOR', 'ROLE_DIRECTOR']} />}>
           <Route path="asistencia/alumnos" element={<AsistenciaAlumnos />} />
         </Route>
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_AUXILIAR']} />}>
@@ -202,7 +202,7 @@ function AppRoutes() {
         </Route>
 
         {/* Configuracion general */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR']} />}>
           <Route path="configuracion/importar-alumnos" element={<ImportarAlumnos />} />
           <Route path="configuracion/importar-calificaciones" element={<ImportarCalificaciones />} />
           {/* Gestionar espacios áulicos -> ADMIN, DIRECTOR, AUXILIAR */}
@@ -212,9 +212,7 @@ function AppRoutes() {
         </Route>
 
         {/* Habilitar acceso a Gestionar Espacios para DIRECTOR y AUXILIAR también */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_DIRECTOR', 'ROLE_AUXILIAR']} />}>
-          <Route path="configuracion/espacios-aulicos" element={<EspaciosAulicosGestion />} />
-        </Route>
+        
 
         {/* Ciclo lectivo -> ADMIN, DIRECTOR, PRECEPTOR (listar y seleccionar). Crear solo se habilita en UI para ADMIN/DIRECTOR */}
         <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_PRECEPTOR']} />}>
@@ -227,12 +225,15 @@ function AppRoutes() {
         </Route>
 
         {/* Espacios Áulicos */}
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DOCENTE', 'ROLE_PRECEPTOR', 'ROLE_DIRECTOR', 'ROLE_AUXILIAR']} />}>
           <Route path="espacios-aulicos/reservar" element={<ReservarEspacio />} />
           <Route path="espacios-aulicos/mis-reservas" element={<MisReservas />} />
         </Route>
-        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN']} />}>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_ADMIN', 'ROLE_DIRECTOR', 'ROLE_AUXILIAR']} />}>
           <Route path="espacios-aulicos/gestionar" element={<GestionarReservas />} />
+        </Route>
+        <Route element={<PrivateRoute allowedRoles={['ROLE_DIRECTOR', 'ROLE_ADMIN', 'ROLE_AUXILIAR']} />}>
+          <Route path="espacios-aulicos/espacios-aulicos" element={<EspaciosAulicosGestion />} />
         </Route>
         
       </Route>

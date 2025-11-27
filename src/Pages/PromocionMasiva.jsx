@@ -135,7 +135,7 @@ export default function PromocionMasiva() {
               <div className="mb-1 mt-2">
                 <strong>Ejemplos:</strong>
                 <ul className="mb-1 mt-2">
-                  <li><strong>0:</strong> Sin límite de repeticiones (los alumnos repiten indefinidamente)</li>
+                  <li><strong>0:</strong> No se permite ninguna repetición</li>
                   <li><strong>1:</strong> Máximo 1 repetición permitida por alumno</li>
                   <li><strong>3:</strong> Máximo 3 repeticiones permitidas por alumno</li>
                 </ul>

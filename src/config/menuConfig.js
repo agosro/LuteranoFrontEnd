@@ -47,10 +47,10 @@ export const menuConfig = [
     icon: FaDoorOpen,
     roles: ["ROLE_ADMIN", "ROLE_DOCENTE", "ROLE_PRECEPTOR", "ROLE_AUXILIAR"],
     subItems: [
-      { label: "Reservar", path: "/espacios-aulicos/reservar", roles: ["ROLE_ADMIN","ROLE_DOCENTE","ROLE_PRECEPTOR", "ROLE_DIRECTOR"] },
-      { label: "Mis Reservas", path: "/espacios-aulicos/mis-reservas", roles: ["ROLE_ADMIN","ROLE_DOCENTE","ROLE_PRECEPTOR", "ROLE_DIRECTOR"] },
-      { label: "Gestionar Reservas", path: "/espacios-aulicos/gestionar", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR"] },
-      { label: "Gestionar Espacios", path: "/configuracion/espacios-aulicos", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_AUXILIAR"] },
+      { label: "Reservar", path: "/espacios-aulicos/reservar", roles: ["ROLE_ADMIN","ROLE_DOCENTE","ROLE_PRECEPTOR", "ROLE_DIRECTOR", "ROLE_AUXILIAR"] },
+      { label: "Mis Reservas", path: "/espacios-aulicos/mis-reservas", roles: ["ROLE_ADMIN","ROLE_DOCENTE","ROLE_PRECEPTOR", "ROLE_DIRECTOR", "ROLE_AUXILIAR"] },
+      { label: "Gestionar Reservas", path: "/espacios-aulicos/gestionar", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR", "ROLE_AUXILIAR"] },
+      { label: "Gestionar Espacios", path: "/espacios-aulicos/espacios-aulicos", roles: ["ROLE_ADMIN", "ROLE_DIRECTOR","ROLE_AUXILIAR" ] },
     ],
   },
   {
