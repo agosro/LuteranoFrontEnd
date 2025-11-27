@@ -20,6 +20,13 @@ export const listarMaterias = async (token) => {
   return data.materiasDto || []
 };
 
+// Obtener una materia por ID
+export const obtenerMateriaPorId = async (token, id) => {
+  void token
+  const data = await httpClient.get(`/materias/${id}`)
+  return data.materia || null
+};
+
 // Eliminar una materia por ID
 export const eliminarMateria = async (token, id) => {
   void token

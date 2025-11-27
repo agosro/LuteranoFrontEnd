@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Table, Button, Form, Stack, Spinner } from "react-bootstrap";
 import ModalConfirmarEliminacion from "./ModalConfirmarEliminacion";
 
@@ -7,6 +7,11 @@ export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, 
   const [guardandoTodo, setGuardandoTodo] = useState(false);
   const [mostrarEliminar, setMostrarEliminar] = useState(false);
   const [objetivoEliminar, setObjetivoEliminar] = useState(null); // { alumnoId, numeroNota, califId, alumnoLabel }
+
+  // Limpiar notasEditadas cuando cambian los datos, materia o etapa
+  useEffect(() => {
+    setNotasEditadas({});
+  }, [datos, materiaId, etapa]);
 
   const handleNotaChange = (alumnoId, numeroNota, valor) => {
     // Validar que el valor esté entre 1 y 10, o vacío
@@ -93,6 +98,13 @@ export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, 
     const payloads = construirPayloadsParaAlumno(alumno);
 
     onGuardar(alumno.id, payloads);
+    
+    // Limpiar las notas editadas de este alumno después de guardar
+    setNotasEditadas((prev) => {
+      const nuevo = { ...prev };
+      delete nuevo[alumno.id];
+      return nuevo;
+    });
   };
 
   const lotes = useMemo(() => {
@@ -119,6 +131,8 @@ export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, 
     try {
       setGuardandoTodo(true);
       await onGuardarTodos(lotes);
+      // Limpiar todas las notas editadas después del guardado masivo
+      setNotasEditadas({});
     } finally {
       setGuardandoTodo(false);
     }

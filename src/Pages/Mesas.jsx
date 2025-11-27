@@ -109,16 +109,16 @@ export default function Mesas() {
     // Escuchar mensajes de la ventana hijo (GestionFechasMesas)
     const handleMessage = (event) => {
       if (event.origin === window.location.origin && event.data.action === 'reload-mesas') {
-        console.log('Recibido mensaje para recargar mesas - refrescando página');
-        // Recargar la página para obtener datos frescos del servidor
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
+        console.log('Recibido mensaje para recargar mesas - reconsultando datos');
+        // Re-fetch in place (sin F5) para mantener filtros y estado
+        buscarMesas();
+        toast.success('Mesas actualizadas');
       }
     };
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, cicloYear]);
 
   // Re-inicializar el formulario de crear mesa cuando se abre el modal

@@ -311,7 +311,8 @@ export default function GestionFechasMesas() {
         // Examen final: todas las divisiones de la misma materia y año van juntas
         key = `EXAMEN|${mesa.materiaNombre}|AÑO_${mesa.cursoAnio}`;
       } else {
-        // Coloquio: cada curso maneja su mesa por separado (fecha y jurado independientes)
+        // Coloquio: cada materia de cada curso es independiente
+        // pero debemos evitar choques de docentes y horarios para alumnos del mismo curso
         key = `COLOQUIO|${mesa.materiaNombre}|${mesa.cursoAnio}${mesa.cursoDivision}`;
       }
       
@@ -363,8 +364,12 @@ export default function GestionFechasMesas() {
     // Ocupación de aulas por fecha+hora y por aula: Map<"fecha|hora", Map<aulaId, claveGrupo>>
     const aulasOcupadasGlobal = new Map();
     // Preferencia de aula por materia (misma materia en distintos años usa siempre la misma aula)
-    const aulaPreferidaPorMateria = new Map(); // materiaNombre -> aulaId
-    let indiceAulaRR = 0; // round-robin para variedad entre materias
+    const aulaPreferidaPorMateria = new Map(); // materiaNombre -> aulaId (EXAMEN)
+    const aulaPreferidaPorCurso = new Map(); // cursoKey -> aulaId (COLOQUIO)
+    // Iniciar round-robin con offset aleatorio para variar selección
+    let indiceAulaRR = (Array.isArray(aulas) && aulas.length > 0)
+      ? Math.floor(Math.random() * aulas.length)
+      : 0; // round-robin para variedad entre materias/coloq.
 
     // Preferencia: separar días por año (misma cohorte en días distintos)
     const aniosPresentes = Array.from(new Set(gruposConDocentes.map(g => g.anio))).filter(Boolean);
@@ -379,43 +384,76 @@ export default function GestionFechasMesas() {
     gruposConDocentes.forEach((grupo, idx) => {
       // Encontrar el próximo slot disponible (priorizando separar días por año)
       const anioGrupo = grupo.anio;
+      const tipoGrupo = grupo.mesas[0]?.tipoMesa;
+      
       let diaIndexBase = inicioPorAnio.has(anioGrupo) ? inicioPorAnio.get(anioGrupo) : 0;
       let diaIndex = diaIndexBase;
       let turnoEnDia = 0;
       let encontrado = false;
       const fechasEvitadas = diasUsadosPorAnio.get(anioGrupo) || new Set();
-      
-      // 1) Intentar encontrar un día NO usado aún por este año
-      let recorridos = 0;
-      while (recorridos < diasDisponibles.length && !encontrado) {
-        const fecha = diasDisponibles[diaIndex].toISOString().split('T')[0];
-        const turnosEnEsteDia = turnosPorDia_Map.get(fecha) || [];
-        const diaNoUsadoPorAnio = !fechasEvitadas.has(fecha);
 
-        // Si este día no fue usado por el año y tiene cupo, usarlo
-        if (diaNoUsadoPorAnio && turnosEnEsteDia.length < turnosPorDia) {
-          turnoEnDia = turnosEnEsteDia.length;
-          encontrado = true;
-        } else {
-          // Probar el próximo día (round-robin simple)
-          diaIndex = (diaIndex + 1) % diasDisponibles.length;
-          recorridos++;
-        }
-      }
-      
-      // 2) Si no se encontró día distinto, permitir mismo día pero distinto turno
-      if (!encontrado) {
-        let i = 0;
-        while (i < diasDisponibles.length && !encontrado) {
+      if (tipoGrupo === 'COLOQUIO') {
+        // Coloquio: buscar slot que no choque con docentes ni con otras materias del mismo curso
+        const docentesGrupo = grupo.docentes || [];
+        const cursoKey = `${grupo.mesas[0]?.cursoAnio}${grupo.mesas[0]?.cursoDivision}`;
+        
+        for (let i = 0; i < diasDisponibles.length && !encontrado; i++) {
           const fecha = diasDisponibles[i].toISOString().split('T')[0];
           const turnosEnEsteDia = turnosPorDia_Map.get(fecha) || [];
-          if (turnosEnEsteDia.length < turnosPorDia) {
-            turnoEnDia = turnosEnEsteDia.length;
-            diaIndex = i;
-            encontrado = true;
-            break;
+          
+          // Probar cada turno del día
+          for (let t = 0; t < turnosPorDia && !encontrado; t++) {
+            // Verificar si este turno ya existe
+            const turnoExistente = turnosEnEsteDia[t];
+            if (turnoExistente) {
+              // Verificar conflicto de docentes
+              const hayConflictoDocente = docentesGrupo.some(d => turnoExistente.docentesOcupados?.has(d));
+              // Verificar conflicto de curso (alumnos no pueden estar en dos lugares a la vez)
+              const hayConflictoCurso = turnoExistente.cursosOcupados?.has(cursoKey);
+              
+              if (!hayConflictoDocente && !hayConflictoCurso) {
+                // Puede usar este turno compartido
+                turnoEnDia = t;
+                diaIndex = i;
+                encontrado = true;
+              }
+            } else {
+              // Turno libre, lo puede usar
+              turnoEnDia = t;
+              diaIndex = i;
+              encontrado = true;
+            }
           }
-          i++;
+        }
+      } else {
+        // EXAMEN: mantener estrategia de separar días por año
+        let recorridos = 0;
+        while (recorridos < diasDisponibles.length && !encontrado) {
+          const fecha = diasDisponibles[diaIndex].toISOString().split('T')[0];
+          const turnosEnEsteDia = turnosPorDia_Map.get(fecha) || [];
+          const diaNoUsadoPorAnio = !fechasEvitadas.has(fecha);
+
+          if (diaNoUsadoPorAnio && turnosEnEsteDia.length < turnosPorDia) {
+            turnoEnDia = turnosEnEsteDia.length;
+            encontrado = true;
+          } else {
+            diaIndex = (diaIndex + 1) % diasDisponibles.length;
+            recorridos++;
+          }
+        }
+        if (!encontrado) {
+          let i = 0;
+          while (i < diasDisponibles.length && !encontrado) {
+            const fecha = diasDisponibles[i].toISOString().split('T')[0];
+            const turnosEnEsteDia = turnosPorDia_Map.get(fecha) || [];
+            if (turnosEnEsteDia.length < turnosPorDia) {
+              turnoEnDia = turnosEnEsteDia.length;
+              diaIndex = i;
+              encontrado = true;
+              break;
+            }
+            i++;
+          }
         }
       }
 
@@ -436,9 +474,9 @@ export default function GestionFechasMesas() {
       horaBase.setMinutes(horaBase.getMinutes() + (turnoEnDia * intervaloMinutos));
       const hora = horaBase.toTimeString().substring(0, 5);
       
-      // Calcular hora fin (suma 2 horas a la hora inicio)
+      // Calcular hora fin según intervalo del usuario
       const horaFinBase = new Date(horaBase);
-      horaFinBase.setHours(horaFinBase.getHours() + 2);
+      horaFinBase.setMinutes(horaFinBase.getMinutes() + intervaloMinutos);
       const horaFin = horaFinBase.toTimeString().substring(0, 5);
       
       // Buscar aula disponible: debe estar libre en esta FECHA y HORA
@@ -447,28 +485,86 @@ export default function GestionFechasMesas() {
       
       let aulaDisponible = null;
       if (asignarAulasAleatorias && Array.isArray(aulas) && aulas.length > 0) {
-        const matNombre = grupo.materiaNombre || (grupo.mesas[0]?.materiaNombre);
-        const preferidaId = matNombre ? aulaPreferidaPorMateria.get(matNombre) : null;
-
-        // 1) Si hay preferida para esta materia y está libre, usarla
-        if (preferidaId && !ocupacionEnHorario.has(Number(preferidaId))) {
-          aulaDisponible = aulas.find(a => Number(a.id) === Number(preferidaId)) || null;
-        }
-
-        // 2) Si no hay preferida o está ocupada, elegir por round-robin la primera libre
-        if (!aulaDisponible) {
-          const start = indiceAulaRR % aulas.length;
-          for (let k = 0; k < aulas.length; k++) {
-            const idxAula = (start + k) % aulas.length;
-            const aula = aulas[idxAula];
-            if (!ocupacionEnHorario.has(Number(aula.id))) {
-              aulaDisponible = aula;
-              // Si no había preferida para esta materia, fijarla ahora para garantizar consistencia futura
-              if (matNombre && !preferidaId) {
-                aulaPreferidaPorMateria.set(matNombre, Number(aula.id));
-                indiceAulaRR = (idxAula + 1) % aulas.length; // avanzar RR para variedad
+        
+        if (tipoGrupo === 'COLOQUIO') {
+          // Preferencia por CURSO para Coloquio
+          const cursoKey = `CURSO_${grupo.mesas[0]?.cursoAnio}${grupo.mesas[0]?.cursoDivision}`;
+          const preferidaCursoId = cursoKey ? aulaPreferidaPorCurso.get(cursoKey) : null;
+          // 1) Si hay preferida para este curso y está libre, usarla
+          if (preferidaCursoId && !ocupacionEnHorario.has(Number(preferidaCursoId))) {
+            aulaDisponible = aulas.find(a => Number(a.id) === Number(preferidaCursoId)) || null;
+          }
+          // 2) Si no hay preferida o está ocupada, elegir por round-robin la primera libre
+          //    que NO esté ya reservada por otro curso (para que los cursos tengan aulas distintas).
+          if (!aulaDisponible) {
+            const aulasReservadasPorCursos = new Set(Array.from(aulaPreferidaPorCurso.values()).map(Number));
+            // Selección aleatoria entre candidatas válidas
+            const candidatas = aulas.filter(a => {
+              const idn = Number(a.id);
+              return !ocupacionEnHorario.has(idn) && !aulasReservadasPorCursos.has(idn);
+            });
+            if (candidatas.length > 0) {
+              const idx = Math.floor(Math.random() * candidatas.length);
+              aulaDisponible = candidatas[idx];
+              const aulaIdNum = Number(aulaDisponible.id);
+              if (cursoKey && !preferidaCursoId) {
+                aulaPreferidaPorCurso.set(cursoKey, aulaIdNum);
               }
-              break;
+            } else {
+              // Si no hay candidatas exclusivas, usar round-robin entre libres
+              const start = indiceAulaRR % aulas.length;
+              for (let k = 0; k < aulas.length; k++) {
+                const idxAula = (start + k) % aulas.length;
+                const aula = aulas[idxAula];
+                const aulaIdNum = Number(aula.id);
+                if (!ocupacionEnHorario.has(aulaIdNum)) {
+                  aulaDisponible = aula;
+                  if (cursoKey && !aulaPreferidaPorCurso.has(cursoKey)) {
+                    aulaPreferidaPorCurso.set(cursoKey, aulaIdNum);
+                  }
+                  indiceAulaRR = (idxAula + 1) % aulas.length;
+                  break;
+                }
+              }
+            }
+          }
+          // 3) Fallback: si todas las aulas ya están reservadas por otros cursos, tomar cualquiera libre en el horario
+          if (!aulaDisponible) {
+            const start = indiceAulaRR % aulas.length;
+            for (let k = 0; k < aulas.length; k++) {
+              const idxAula = (start + k) % aulas.length;
+              const aula = aulas[idxAula];
+              const aulaIdNum = Number(aula.id);
+              if (!ocupacionEnHorario.has(aulaIdNum)) {
+                aulaDisponible = aula;
+                if (cursoKey && !aulaPreferidaPorCurso.has(cursoKey)) {
+                  aulaPreferidaPorCurso.set(cursoKey, aulaIdNum);
+                }
+                indiceAulaRR = (idxAula + 1) % aulas.length;
+                break;
+              }
+            }
+          }
+        } else {
+          // EXAMEN: preferencia por materia
+          const matNombre = grupo.materiaNombre || (grupo.mesas[0]?.materiaNombre);
+          const preferidaId = matNombre ? aulaPreferidaPorMateria.get(matNombre) : null;
+          if (preferidaId && !ocupacionEnHorario.has(Number(preferidaId))) {
+            aulaDisponible = aulas.find(a => Number(a.id) === Number(preferidaId)) || null;
+          }
+          if (!aulaDisponible) {
+            const start = indiceAulaRR % aulas.length;
+            for (let k = 0; k < aulas.length; k++) {
+              const idxAula = (start + k) % aulas.length;
+              const aula = aulas[idxAula];
+              if (!ocupacionEnHorario.has(Number(aula.id))) {
+                aulaDisponible = aula;
+                if (matNombre && !preferidaId) {
+                  aulaPreferidaPorMateria.set(matNombre, Number(aula.id));
+                  indiceAulaRR = (idxAula + 1) % aulas.length;
+                }
+                break;
+              }
             }
           }
         }
@@ -483,22 +579,41 @@ export default function GestionFechasMesas() {
         aulasOcupadasGlobal.get(claveHorario).set(Number(aulaDisponible.id), grupo.materia);
       }
       
-      // Crear nuevo turno
-      const nuevoTurno = {
-        fecha,
-        hora,
-        docentesOcupados: new Set(grupo.docentes),
-        aulasOcupadas: (aulaDisponible) ? new Set([Number(aulaDisponible.id)]) : new Set()
-      };
+      // Crear o actualizar turno
+      const cursoKey = `${grupo.mesas[0]?.cursoAnio}${grupo.mesas[0]?.cursoDivision}`;
+      const turnosExistentes = turnosPorDia_Map.get(fecha) || [];
+      const turnoExistente = turnosExistentes[turnoEnDia];
       
-      // Agregar turno al mapa de días
+      if (turnoExistente) {
+        // Agregar docentes y curso a turno existente
+        grupo.docentes.forEach(d => turnoExistente.docentesOcupados.add(d));
+        if (tipoGrupo === 'COLOQUIO') {
+          turnoExistente.cursosOcupados = turnoExistente.cursosOcupados || new Set();
+          turnoExistente.cursosOcupados.add(cursoKey);
+        }
+        if (aulaDisponible) turnoExistente.aulasOcupadas.add(Number(aulaDisponible.id));
+      } else {
+        // Crear nuevo turno
+        const nuevoTurno = {
+          fecha,
+          hora,
+          docentesOcupados: new Set(grupo.docentes),
+          aulasOcupadas: (aulaDisponible) ? new Set([Number(aulaDisponible.id)]) : new Set(),
+          cursosOcupados: (tipoGrupo === 'COLOQUIO') ? new Set([cursoKey]) : new Set()
+        };
+        turnosExistentes[turnoEnDia] = nuevoTurno;
+      }
+      
+      // Actualizar mapa de días
       if (!turnosPorDia_Map.has(fecha)) {
         turnosPorDia_Map.set(fecha, []);
       }
-      turnosPorDia_Map.get(fecha).push(nuevoTurno);
+      if (!turnoExistente) {
+        turnosPorDia_Map.set(fecha, turnosExistentes);
+      }
 
       // Marcar el día como usado por este año (preferencia de separación)
-      if (!fechasEvitadas.has(fecha)) {
+      if (tipoGrupo !== 'COLOQUIO' && !fechasEvitadas.has(fecha)) {
         fechasEvitadas.add(fecha);
         diasUsadosPorAnio.set(anioGrupo, fechasEvitadas);
         // Avanzar el índice base de este anio para próximas asignaciones
@@ -631,6 +746,17 @@ Próximos pasos:
         return false;
       }
       
+      // Pre-calcular mesa representante por grupo EXAMEN (materia+turno) para asignar docentes solo una vez
+      const representantesExamen = new Map(); // key -> mesaId
+      mesasAGuardar
+        .filter(m => m.tipoMesa === 'EXAMEN' && m.turnoId && m.materiaNombre)
+        .forEach(m => {
+          const key = `${m.materiaNombre}|${m.turnoId}`;
+          if (!representantesExamen.has(key) || m.id < representantesExamen.get(key)) {
+            representantesExamen.set(key, m.id);
+          }
+        });
+
       // Proceder a guardar (permitir guardar aula aunque no tenga fecha/hora)
       for (const mesa of mesasAGuardar) {
         try {
@@ -641,16 +767,6 @@ Próximos pasos:
           // Respetar horaFin si el usuario la definió; si no, calcular sólo si hay horaInicio
           if (mesa.horaFin && mesa.horaFin.trim() !== '') {
             updatePayload.horaFin = mesa.horaFin;
-          } else if (updatePayload.horaInicio) {
-            try {
-              const [hh, mm] = updatePayload.horaInicio.split(':').map(Number);
-              const fechaTmp = new Date();
-              fechaTmp.setHours(hh, mm, 0, 0);
-              fechaTmp.setHours(fechaTmp.getHours() + 2);
-              updatePayload.horaFin = fechaTmp.toTimeString().substring(0, 5);
-            } catch {
-              console.warn(`Mesa ${mesa.id}: no se pudo calcular horaFin automáticamente`);
-            }
           }
           if (mesa.aulaId) updatePayload.aulaId = Number(mesa.aulaId);
           // No enviar tipoMesa/estado aquí; no cambian en esta vista
@@ -680,6 +796,14 @@ Próximos pasos:
                 console.warn(`Mesa ${mesa.id} (EXAMEN): Tiene ${mesa.docentesIds.length} docentes, se requieren 3. Se omite asignación.`);
                 continue;
               }
+              // Verificar si esta mesa es la representante del grupo (materia+turno)
+              const keyGrupo = `${mesa.materiaNombre}|${mesa.turnoId}`;
+              const representanteId = representantesExamen.get(keyGrupo);
+              if (representanteId && representanteId !== mesa.id) {
+                // No asignar en no-representantes: backend copiará docentes tras sincronización
+                console.log(`Mesa ${mesa.id} (EXAMEN): no representante, se omite asignación directa de docentes.`);
+                continue;
+              }
             }
             
             // Para coloquios, validar que tenga exactamente 1 docente
@@ -688,6 +812,14 @@ Próximos pasos:
                 console.warn(`Mesa ${mesa.id} (COLOQUIO): Tiene ${mesa.docentesIds.length} docentes, se requiere 1. Se omite asignación.`);
                 continue;
               }
+            }
+
+            // Verificar conflictos locales de horario (docente ya asignado a otra mesa en intervalo solapado)
+            const conflictosLocales = detectarConflictosDocentesLocal(mesa, mesasAGuardar, representantesExamen);
+            if (conflictosLocales.length) {
+              console.warn(`Mesa ${mesa.id}: Conflictos locales con docentes ${conflictosLocales.join(', ')}. Se omite asignación para evitar 422.`);
+              errores.push(`Mesa ${mesa.id}: conflicto local docentes (${conflictosLocales.join(', ')})`);
+              continue;
             }
             
             console.log(`Asignando ${mesa.docentesIds.length} docentes a mesa ${mesa.id}`);
@@ -762,16 +894,6 @@ Próximos pasos:
       if (mesa.hora && mesa.hora.trim() !== '') updatePayload.horaInicio = mesa.hora;
       if (mesa.horaFin && mesa.horaFin.trim() !== '') {
         updatePayload.horaFin = mesa.horaFin;
-      } else if (updatePayload.horaInicio) {
-        try {
-          const [hh, mm] = updatePayload.horaInicio.split(':').map(Number);
-          const fechaTmp = new Date();
-          fechaTmp.setHours(hh, mm, 0, 0);
-          fechaTmp.setHours(fechaTmp.getHours() + 2);
-          updatePayload.horaFin = fechaTmp.toTimeString().substring(0, 5);
-        } catch {
-          console.warn(`Mesa ${mesa.id}: no se pudo calcular horaFin automáticamente`);
-        }
       }
       if (mesa.aulaId) updatePayload.aulaId = Number(mesa.aulaId);
 
@@ -787,12 +909,34 @@ Próximos pasos:
       if (mesa.docentesIds && mesa.fecha && mesa.hora) {
         const cant = mesa.tipoMesa === 'COLOQUIO' ? 1 : 3;
         if (mesa.docentesIds.length === cant) {
+          // Preparar representantes (solo para fila individual si no existe map global)
+          const representantesExamen = new Map();
+          mesas
+            .filter(m => m.tipoMesa === 'EXAMEN' && m.turnoId && m.materiaNombre)
+            .forEach(m => {
+              const key = `${m.materiaNombre}|${m.turnoId}`;
+              if (!representantesExamen.has(key) || m.id < representantesExamen.get(key)) {
+                representantesExamen.set(key, m.id);
+              }
+            });
+          if (mesa.tipoMesa === 'EXAMEN') {
+            const repId = representantesExamen.get(`${mesa.materiaNombre}|${mesa.turnoId}`);
+            if (repId && repId !== mesa.id) {
+              toast.info(`Mesa ${mesa.id}: no representante del grupo, no se asignan docentes aquí.`);
+              return;
+            }
+          }
+          const conflictosLocales = detectarConflictosDocentesLocal(mesa, mesas, representantesExamen);
+          if (conflictosLocales.length) {
+            toast.error(`Mesa ${mesa.id}: conflicto horario docentes (${conflictosLocales.join(', ')})`);
+          } else {
           await asignarDocentes(token, mesa.id, mesa.docentesIds);
           try {
             const mRefrescada = await obtenerMesa(token, mesa.id);
             sincronizarEstadoLocalConMesa(mRefrescada, mesa.docentesIds);
           } catch (e) {
             console.warn('No se pudo refrescar mesa luego de asignar docentes:', e);
+          }
           }
         }
       }
@@ -846,6 +990,42 @@ Próximos pasos:
       }
       return m;
     }));
+  };
+
+  // Detecta conflictos locales entre docentes de una mesa y otras mesas en memoria.
+  // Requiere horaInicio (hora) y horaFin para evaluar superposición. Si falta horaFin se omite.
+  const detectarConflictosDocentesLocal = (mesaObjetivo, conjuntoMesas) => {
+    if (!mesaObjetivo || !Array.isArray(mesaObjetivo.docentesIds) || mesaObjetivo.docentesIds.length === 0) return [];
+    if (!mesaObjetivo.fecha || !mesaObjetivo.hora || !mesaObjetivo.horaFin) return [];
+    const fechaObj = mesaObjetivo.fecha;
+    const [sH, sM] = mesaObjetivo.hora.split(':').map(Number);
+    const [eH, eM] = mesaObjetivo.horaFin.split(':').map(Number);
+    const inicioMin = sH * 60 + sM;
+    const finMin = eH * 60 + eM;
+    const conflictos = new Set();
+    conjuntoMesas.forEach(m => {
+      if (m.id === mesaObjetivo.id) return;
+      if (!m.fecha || !m.hora || !m.horaFin) return;
+      if (m.fecha !== fechaObj) return;
+      // Si ambos son EXAMEN y pertenecen al mismo grupo materia+turno, ignorar (se asigna solo representante)
+      if (mesaObjetivo.tipoMesa === 'EXAMEN' && m.tipoMesa === 'EXAMEN' && mesaObjetivo.materiaNombre === m.materiaNombre && mesaObjetivo.turnoId === m.turnoId) {
+        // Ignorar este potencial "conflicto" interno del grupo
+        return;
+      }
+      // Evaluar superposición de intervalos
+      const [msH, msM] = m.hora.split(':').map(Number);
+      const [meH, meM] = m.horaFin.split(':').map(Number);
+      const mInicio = msH * 60 + msM;
+      const mFin = meH * 60 + meM;
+      const seSolapan = inicioMin < mFin && mInicio < finMin;
+      if (!seSolapan) return;
+      // Comprobar docentes compartidos
+      const ids = Array.isArray(m.docentesIds) ? m.docentesIds : [];
+      ids.forEach(dId => {
+        if (mesaObjetivo.docentesIds.includes(dId)) conflictos.add(dId);
+      });
+    });
+    return Array.from(conflictos);
   };
 
   // Filtrar mesas por tipo, búsqueda y filtros adicionales
