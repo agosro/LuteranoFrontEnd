@@ -47,10 +47,8 @@ export default function Mesas() {
   // Paginación
   const [pagina, setPagina] = useState(1);
   const pageSize = 10;
-
-  // Estado antiguo de creación inline eliminado; nuevo modal de creación:
   const [showCrearMesa, setShowCrearMesa] = useState(false);
-  const [crearMesaForm, setCrearMesaForm] = useState({ anio: '', cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' });
+  const [crearMesaForm, setCrearMesaForm] = useState({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' });
   const [turnosPorAnio, setTurnosPorAnio] = useState(new Map()); // anio -> turnos
   const [crearMesaLoading, setCrearMesaLoading] = useState(false);
   const [crearMesaError, setCrearMesaError] = useState('');
@@ -58,6 +56,7 @@ export default function Mesas() {
   // Creación masiva
   const [showCrearMasiva, setShowCrearMasiva] = useState(false);
   const [crearMasivaForm, setCrearMasivaForm] = useState({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] });
+  const [crearMasivaAnio, setCrearMasivaAnio] = useState(cicloYear);
   const [crearMasivaLoading, setCrearMasivaLoading] = useState(false);
   const [crearMasivaError, setCrearMasivaError] = useState('');
   const [crearMasivaResultado, setCrearMasivaResultado] = useState(null);
@@ -106,7 +105,27 @@ export default function Mesas() {
         toast.error(e.message);
       }
     })();
+    
+    // Escuchar mensajes de la ventana hijo (GestionFechasMesas)
+    const handleMessage = (event) => {
+      if (event.origin === window.location.origin && event.data.action === 'reload-mesas') {
+        console.log('Recibido mensaje para recargar mesas - refrescando página');
+        // Recargar la página para obtener datos frescos del servidor
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, [token, cicloYear]);
+
+  // Re-inicializar el formulario de crear mesa cuando se abre el modal
+  const abrirCrearMesa = () => {
+    setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' });
+    setShowCrearMesa(true);
+  };
 
   const buscarMesas = async () => {
     setLoading(true);
@@ -188,7 +207,7 @@ export default function Mesas() {
       await refreshMesas();
       toast.success('Mesa creada');
       setShowCrearMesa(false);
-      setCrearMesaForm({ cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' });
+      setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' });
     } catch (e) {
       setCrearMesaError(e.message || 'No se pudo crear la mesa');
       toast.error(e.message);
@@ -359,12 +378,20 @@ export default function Mesas() {
 
   // Abrir gestión de fechas en nueva pestaña
   const abrirGestionFechas = () => {
+    // Filtrar solo mesas en estado CREADA (excluir finalizadas)
+    const mesasCreadas = mesasFiltradas.filter(m => m.estado === 'CREADA');
+    
+    if (mesasCreadas.length === 0) {
+      toast.warn('No hay mesas en estado CREADA para gestionar. Las mesas finalizadas no se pueden modificar.');
+      return;
+    }
+    
     const url = '/mesa-de-examen/gestion-fechas';
     const newWindow = window.open(url, '_blank');
     if (newWindow) {
-      // Esperar a que la ventana cargue y enviar los datos
+      // Esperar a que la ventana cargue y enviar solo las mesas CREADAS
       newWindow.addEventListener('load', () => {
-        newWindow.postMessage({ mesas: mesasFiltradas }, window.location.origin);
+        newWindow.postMessage({ mesas: mesasCreadas }, window.location.origin);
       });
     }
   };
@@ -490,10 +517,10 @@ export default function Mesas() {
                   </Col>
                 )}
                 <Col sm="auto">
-                  <Button variant="info" onClick={()=> { setCrearMasivaForm({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setMateriasMasivas([]); setShowCrearMasiva(true); }}>Crear masiva</Button>
+                  <Button variant="info" onClick={()=> { setCrearMasivaAnio(cicloYear); setCrearMasivaForm({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setMateriasMasivas([]); setShowCrearMasiva(true); }}>Crear masiva</Button>
                 </Col>
                 <Col sm="auto">
-                  <Button variant="success" onClick={()=> { setCrearMesaForm({ anio: String(cicloYear), cursoId: '', materiaCursoId: '', turnoId: '', fecha: '', aulaId: '', horaInicio: '', horaFin: '', tipoMesa: 'EXAMEN' }); setCrearMesaError(''); setShowCrearMesa(true); }}>Crear mesa</Button>
+                  <Button variant="success" onClick={abrirCrearMesa}>Crear mesa</Button>
                 </Col>
               </Row>
             </Col>
@@ -921,10 +948,28 @@ export default function Mesas() {
             <Row className="g-3">
               <Col md={6}>
                 <Form.Group>
+                  <Form.Label>Año</Form.Label>
+                  <Form.Control type="number" min={2000} max={2100} value={crearMasivaAnio}
+                    onChange={async (e)=> {
+                      const anioNuevo = Number(e.target.value);
+                      setCrearMasivaAnio(anioNuevo);
+                      setCrearMasivaForm(f=>({...f, turnoId: '' }));
+                      if (!anioNuevo) return;
+                      if (!turnosPorAnio.has(String(anioNuevo))) {
+                        try {
+                          const ts = await listarTurnos(token, anioNuevo);
+                          setTurnosPorAnio(prev => new Map(prev).set(String(anioNuevo), ts));
+                        } catch { /* ignore */ }
+                      }
+                    }} />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
                   <Form.Label>Turno *</Form.Label>
                   <Form.Select value={crearMasivaForm.turnoId} onChange={(e)=> setCrearMasivaForm(f=>({...f, turnoId: e.target.value}))}>
                     <option value="">-- Seleccionar --</option>
-                    {turnos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                    {(turnosPorAnio.get(String(crearMasivaAnio)) || []).map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                   </Form.Select>
                   <Form.Text className="text-muted">
                     El año lectivo se determina automáticamente según el turno

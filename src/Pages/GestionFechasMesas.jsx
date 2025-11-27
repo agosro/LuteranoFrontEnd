@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Container, Row, Col, Card, Table, Form, Button, Alert, Spinner, Badge, Nav, Modal, ListGroup, Pagination } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useAuth } from '../Context/AuthContext';
-import { actualizarMesa } from '../Services/MesaExamenService';
+import { actualizarMesa, obtenerMesa } from '../Services/MesaExamenService';
 import { listarDocentesAsignados, asignarDocentes } from '../Services/MesaExamenDocenteService';
 import { listarAulas } from '../Services/AulaService';
 
@@ -66,17 +66,27 @@ export default function GestionFechasMesas() {
     try {
       setLoading(true);
       
-      // Cargar aulas de cursos (filtrar solo las que tienen curso asignado y están activas)
-      const aulasData = await listarAulas(token);
-      const aulasDeCursos = (aulasData || []).filter(aula => aula.activo && aula.cursoId);
+      // Filtrar solo mesas con estado CREADA (excluir finalizadas)
+      const mesasCreadas = mesasIniciales.filter(m => m.estado === 'CREADA');
       
-      setAulas(aulasDeCursos);
-      console.log('Aulas de cursos cargadas:', aulasDeCursos);
+      if (mesasCreadas.length === 0) {
+        toast.warn('No hay mesas en estado CREADA para gestionar');
+        setLoading(false);
+        return;
+      }
+      
+      // Cargar todas las aulas disponibles desde el backend
+      // NOTA: No filtrar por cursoId/activo aquí, para mantener consistencia con MesaGestion
+      const aulasData = await listarAulas(token).catch(() => []);
+      const listaAulas = Array.isArray(aulasData) ? aulasData : [];
+      setAulas(listaAulas);
+      console.log('Aulas cargadas:', listaAulas);
+      console.log('Mesas CREADAS a gestionar:', mesasCreadas.length);
 
       // Cargar docentes disponibles y asignados para cada mesa
       const docentesMap = new Map();
       const mesasConDocentes = await Promise.all(
-        mesasIniciales.map(async (mesa) => {
+        mesasCreadas.map(async (mesa) => {
           try {
             // Solo cargar docentes asignados inicialmente
             const docentesAsignados = await listarDocentesAsignados(token, mesa.id).catch(() => []);
@@ -96,7 +106,8 @@ export default function GestionFechasMesas() {
               docentesIds: docentesAsignados && docentesAsignados.map ? docentesAsignados.map(d => d.id) : [],
               cursoAnio: cursoAnio,
               cursoDivision: cursoDivision,
-              materiaNombre: mesa.materiaNombre || 'Sin nombre'
+              materiaNombre: mesa.materiaNombre || 'Sin nombre',
+              turnoId: mesa.turnoId
             };
           } catch {
             const cursoAnio = mesa.curso && mesa.curso.anio ? mesa.curso.anio : '';
@@ -110,7 +121,8 @@ export default function GestionFechasMesas() {
               docentesIds: [],
               cursoAnio: cursoAnio,
               cursoDivision: cursoDivision,
-              materiaNombre: mesa.materiaNombre || 'Sin nombre'
+              materiaNombre: mesa.materiaNombre || 'Sin nombre',
+              turnoId: mesa.turnoId
             };
           }
         })
@@ -147,35 +159,47 @@ export default function GestionFechasMesas() {
 
   const asignarDocentesAExamenes = async () => {
     try {
-      // Asignar docentes adicionales a exámenes finales que ya tienen fecha/hora
-      const mesasActualizadas = await Promise.all(mesas.map(async (mesa) => {
-        // Solo procesar exámenes finales
-        if (mesa.tipoMesa !== 'EXAMEN') {
-          return mesa;
+      // Agrupar mesas de examen final por materia + AÑO (todas las divisiones del mismo año van juntas)
+      // Ej: Matemática 1°A, 1°B, 1°C → todos comparten docentes
+      const gruposPorMateriaYAnio = new Map();
+      
+      mesas.forEach(mesa => {
+        if (mesa.tipoMesa === 'EXAMEN' && mesa.fecha && mesa.hora) {
+          // Usar AÑO para agrupar, no TURNO
+          const key = `${mesa.materiaNombre}|AÑO_${mesa.cursoAnio}`;
+          if (!gruposPorMateriaYAnio.has(key)) {
+            gruposPorMateriaYAnio.set(key, []);
+          }
+          gruposPorMateriaYAnio.get(key).push(mesa);
         }
+      });
 
-        // Solo si tiene fecha y hora asignadas
-        if (!mesa.fecha || !mesa.hora) {
-          return mesa;
+      // Para cada grupo, asignar los MISMOS docentes a todas las mesas del grupo
+      const docentesPorGrupo = new Map(); // key -> [docenteIds]
+      
+      for (const [key, mesasDelGrupo] of gruposPorMateriaYAnio.entries()) {
+        // Tomar la primera mesa del grupo como referencia
+        const mesaReferencia = mesasDelGrupo[0];
+        
+        // Si ya tiene 3 docentes, usar esos para todo el grupo
+        if (mesaReferencia.docentesIds && mesaReferencia.docentesIds.length >= 3) {
+          docentesPorGrupo.set(key, mesaReferencia.docentesIds);
+          continue;
         }
-
-        // Verificar si ya tiene 3 docentes asignados
-        if (mesa.docentesIds && mesa.docentesIds.length >= 3) {
-          return mesa; // Ya tiene todos los docentes
-        }
-
+        
         try {
-          // Cargar docentes disponibles de esta mesa (backend verifica conflictos)
+          // Cargar docentes disponibles para esta mesa
           const { listarDocentesDisponibles } = await import('../Services/MesaExamenDocenteService');
-          const docentesDisponibles = await listarDocentesDisponibles(token, mesa.id);
+          const docentesDisponibles = await listarDocentesDisponibles(token, mesaReferencia.id);
           
           if (!docentesDisponibles || docentesDisponibles.length === 0) {
-            return mesa;
+            console.warn(`Grupo ${key}: No hay docentes disponibles`);
+            continue;
           }
 
-          // Obtener TODOS los titulares (pueden ser 1 o 2)
+          // Obtener TODOS los titulares
           const titulares = docentesDisponibles.filter(d => d.daLaMateria);
-          const idsAsignados = new Set(mesa.docentesIds || []);
+          const idsAsignados = new Set(mesaReferencia.docentesIds || []);
           
           // Asegurar que todos los titulares estén incluidos
           titulares.forEach(t => idsAsignados.add(t.id));
@@ -188,7 +212,7 @@ export default function GestionFechasMesas() {
             const otrosDocentes = docentesDisponibles.filter(d => 
               !d.daLaMateria && 
               !idsAsignados.has(d.id) &&
-              !d.tieneConflictoHorario // Backend ya verificó esto
+              !d.tieneConflictoHorario
             );
 
             // Mezclar y tomar los necesarios
@@ -199,15 +223,31 @@ export default function GestionFechasMesas() {
             otrosAleatorios.forEach(d => idsAsignados.add(d.id));
           }
 
-          return {
-            ...mesa,
-            docentesIds: Array.from(idsAsignados)
-          };
+          // Guardar estos docentes para todo el grupo
+          docentesPorGrupo.set(key, Array.from(idsAsignados));
+          
+          console.log(`Grupo ${key}: ${mesasDelGrupo.length} mesas compartirán ${idsAsignados.size} docentes`);
         } catch (error) {
-          console.error(`Error asignando docentes a mesa ${mesa.id}:`, error);
-          return mesa;
+          console.error(`Error asignando docentes al grupo ${key}:`, error);
         }
-      }));
+      }
+      
+      // Actualizar todas las mesas con los docentes de su grupo
+      const mesasActualizadas = mesas.map(mesa => {
+        if (mesa.tipoMesa === 'EXAMEN' && mesa.fecha && mesa.hora) {
+          // Usar la MISMA clave (AÑO) que se usó en la agrupación
+          const key = `${mesa.materiaNombre}|AÑO_${mesa.cursoAnio}`;
+          const docentesDelGrupo = docentesPorGrupo.get(key);
+          
+          if (docentesDelGrupo && docentesDelGrupo.length === 3) {
+            return {
+              ...mesa,
+              docentesIds: docentesDelGrupo
+            };
+          }
+        }
+        return mesa;
+      });
 
       setMesas(mesasActualizadas);
       
@@ -251,18 +291,25 @@ export default function GestionFechasMesas() {
       return;
     }
 
-    // Agrupar por materia y turno para exámenes finales, solo por materia+curso para coloquios
+    // Agrupar por materia y año para exámenes finales (las Matemática 1°A, 1°B, 1°C comparten fecha/hora/docentes)
+    // Para coloquios: agrupar por materia + curso (cada curso es completamente independiente)
     const gruposPorMateria = new Map();
     // Filtrar solo las mesas del tipo activo (pestaña seleccionada)
     const mesasADistribuir = mesas.filter(m => m.tipoMesa === tipoMesaActiva);
     
+    if (mesasADistribuir.length === 0) {
+      toast.warn(`No hay mesas de tipo ${tipoMesaActiva} para distribuir`);
+      return;
+    }
+    
     mesasADistribuir.forEach(mesa => {
-      // Para exámenes finales: agrupar por materia + turno (se sincronizan entre divisiones)
+      // Para exámenes finales: agrupar por materia + año (1°, 2°, 3°, etc)
+      // Todas las divisiones de Matemática 1° (1°A, 1°B, 1°C) comparten fecha, hora y docentes
       // Para coloquios: agrupar por materia + curso (cada curso es completamente independiente)
       let key;
       if (mesa.tipoMesa === 'EXAMEN') {
-        // Examen final: todas las divisiones de la misma materia y turno van juntas
-        key = `EXAMEN|${mesa.materiaNombre}|${mesa.turnoNombre || 'SIN_TURNO'}`;
+        // Examen final: todas las divisiones de la misma materia y año van juntas
+        key = `EXAMEN|${mesa.materiaNombre}|AÑO_${mesa.cursoAnio}`;
       } else {
         // Coloquio: cada curso maneja su mesa por separado (fecha y jurado independientes)
         key = `COLOQUIO|${mesa.materiaNombre}|${mesa.cursoAnio}${mesa.cursoDivision}`;
@@ -284,104 +331,194 @@ export default function GestionFechasMesas() {
       return {
         materia,
         mesas: mesasGrupo,
-        docentes: Array.from(docentesDelGrupo)
+        docentes: Array.from(docentesDelGrupo),
+        anio: mesasGrupo[0]?.cursoAnio,
+        materiaNombre: mesasGrupo[0]?.materiaNombre
       };
     });
+    
+    // VALIDACIÓN PREVIA: Verificar que hay suficiente capacidad
+    const gruposNecesarios = gruposConDocentes.length;
+    const turnosTotalesDisponibles = diasDisponibles.length * turnosPorDia;
+    
+    if (gruposNecesarios > turnosTotalesDisponibles) {
+      toast.error(
+        `⚠️ No hay suficiente capacidad:\n\n` +
+        `• Grupos a distribuir: ${gruposNecesarios}\n` +
+        `• Días disponibles: ${diasDisponibles.length}\n` +
+        `• Turnos por día: ${turnosPorDia}\n` +
+        `• Capacidad total: ${turnosTotalesDisponibles} turnos\n\n` +
+        `Soluciones:\n` +
+        `1. Aumentar turnos por día (actualmente ${turnosPorDia})\n` +
+        `2. Ampliar rango de fechas (${diasDisponibles.length} días hábiles)\n` +
+        `3. Reducir intervalo entre turnos`,
+        { autoClose: 10000 }
+      );
+      return;
+    }
 
     // Algoritmo de distribución con verificación de conflictos
     const mesasActualizadas = [];
-    const turnosPorDiaArray = []; // Array de turnos: [{ fecha, hora, docentesOcupados: Set, aulasOcupadas: Set }]
+    const turnosPorDia_Map = new Map(); // Map<fecha, turno[]> para organizar por día
+    // Ocupación de aulas por fecha+hora y por aula: Map<"fecha|hora", Map<aulaId, claveGrupo>>
+    const aulasOcupadasGlobal = new Map();
+    // Preferencia de aula por materia (misma materia en distintos años usa siempre la misma aula)
+    const aulaPreferidaPorMateria = new Map(); // materiaNombre -> aulaId
+    let indiceAulaRR = 0; // round-robin para variedad entre materias
 
-    gruposConDocentes.forEach(grupo => {
-      let asignado = false;
+    // Preferencia: separar días por año (misma cohorte en días distintos)
+    const aniosPresentes = Array.from(new Set(gruposConDocentes.map(g => g.anio))).filter(Boolean);
+    const aniosOrdenados = aniosPresentes.sort((a,b)=> Number(a)-Number(b));
+    const inicioPorAnio = new Map(); // anio -> índice de día inicial sugerido
+    const diasUsadosPorAnio = new Map(); // anio -> Set<fecha>
+    aniosOrdenados.forEach((anio, idx) => {
+      inicioPorAnio.set(anio, idx % Math.max(1, diasDisponibles.length));
+      diasUsadosPorAnio.set(anio, new Set());
+    });
+
+    gruposConDocentes.forEach((grupo, idx) => {
+      // Encontrar el próximo slot disponible (priorizando separar días por año)
+      const anioGrupo = grupo.anio;
+      let diaIndexBase = inicioPorAnio.has(anioGrupo) ? inicioPorAnio.get(anioGrupo) : 0;
+      let diaIndex = diaIndexBase;
+      let turnoEnDia = 0;
+      let encontrado = false;
+      const fechasEvitadas = diasUsadosPorAnio.get(anioGrupo) || new Set();
       
-      // Intentar asignar en los días/turnos existentes
-      for (let i = 0; i < turnosPorDiaArray.length && !asignado; i++) {
-        const turno = turnosPorDiaArray[i];
-        
-        // Verificar si hay conflicto de docentes
-        const hayConflicto = grupo.docentes.some(dId => turno.docentesOcupados.has(dId));
-        
-        if (!hayConflicto) {
-          // No hay conflicto, asignar a este turno
-          // Buscar un aula disponible para este turno (solo si está habilitada la opción)
-          const aulaDisponible = asignarAulasAleatorias 
-            ? aulas.find(aula => !turno.aulasOcupadas.has(aula.id))
-            : null;
-          
-          grupo.mesas.forEach(mesa => {
-            mesasActualizadas.push({
-              ...mesa,
-              fecha: turno.fecha,
-              hora: turno.hora,
-              aulaId: aulaDisponible?.id || null,
-              // Mantener los docentes que ya tiene asignados
-              docentesIds: mesa.docentesIds
-            });
-          });
-          
-          // Agregar docentes de este grupo al turno
-          grupo.docentes.forEach(dId => turno.docentesOcupados.add(dId));
-          
-          // Agregar aula al turno si se asignó
-          if (asignarAulasAleatorias && aulaDisponible) {
-            turno.aulasOcupadas.add(aulaDisponible.id);
-          }
-          
-          asignado = true;
+      // 1) Intentar encontrar un día NO usado aún por este año
+      let recorridos = 0;
+      while (recorridos < diasDisponibles.length && !encontrado) {
+        const fecha = diasDisponibles[diaIndex].toISOString().split('T')[0];
+        const turnosEnEsteDia = turnosPorDia_Map.get(fecha) || [];
+        const diaNoUsadoPorAnio = !fechasEvitadas.has(fecha);
+
+        // Si este día no fue usado por el año y tiene cupo, usarlo
+        if (diaNoUsadoPorAnio && turnosEnEsteDia.length < turnosPorDia) {
+          turnoEnDia = turnosEnEsteDia.length;
+          encontrado = true;
+        } else {
+          // Probar el próximo día (round-robin simple)
+          diaIndex = (diaIndex + 1) % diasDisponibles.length;
+          recorridos++;
         }
       }
       
-      // Si no se pudo asignar en turnos existentes, crear nuevo turno
-      if (!asignado) {
-        // Calcular día y turno
-        const turnosCreados = turnosPorDiaArray.length;
-        const diaParaNuevoTurno = Math.floor(turnosCreados / turnosPorDia);
-        const turnoEnDia = turnosCreados % turnosPorDia;
-        
-        if (diaParaNuevoTurno >= diasDisponibles.length) {
-          // No hay más días disponibles
-          toast.warn('Se acabaron los días disponibles. Algunas mesas no tienen fecha asignada.');
-          grupo.mesas.forEach(mesa => mesasActualizadas.push(mesa));
-          return;
+      // 2) Si no se encontró día distinto, permitir mismo día pero distinto turno
+      if (!encontrado) {
+        let i = 0;
+        while (i < diasDisponibles.length && !encontrado) {
+          const fecha = diasDisponibles[i].toISOString().split('T')[0];
+          const turnosEnEsteDia = turnosPorDia_Map.get(fecha) || [];
+          if (turnosEnEsteDia.length < turnosPorDia) {
+            turnoEnDia = turnosEnEsteDia.length;
+            diaIndex = i;
+            encontrado = true;
+            break;
+          }
+          i++;
         }
-        
-        const fecha = diasDisponibles[diaParaNuevoTurno].toISOString().split('T')[0];
-        
-        // Calcular hora
-        const [hh, mm] = horaInicio.split(':').map(Number);
-        const horaBase = new Date();
-        horaBase.setHours(hh, mm, 0, 0);
-        horaBase.setMinutes(horaBase.getMinutes() + (turnoEnDia * intervaloMinutos));
-        const hora = horaBase.toTimeString().substring(0, 5);
-        
-        // Buscar aula disponible (solo si está habilitada la opción)
-        const aulasOcupadas = new Set();
-        const aulaDisponible = asignarAulasAleatorias
-          ? aulas.find(aula => !aulasOcupadas.has(aula.id))
-          : null;
-        
-        // Crear nuevo turno
-        const nuevoTurno = {
+      }
+
+      // Verificar que encontramos un slot
+      if (!encontrado || diaIndex >= diasDisponibles.length) {
+        toast.error(`Se acabaron los días disponibles después de asignar ${idx} de ${gruposConDocentes.length} grupos`);
+        // Agregar las mesas sin fecha
+        grupo.mesas.forEach(mesa => mesasActualizadas.push(mesa));
+        return;
+      }
+      
+      const fecha = diasDisponibles[diaIndex].toISOString().split('T')[0];
+      
+      // Calcular hora para este turno
+      const [hh, mm] = horaInicio.split(':').map(Number);
+      const horaBase = new Date();
+      horaBase.setHours(hh, mm, 0, 0);
+      horaBase.setMinutes(horaBase.getMinutes() + (turnoEnDia * intervaloMinutos));
+      const hora = horaBase.toTimeString().substring(0, 5);
+      
+      // Calcular hora fin (suma 2 horas a la hora inicio)
+      const horaFinBase = new Date(horaBase);
+      horaFinBase.setHours(horaFinBase.getHours() + 2);
+      const horaFin = horaFinBase.toTimeString().substring(0, 5);
+      
+      // Buscar aula disponible: debe estar libre en esta FECHA y HORA
+      const claveHorario = `${fecha}|${hora}`;
+      const ocupacionEnHorario = aulasOcupadasGlobal.get(claveHorario) || new Map();
+      
+      let aulaDisponible = null;
+      if (asignarAulasAleatorias && Array.isArray(aulas) && aulas.length > 0) {
+        const matNombre = grupo.materiaNombre || (grupo.mesas[0]?.materiaNombre);
+        const preferidaId = matNombre ? aulaPreferidaPorMateria.get(matNombre) : null;
+
+        // 1) Si hay preferida para esta materia y está libre, usarla
+        if (preferidaId && !ocupacionEnHorario.has(Number(preferidaId))) {
+          aulaDisponible = aulas.find(a => Number(a.id) === Number(preferidaId)) || null;
+        }
+
+        // 2) Si no hay preferida o está ocupada, elegir por round-robin la primera libre
+        if (!aulaDisponible) {
+          const start = indiceAulaRR % aulas.length;
+          for (let k = 0; k < aulas.length; k++) {
+            const idxAula = (start + k) % aulas.length;
+            const aula = aulas[idxAula];
+            if (!ocupacionEnHorario.has(Number(aula.id))) {
+              aulaDisponible = aula;
+              // Si no había preferida para esta materia, fijarla ahora para garantizar consistencia futura
+              if (matNombre && !preferidaId) {
+                aulaPreferidaPorMateria.set(matNombre, Number(aula.id));
+                indiceAulaRR = (idxAula + 1) % aulas.length; // avanzar RR para variedad
+              }
+              break;
+            }
+          }
+        }
+      }
+      
+      // Registrar aula como ocupada en este horario (fecha+hora)
+      if (aulaDisponible) {
+        if (!aulasOcupadasGlobal.has(claveHorario)) {
+          aulasOcupadasGlobal.set(claveHorario, new Map());
+        }
+        // Registrar que el aula está ocupada por este grupo (materia+año) en esa fecha/hora
+        aulasOcupadasGlobal.get(claveHorario).set(Number(aulaDisponible.id), grupo.materia);
+      }
+      
+      // Crear nuevo turno
+      const nuevoTurno = {
+        fecha,
+        hora,
+        docentesOcupados: new Set(grupo.docentes),
+        aulasOcupadas: (aulaDisponible) ? new Set([Number(aulaDisponible.id)]) : new Set()
+      };
+      
+      // Agregar turno al mapa de días
+      if (!turnosPorDia_Map.has(fecha)) {
+        turnosPorDia_Map.set(fecha, []);
+      }
+      turnosPorDia_Map.get(fecha).push(nuevoTurno);
+
+      // Marcar el día como usado por este año (preferencia de separación)
+      if (!fechasEvitadas.has(fecha)) {
+        fechasEvitadas.add(fecha);
+        diasUsadosPorAnio.set(anioGrupo, fechasEvitadas);
+        // Avanzar el índice base de este anio para próximas asignaciones
+        const cantAnios = Math.max(1, aniosOrdenados.length);
+        inicioPorAnio.set(anioGrupo, (diaIndexBase + cantAnios) % Math.max(1, diasDisponibles.length));
+      }
+      
+      // Asignar mesas a este nuevo turno
+      grupo.mesas.forEach(mesa => {
+        mesasActualizadas.push({
+          ...mesa,
           fecha,
           hora,
-          docentesOcupados: new Set(grupo.docentes),
-          aulasOcupadas: (asignarAulasAleatorias && aulaDisponible) ? new Set([aulaDisponible.id]) : new Set()
-        };
-        turnosPorDiaArray.push(nuevoTurno);
-        
-        // Asignar mesas al nuevo turno
-        grupo.mesas.forEach(mesa => {
-          mesasActualizadas.push({
-            ...mesa,
-            fecha,
-            hora,
-            aulaId: aulaDisponible?.id || null,
-            // Mantener los docentes que ya tiene asignados
-            docentesIds: mesa.docentesIds
-          });
+          horaFin,
+          aulaId: aulaDisponible ? Number(aulaDisponible.id) : null,
+          docentesIds: mesa.docentesIds
         });
-      }
+      });
+      
+      console.log(`Grupo ${idx} (${grupo.materia}, ${anioGrupo}°) → ${fecha} ${hora} Aula: ${aulaDisponible ? (aulaDisponible.nombre || aulaDisponible.nombreAula || aulaDisponible.id) : 'SIN AULA'} (turno ${turnoEnDia + 1}/${turnosPorDia} del día ${diaIndex + 1}/${diasDisponibles.length})`);
     });
 
     // Combinar mesas actualizadas con las que no fueron distribuidas (del otro tipo)
@@ -390,33 +527,23 @@ export default function GestionFechasMesas() {
     
     setMesas(todasLasMesas);
     
-    const diasUtilizados = new Set(turnosPorDiaArray.map(t => t.fecha)).size;
+    // Calcular estadísticas de distribución
+    const turnosTotales = Array.from(turnosPorDia_Map.values()).reduce((sum, turnos) => sum + turnos.length, 0);
+    const diasUtilizados = turnosPorDia_Map.size;
     const cantidadGrupos = gruposConDocentes.length;
     const mesasExamen = mesasActualizadas.filter(m => m.tipoMesa === 'EXAMEN').length;
     const mesasColoquio = mesasActualizadas.filter(m => m.tipoMesa === 'COLOQUIO').length;
     const mesasConAula = mesasActualizadas.filter(m => m.aulaId).length;
     
-    let detalles = [`${turnosPorDiaArray.length} turnos en ${diasUtilizados} días`];
+    let detalles = [`${turnosTotales} turnos en ${diasUtilizados} días`];
     if (asignarAulasAleatorias) detalles.push(`${mesasConAula} aulas asignadas`);
     detalles.push(`${cantidadGrupos} grupos (${mesasExamen} ex., ${mesasColoquio} col.)`);
     
-    toast.info(`Distribución calculada: ${detalles.join(' | ')}. Guardando en el servidor...`, { autoClose: 2000 });
+    toast.success(`✅ Distribución: ${detalles.join(' | ')}
     
-    // Guardar automáticamente después de distribuir (modo silencioso)
-    const guardadoExitoso = await guardarCambios(true);
-    
-    if (guardadoExitoso) {
-      // Recargar datos para obtener docentes titulares asignados automáticamente por el backend
-      toast.info('Recargando datos del servidor...', { autoClose: 1000 });
-      
-      setTimeout(async () => {
-        await cargarDatos();
-        toast.success(
-          `✅ Fechas y horarios guardados correctamente. Los docentes titulares han sido asignados automáticamente.`,
-          { autoClose: 4000 }
-        );
-      }, 1000);
-    }
+Próximos pasos:
+1️⃣ Asignar docentes aleatorios
+2️⃣ Guardar cambios`, { autoClose: 6000 });
   };
 
   const handleCambio = (mesaId, campo, valor) => {
@@ -431,7 +558,10 @@ export default function GestionFechasMesas() {
     setShowModalDocentes(true);
 
     // Cargar docentes disponibles si la mesa tiene fecha y hora
-    if (mesa.fecha && mesa.hora && !docentesPorMesa.has(mesa.id)) {
+    // Nota: antes no cargaba porque el mapa tenía clave con [] desde cargarDatos.
+    // Ahora cargamos si la lista actual está vacía.
+    const listaActual = docentesPorMesa.get(mesa.id) || [];
+    if (mesa.fecha && mesa.hora && listaActual.length === 0) {
       try {
         const { listarDocentesDisponibles } = await import('../Services/MesaExamenDocenteService');
         const docentes = await listarDocentesDisponibles(token, mesa.id);
@@ -476,63 +606,246 @@ export default function GestionFechasMesas() {
       setGuardando(true);
 
       const errores = [];
-      // Filtrar solo mesas que no están finalizadas
-      const mesasAGuardar = mesas.filter(m => m.estado !== 'FINALIZADA');
+      const advertencias = [];
       
+      // Filtrar solo mesas con estado CREADA (excluir finalizadas)
+      const mesasAGuardar = mesas.filter(m => m.estado === 'CREADA');
+      
+      // Validación previa: verificar docentes solo cuando haya fecha/hora
+      for (const mesa of mesasAGuardar) {
+        // Solo validar docentes si hay fecha y hora definidas (condición para asignar jurado)
+        if (mesa.fecha && mesa.fecha.trim() !== '' && mesa.hora && mesa.hora.trim() !== '') {
+          if (mesa.tipoMesa === 'EXAMEN' && mesa.docentesIds.length !== 3) {
+            advertencias.push(`Mesa ${mesa.id} (${mesa.materiaNombre} - ${mesa.cursoAnio}° ${mesa.cursoDivision}): Examen requiere 3 docentes, tiene ${mesa.docentesIds.length}`);
+          }
+          if (mesa.tipoMesa === 'COLOQUIO' && mesa.docentesIds.length !== 1) {
+            advertencias.push(`Mesa ${mesa.id} (${mesa.materiaNombre} - ${mesa.cursoAnio}° ${mesa.cursoDivision}): Coloquio requiere 1 docente, tiene ${mesa.docentesIds.length}`);
+          }
+        }
+      }
+      
+      // Si hay advertencias, mostrarlas y NO guardar
+      if (advertencias.length > 0 && !silencioso) {
+        toast.error(`⚠️ No se puede guardar por falta de docentes:\n\n${advertencias.join('\n')}\n\nUsa "Asignar docentes aleatorios" primero.`, { autoClose: 8000 });
+        setGuardando(false);
+        return false;
+      }
+      
+      // Proceder a guardar (permitir guardar aula aunque no tenga fecha/hora)
       for (const mesa of mesasAGuardar) {
         try {
-          // Calcular horaFin sumando 2 horas a horaInicio
-          let horaInicio = null;
-          let horaFin = null;
-          if (mesa.hora) {
-            horaInicio = mesa.hora;
-            const [hh, mm] = mesa.hora.split(':').map(Number);
-            const fecha = new Date();
-            fecha.setHours(hh, mm, 0, 0);
-            fecha.setHours(fecha.getHours() + 2); // Sumar 2 horas
-            horaFin = fecha.toTimeString().substring(0, 5);
+          // Construir payload solo con campos presentes
+          const updatePayload = { id: mesa.id };
+          if (mesa.fecha && mesa.fecha.trim() !== '') updatePayload.fecha = mesa.fecha;
+          if (mesa.hora && mesa.hora.trim() !== '') updatePayload.horaInicio = mesa.hora;
+          // Respetar horaFin si el usuario la definió; si no, calcular sólo si hay horaInicio
+          if (mesa.horaFin && mesa.horaFin.trim() !== '') {
+            updatePayload.horaFin = mesa.horaFin;
+          } else if (updatePayload.horaInicio) {
+            try {
+              const [hh, mm] = updatePayload.horaInicio.split(':').map(Number);
+              const fechaTmp = new Date();
+              fechaTmp.setHours(hh, mm, 0, 0);
+              fechaTmp.setHours(fechaTmp.getHours() + 2);
+              updatePayload.horaFin = fechaTmp.toTimeString().substring(0, 5);
+            } catch {
+              console.warn(`Mesa ${mesa.id}: no se pudo calcular horaFin automáticamente`);
+            }
+          }
+          if (mesa.aulaId) updatePayload.aulaId = Number(mesa.aulaId);
+          // No enviar tipoMesa/estado aquí; no cambian en esta vista
+          
+          // Si no hay nada para actualizar, continuar
+          if (Object.keys(updatePayload).length === 1) {
+            console.warn(`Mesa ${mesa.id}: Sin cambios para actualizar`);
+          } else {
+            console.log(`Guardando mesa ${mesa.id}:`, updatePayload);
+            const mesaActualizada = await actualizarMesa(token, updatePayload);
+            try {
+              sincronizarEstadoLocalConMesa(mesaActualizada, mesa.docentesIds);
+            } catch (e) {
+              console.warn('No se pudo sincronizar UI localmente:', e);
+            }
           }
 
-          // Actualizar mesa
-          await actualizarMesa(token, {
-            id: mesa.id,
-            fecha: mesa.fecha,
-            horaInicio: horaInicio,
-            horaFin: horaFin,
-            aulaId: mesa.aulaId || null, // Asegurar que sea null y no undefined
-            tipoMesa: mesa.tipoMesa,
-            estado: mesa.estado
-          });
-
-          // Asignar docentes solo si la mesa tiene fecha y hora definidas
-          if (mesa.docentesIds && mesa.docentesIds.length > 0) {
-            if (mesa.fecha && mesa.hora) {
-              await asignarDocentes(token, mesa.id, mesa.docentesIds);
-            } else {
-              console.warn(`Mesa ${mesa.id}: Docentes no guardados - Falta fecha: ${!mesa.fecha}, Falta hora: ${!mesa.hora}`);
+          // Asignar docentes solo si:
+          // 1. Tiene docentes asignados
+          // 2. Tiene fecha y hora definidas
+          // 3. Para exámenes finales, DEBE tener exactamente 3 docentes
+          // 4. Para coloquios, DEBE tener exactamente 1 docente
+          if (mesa.docentesIds && mesa.docentesIds.length > 0 && mesa.fecha && mesa.hora) {
+            // Para exámenes finales, validar que tenga exactamente 3 docentes
+            if (mesa.tipoMesa === 'EXAMEN') {
+              if (mesa.docentesIds.length !== 3) {
+                console.warn(`Mesa ${mesa.id} (EXAMEN): Tiene ${mesa.docentesIds.length} docentes, se requieren 3. Se omite asignación.`);
+                continue;
+              }
+            }
+            
+            // Para coloquios, validar que tenga exactamente 1 docente
+            if (mesa.tipoMesa === 'COLOQUIO') {
+              if (mesa.docentesIds.length !== 1) {
+                console.warn(`Mesa ${mesa.id} (COLOQUIO): Tiene ${mesa.docentesIds.length} docentes, se requiere 1. Se omite asignación.`);
+                continue;
+              }
+            }
+            
+            console.log(`Asignando ${mesa.docentesIds.length} docentes a mesa ${mesa.id}`);
+            await asignarDocentes(token, mesa.id, mesa.docentesIds);
+            // Tras asignación, refrescar la mesa base para tomar datos normalizados y propagar docentes
+            try {
+              const mRefrescada = await obtenerMesa(token, mesa.id);
+              sincronizarEstadoLocalConMesa(mRefrescada, mesa.docentesIds);
+            } catch (e) {
+              console.warn('No se pudo refrescar mesa luego de asignar docentes:', e);
             }
           }
         } catch (error) {
+          console.error(`Error procesando mesa ${mesa.id}:`, error);
           errores.push(`Mesa ${mesa.id}: ${error.message}`);
         }
       }
 
       if (errores.length > 0) {
-        toast.error(`Algunos cambios no se guardaron: ${errores.join(', ')}`);
+        toast.error(`Algunos cambios no se guardaron: ${errores.join('; ')}`);
       } else if (!silencioso) {
-        toast.success('Todos los cambios se guardaron correctamente');
+        toast.success('✅ Todos los cambios se guardaron correctamente. Recargando...');
+        
+        // Notificar a la ventana padre que recargue los datos
+        if (window.opener && window.opener.location.origin === window.location.origin) {
+          try {
+            window.opener.postMessage({ action: 'reload-mesas' }, window.location.origin);
+          } catch (e) {
+            console.error('Error enviando mensaje a ventana padre:', e);
+          }
+        }
+        
+        // Cerrar después de 2 segundos
         setTimeout(() => {
           window.close();
-        }, 1500);
+        }, 2000);
       }
       
       return errores.length === 0;
     } catch (error) {
+      console.error('Error general en guardarCambios:', error);
       toast.error('Error al guardar: ' + (error.message || 'Error desconocido'));
       return false;
     } finally {
       setGuardando(false);
     }
+  };
+
+  // Guardado individual por fila
+  const [filasGuardando, setFilasGuardando] = useState(new Set());
+
+  const guardarFila = async (mesa) => {
+    try {
+      setFilasGuardando(prev => new Set(prev).add(mesa.id));
+
+      const advertencias = [];
+      if (mesa.fecha && mesa.fecha.trim() !== '' && mesa.hora && mesa.hora.trim() !== '') {
+        if (mesa.tipoMesa === 'EXAMEN' && (mesa.docentesIds?.length || 0) !== 3) {
+          advertencias.push('Examen requiere 3 docentes');
+        }
+        if (mesa.tipoMesa === 'COLOQUIO' && (mesa.docentesIds?.length || 0) !== 1) {
+          advertencias.push('Coloquio requiere 1 docente');
+        }
+      }
+
+      if (advertencias.length) {
+        toast.warn(`Mesa ${mesa.id}: ${advertencias.join(' | ')}`);
+      }
+
+      const updatePayload = { id: mesa.id };
+      if (mesa.fecha && mesa.fecha.trim() !== '') updatePayload.fecha = mesa.fecha;
+      if (mesa.hora && mesa.hora.trim() !== '') updatePayload.horaInicio = mesa.hora;
+      if (mesa.horaFin && mesa.horaFin.trim() !== '') {
+        updatePayload.horaFin = mesa.horaFin;
+      } else if (updatePayload.horaInicio) {
+        try {
+          const [hh, mm] = updatePayload.horaInicio.split(':').map(Number);
+          const fechaTmp = new Date();
+          fechaTmp.setHours(hh, mm, 0, 0);
+          fechaTmp.setHours(fechaTmp.getHours() + 2);
+          updatePayload.horaFin = fechaTmp.toTimeString().substring(0, 5);
+        } catch {
+          console.warn(`Mesa ${mesa.id}: no se pudo calcular horaFin automáticamente`);
+        }
+      }
+      if (mesa.aulaId) updatePayload.aulaId = Number(mesa.aulaId);
+
+      if (Object.keys(updatePayload).length > 1) {
+        const mesaActualizada = await actualizarMesa(token, updatePayload);
+        try {
+          sincronizarEstadoLocalConMesa(mesaActualizada, mesa.docentesIds);
+        } catch (e) {
+          console.warn('No se pudo sincronizar UI localmente:', e);
+        }
+      }
+
+      if (mesa.docentesIds && mesa.fecha && mesa.hora) {
+        const cant = mesa.tipoMesa === 'COLOQUIO' ? 1 : 3;
+        if (mesa.docentesIds.length === cant) {
+          await asignarDocentes(token, mesa.id, mesa.docentesIds);
+          try {
+            const mRefrescada = await obtenerMesa(token, mesa.id);
+            sincronizarEstadoLocalConMesa(mRefrescada, mesa.docentesIds);
+          } catch (e) {
+            console.warn('No se pudo refrescar mesa luego de asignar docentes:', e);
+          }
+        }
+      }
+
+      toast.success(`Mesa ${mesa.id} guardada`);
+      // Notificar al padre para que refresque la lista (para próximas aperturas)
+      if (window.opener && window.opener.location.origin === window.location.origin) {
+        try {
+          window.opener.postMessage({ action: 'reload-mesas' }, window.location.origin);
+        } catch (e) {
+          console.warn('No se pudo notificar a la ventana padre para recargar:', e);
+        }
+      }
+    } catch (e) {
+      toast.error(`Mesa ${mesa.id}: ${e.message}`);
+    } finally {
+      setFilasGuardando(prev => {
+        const next = new Set(prev);
+        next.delete(mesa.id);
+        return next;
+      });
+    }
+  };
+
+  // Sincroniza en memoria las filas impactadas por la actualización/sincronización backend
+  const formatearHora = (h) => {
+    if (!h) return '';
+    const s = String(h);
+    return s.length >= 5 ? s.substring(0, 5) : s;
+  };
+
+  const sincronizarEstadoLocalConMesa = (mesaSrv, docentesIdsOpt) => {
+    if (!mesaSrv) return;
+    const fecha = mesaSrv.fecha || '';
+    const hora = formatearHora(mesaSrv.horaInicio);
+    const horaFin = formatearHora(mesaSrv.horaFin);
+    const aulaId = mesaSrv.aulaId || null;
+    const materiaNombre = mesaSrv.materiaNombre;
+    const turnoId = mesaSrv.turnoId;
+    const tipo = mesaSrv.tipoMesa || 'EXAMEN';
+    const docentesIds = Array.isArray(docentesIdsOpt) ? docentesIdsOpt : undefined;
+
+    setMesas(prev => prev.map(m => {
+      // Si es EXAMEN, la sincronización backend afecta a todas las divisiones de misma materia+turno
+      const esMismoGrupoExamen = tipo === 'EXAMEN' && m.tipoMesa === 'EXAMEN' && m.materiaNombre === materiaNombre && m.turnoId === turnoId;
+      const esMismaMesa = Number(m.id) === Number(mesaSrv.id);
+      if (esMismoGrupoExamen || esMismaMesa) {
+        const updated = { ...m, fecha, hora, horaFin, aulaId };
+        if (docentesIds) updated.docentesIds = docentesIds;
+        return updated;
+      }
+      return m;
+    }));
   };
 
   // Filtrar mesas por tipo, búsqueda y filtros adicionales
@@ -626,6 +939,14 @@ export default function GestionFechasMesas() {
           </Button>
         </Col>
       </Row>
+
+      {/* Alerta sobre filtrado de mesas CREADAS */}
+      <Alert variant="warning" className="mb-3">
+        <Alert.Heading as="h6">⚠️ Solo mesas en estado CREADA</Alert.Heading>
+        <p className="mb-0" style={{fontSize: '.9rem'}}>
+          Esta vista gestiona únicamente mesas en estado <strong>CREADA</strong>. Las mesas finalizadas no se muestran ni se pueden modificar.
+        </p>
+      </Alert>
 
       {/* Alerta informativa sobre sincronización */}
       <Alert variant="info" className="mb-3">
@@ -727,15 +1048,17 @@ export default function GestionFechasMesas() {
                 Distribuir fechas y horarios
               </Button>
             </Col>
-            <Col xs="auto">
-              <Button 
-                variant="success" 
-                onClick={asignarDocentesAExamenes}
-                disabled={mesas.filter(m => m.tipoMesa === 'EXAMEN' && m.fecha && m.hora).length === 0}
-              >
-                Asignar docentes aleatorios
-              </Button>
-            </Col>
+            {tipoMesaActiva === 'EXAMEN' && (
+              <Col xs="auto">
+                <Button 
+                  variant="success" 
+                  onClick={asignarDocentesAExamenes}
+                  disabled={mesas.filter(m => m.tipoMesa === 'EXAMEN' && m.fecha && m.hora).length === 0}
+                >
+                  Asignar docentes aleatorios
+                </Button>
+              </Col>
+            )}
             <Col xs="auto" className="ms-auto">
               <Form.Check 
                 type="checkbox"
@@ -752,7 +1075,7 @@ export default function GestionFechasMesas() {
               <li><strong>Exámenes finales (EXAMEN):</strong> Se sincronizan automáticamente por materia + turno.
                 Las divisiones comparten fecha, hora, aula y jurado.</li>
               <li><strong>Coloquios (COLOQUIO):</strong> Cada curso es independiente (no se sincronizan).</li>
-              <li><strong>Conflictos de docentes:</strong> Se evitan detectando si un docente ya está asignado en otro horario.</li>
+              <li><strong>Conflictos de docentes:</strong> Se evitan verificando que un docente NO esté asignado a otra mesa <strong>en el mismo día Y misma hora</strong>. Un docente puede tener múltiples mesas el mismo día, pero en horarios diferentes.</li>
               <li><strong>Pasos recomendados:</strong>
                 <ul className="mb-0 mt-1">
                   <li><strong>1. Distribuir por materia:</strong> Asigna fechas y horarios a todas las mesas evitando conflictos.</li>
@@ -898,10 +1221,12 @@ export default function GestionFechasMesas() {
                   <th style={{width: '18%'}}>Materia</th>
                   <th style={{width: '8%'}}>Curso</th>
                   <th style={{width: '12%'}}>Fecha</th>
-                  <th style={{width: '10%'}}>Hora</th>
+                  <th style={{width: '8%'}}>Hora inicio</th>
+                  <th style={{width: '8%'}}>Hora fin</th>
                   <th style={{width: '15%'}}>Aula</th>
                   <th style={{width: '32%'}}>Docentes</th>
                   <th style={{width: '5%'}}>Tipo</th>
+                  <th style={{width: '9%'}}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -941,6 +1266,14 @@ export default function GestionFechasMesas() {
                         />
                       </td>
                       <td>
+                        <Form.Control 
+                          type="time" 
+                          size="sm"
+                          value={mesa.horaFin || ''} 
+                          onChange={(e) => handleCambio(mesa.id, 'horaFin', e.target.value)}
+                        />
+                      </td>
+                      <td>
                         <Form.Select
                           size="sm"
                           value={mesa.aulaId || ''}
@@ -948,7 +1281,7 @@ export default function GestionFechasMesas() {
                         >
                           <option value="">Sin asignar</option>
                           {aulas.map(a => (
-                            <option key={a.id} value={a.id}>{a.nombre}</option>
+                            <option key={a.id} value={a.id}>{a.nombre || a.nombreAula || `Aula ${a.id}`}</option>
                           ))}
                         </Form.Select>
                       </td>
@@ -970,6 +1303,25 @@ export default function GestionFechasMesas() {
                         <Badge bg={mesa.tipoMesa === 'COLOQUIO' ? 'info' : 'primary'} className="w-100">
                           {mesa.tipoMesa === 'COLOQUIO' ? 'COL' : 'EXA'}
                         </Badge>
+                      </td>
+                      <td>
+                        <div className="d-grid">
+                          <Button
+                            variant="success"
+                            size="sm"
+                            onClick={() => guardarFila(mesa)}
+                            disabled={filasGuardando.has(mesa.id)}
+                          >
+                            {filasGuardando.has(mesa.id) ? (
+                              <>
+                                <Spinner animation="border" size="sm" className="me-2" />
+                                Guardando...
+                              </>
+                            ) : (
+                              'Guardar'
+                            )}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
