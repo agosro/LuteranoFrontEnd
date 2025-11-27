@@ -192,15 +192,45 @@ export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, 
 
             return (
               <tr key={alumno.id}>
-                <td>
+                <td
+                  style={{ cursor: modoEdicion ? 'pointer' : 'default' }}
+                  onClick={() => {
+                    // Al hacer clic en el nombre del alumno, desbloquear toda la fila
+                    if (modoEdicion && onToggleEdicionNota) {
+                      for (let n = 1; n <= 4; n++) {
+                        const notaId = `${alumno.id}-${n}`;
+                        if (notasEnEdicion.has(notaId)) {
+                          // Ya está desbloqueada, no hacer nada
+                        } else {
+                          // Desbloquear
+                          onToggleEdicionNota(notaId);
+                        }
+                      }
+                    }
+                  }}
+                  title={modoEdicion ? 'Haz clic para desbloquear todas las notas de este alumno' : ''}
+                >
                   {alumno.apellido} {alumno.nombre}
                 </td>
                 {[1, 2, 3, 4].map((n) => {
                   const prev = (alumno.calificaciones || []).find((c) => c.numeroNota === n);
                   const existeNota = !!prev;
                   const notaId = `${alumno.id}-${n}`;
-                  const estaBloqueado = estaBloqueada(alumno.id, n);
+                  // Directamente verificar si esta nota está en el set de notas para editar
+                  const puedeEditar = modoEdicion && (notasEnEdicion.has(notaId) || columnaEstaVacia(n));
                   const columnaVacia = columnaEstaVacia(n);
+                  
+                  const handleInputClick = (e) => {
+                    // Al hacer clic, si NO puede editar y estamos en modo edición, desbloquear
+                    if (modoEdicion && !puedeEditar && onToggleEdicionNota) {
+                      onToggleEdicionNota(notaId);
+                      // Enfocarse después de desbloquear
+                      setTimeout(() => {
+                        e.target.focus();
+                        e.target.select();
+                      }, 0);
+                    }
+                  };
                   
                   return (
                     <td key={n}>
@@ -211,36 +241,30 @@ export default function TablaCalificaciones({ datos, materiaId, materiaCursoId, 
                           max="10"
                           value={notasActuales[n] || ""}
                           onChange={(e) => {
-                            if (!estaBloqueado) {
+                            if (puedeEditar) {
                               handleNotaChange(alumno.id, n, e.target.value);
                             }
                           }}
-                          onFocus={() => {
-                            // Al hacer clic/focus, si está bloqueado y estamos en modo edición, desbloquear
-                            if (modoEdicion && estaBloqueado && onToggleEdicionNota) {
-                              onToggleEdicionNota(notaId);
-                            }
-                          }}
-                          disabled={!columnaVacia && estaBloqueado}
-                          readOnly={!columnaVacia && modoEdicion && estaBloqueado}
+                          onClick={handleInputClick}
+                          disabled={!puedeEditar}
                           className="text-center"
                           style={{ 
                             width: 80,
-                            cursor: !columnaVacia && modoEdicion && estaBloqueado ? 'pointer' : 'default',
-                            backgroundColor: !columnaVacia && estaBloqueado ? '#f0f0f0' : 'white',
-                            opacity: !columnaVacia && estaBloqueado ? 0.7 : 1,
+                            cursor: modoEdicion && !puedeEditar && !columnaVacia ? 'pointer' : 'default',
+                            backgroundColor: !puedeEditar && !columnaVacia ? '#f0f0f0' : 'white',
+                            opacity: !puedeEditar && !columnaVacia ? 0.7 : 1,
                           }}
                           title={
                             columnaVacia 
                               ? 'Esta nota está vacía, puedes editarla siempre'
-                              : modoEdicion && estaBloqueado 
+                              : modoEdicion && !puedeEditar
                                 ? 'Haz clic para editar' 
-                                : estaBloqueado 
+                                : !puedeEditar
                                   ? 'Entra en modo edición para modificar' 
                                   : 'Editando'
                           }
                         />
-                         {existeNota && onEliminar && !estaBloqueado && (
+                         {existeNota && onEliminar && puedeEditar && (
                           <Button
                             variant="outline-danger"
                             size="sm"

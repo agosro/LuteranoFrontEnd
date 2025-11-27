@@ -18,6 +18,9 @@ export default function ConfiguracionCicloLectivo() {
   const [selectedId, setSelectedId] = useState(cicloLectivo?.id || '');
 
   const isAdminOrDirector = useMemo(() => ['ROLE_ADMIN', 'ROLE_DIRECTOR'].includes(user?.rol), [user]);
+  
+  // Roles restringidos que solo pueden ver el ciclo actual, no cambiarlo
+  const isRolRestringido = useMemo(() => ['ROLE_DOCENTE', 'ROLE_AUXILIAR', 'ROLE_PRECEPTOR'].includes(user?.rol), [user]);
 
   useEffect(() => {
     const load = async () => {
@@ -123,11 +126,30 @@ export default function ConfiguracionCicloLectivo() {
         <Col md={6}>
           <Card className="mb-4">
             <Card.Body>
-              <Card.Title className="mb-3">Seleccionar ciclo lectivo activo</Card.Title>
+              <Card.Title className="mb-3">
+                {isRolRestringido ? 'Ciclo lectivo actual' : 'Seleccionar ciclo lectivo activo'}
+              </Card.Title>
               {loading ? (
                 <div className="d-flex align-items-center gap-2">
                   <Spinner size="sm" /> Cargando ciclos...
                 </div>
+              ) : isRolRestringido ? (
+                <>
+                  {cicloLectivo ? (
+                    <div className="alert alert-info mb-0">
+                      <div className="d-flex align-items-center gap-2 mb-2">
+                        <strong>Ciclo lectivo: {cicloLectivo.nombre}</strong>
+                      </div>
+                      <small className="text-muted">
+                        Tu rol ({user?.rol === 'ROLE_DOCENTE' ? 'Docente' : user?.rol === 'ROLE_AUXILIAR' ? 'Auxiliar' : 'Preceptor'}) utiliza automáticamente el ciclo lectivo del año actual. Solo ADMIN y DIRECTOR pueden cambiar el ciclo lectivo.
+                      </small>
+                    </div>
+                  ) : (
+                    <div className="alert alert-warning mb-0">
+                      <small>No hay ciclo lectivo configurado. Contactá al administrador.</small>
+                    </div>
+                  )}
+                </>
               ) : (
                 <>
                   <Form.Group className="mb-3">

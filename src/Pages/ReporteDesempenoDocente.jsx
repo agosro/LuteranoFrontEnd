@@ -31,7 +31,7 @@ export default function ReporteDesempenoDocente() {
   const [materiaId, setMateriaId] = useState('');
   const [docenteOpt, setDocenteOpt] = useState(null);
   const [docenteId, setDocenteId] = useState(docenteIdFromUrl || '');
-  const [modo, setModo] = useState('curso'); // 'curso' | 'materia' | 'docente' | 'anio'
+  const [modo, setModo] = useState(docenteIdFromUrl ? 'docente' : 'curso'); // 'curso' | 'materia' | 'docente' | 'anio'
   const [busquedaDocente, setBusquedaDocente] = useState('');
   const [cargando, setCargando] = useState(false);
   const [data, setData] = useState(null);
@@ -127,7 +127,7 @@ export default function ReporteDesempenoDocente() {
       generar();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoGenerar, docenteIdFromUrl, token]);
+  }, [autoGenerar, docenteIdFromUrl, token, data, cargando]);
 
   // Opciones de materias según modo
   const materiasOpts = useMemo(() => {

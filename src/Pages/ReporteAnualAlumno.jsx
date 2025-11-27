@@ -219,7 +219,7 @@ export default function ReporteAnualAlumno() {
   const materiasPrevia = useMemo(() => {
     if (!Array.isArray(dto?.materiasPreviasIds) || dto.materiasPreviasIds.length === 0) return [];
     return dto.materiasPreviasIds
-      .map(id => todasLasMaterias.find(m => m.id === id))
+      .map(id => todasLasMaterias.find(m => String(m.id) === String(id)))
       .filter(Boolean);
   }, [dto, todasLasMaterias]);
 
@@ -787,7 +787,7 @@ export default function ReporteAnualAlumno() {
               {cantPrevias > 0 ? (
                 <ul className="mb-0">
                   {materiasPrevia.map((m,i) => (
-                    <li key={i}>{m.nombre || m.materiaNombre || ""}</li>
+                    <li key={i}>{m.nombre || m.materiaNombre || `ID: ${m.id}`}</li>
                   ))}
                 </ul>
               ) : (

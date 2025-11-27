@@ -5,8 +5,9 @@ import Breadcrumbs from '../Components/Botones/Breadcrumbs';
 import BackButton from '../Components/Botones/BackButton';
 import { useAuth } from '../Context/AuthContext';
 import { useOpenedInNewTab } from '../Context/useOpenedInNewTab';
-import { listarCursos } from '../Services/CursoService';
+import { listarCursos, listarCursosPorDocente } from '../Services/CursoService';
 import { listarMaterias } from '../Services/MateriaService';
+import { listarMateriasDeCurso } from '../Services/MateriaCursoService';
 import { porMateria, porCurso } from '../Services/ReporteExamenesConsecutivosService';
 import { listarCalifPorMateria } from '../Services/CalificacionesService';
 import { toast } from 'react-toastify';
@@ -225,7 +226,36 @@ export default function ReporteExamenesConsecutivos() {
           label: `${c.anio ? c.anio + '°' : ''} ${c.division ?? ''}`.trim(),
           raw: c
         })));
-        setMaterias((ms || []).map(m => ({
+        
+        // Filtrar materias según el rol del usuario
+        let materiasFiltradas = ms || [];
+        if (rol === 'ROLE_DOCENTE' && user?.docenteId) {
+          // Para docentes, cargar materias asignadas desde sus cursos
+          try {
+            const cursosPorDocente = await listarCursosPorDocente(token, user.docenteId);
+            const materiasDelDocente = [];
+            
+            // Obtener materias de cada curso
+            for (const curso of cursosPorDocente) {
+              const materiasCurso = await listarMateriasDeCurso(token, curso.id).catch(() => []);
+              // Filtrar solo las que el docente dicta
+              materiasCurso.forEach(m => {
+                if (m.docente?.id === user.docenteId || m.docenteId === user.docenteId) {
+                  // Evitar duplicados
+                  if (!materiasDelDocente.find(mat => mat.id === m.id)) {
+                    materiasDelDocente.push(m);
+                  }
+                }
+              });
+            }
+            materiasFiltradas = materiasDelDocente;
+          } catch {
+            // Si falla, usar lista vacía
+            materiasFiltradas = [];
+          }
+        }
+        
+        setMaterias(materiasFiltradas.map(m => ({
           value: m.id,
           label: m.nombreMateria || m.descripcion || `Materia ${m.id}`,
           raw: m
@@ -234,7 +264,7 @@ export default function ReporteExamenesConsecutivos() {
         // ignore
       }
     })();
-  }, [token]);
+  }, [token, rol, user?.docenteId]);
 
   // Ambitos permitidos según rol
   const allowed = useMemo(() => ({
