@@ -8,6 +8,7 @@ import { camposCurso } from "../Entidades/camposCurso";
 import { obtenerCursoPorId, editarCurso } from "../Services/CursoService";
 import { listarAulas, listarAulasLibres } from "../Services/AulaService";
 import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
+import { useCicloLectivo } from "../Context/CicloLectivoContext.jsx";
 import { listarMateriasDeCurso } from "../Services/MateriaCursoService";
 import { getModulosConEstadoPorDia } from "../Services/ModuloService";
 import { listarPreceptores } from "../Services/PreceptorService";
@@ -18,6 +19,7 @@ import { getTituloCurso } from "../utils/cursos";
 const DIAS_SEMANA = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
 
 export default function CursoDetalle() {
+  const { cicloLectivo } = useCicloLectivo();
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -179,14 +181,14 @@ export default function CursoDetalle() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, id, navigate]);
 
-  // Cargar alumnos del curso (ciclo lectivo activo 1 por ahora)
+  // Cargar alumnos del curso según ciclo lectivo seleccionado
   useEffect(() => {
     const fetchAlumnos = async () => {
-      if (!token || !id) return;
+      if (!token || !id || !cicloLectivo?.id) return;
       setAlumnosLoading(true);
       setAlumnosError("");
       try {
-        const lista = await listarAlumnosPorCurso(token, id, 1);
+        const lista = await listarAlumnosPorCurso(token, id, cicloLectivo.id);
         setAlumnos(Array.isArray(lista) ? lista : []);
       } catch (e) {
         console.error(e);
@@ -196,7 +198,7 @@ export default function CursoDetalle() {
       }
     };
     fetchAlumnos();
-  }, [token, id]);
+  }, [token, id, cicloLectivo?.id]);
 
   // Cargar materias del curso
   useEffect(() => {

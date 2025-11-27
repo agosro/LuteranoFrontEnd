@@ -81,11 +81,12 @@ function AlumnoDetalle() {
       setHistLoading(true);
       setHistError("");
       try {
+        // Traer historial completo del alumno, sin filtrar por curso
         const ciclo = cicloLectivo?.id ?? null;
         const data = await listarHistorialAlumnoFiltrado(
           user.token,
           alumno.id,
-          { cicloLectivoId: ciclo, cursoId: cursoId || null }
+          { cicloLectivoId: ciclo }
         );
 
         const lista = Array.isArray(data?.historialCursos) ? data.historialCursos : [];
