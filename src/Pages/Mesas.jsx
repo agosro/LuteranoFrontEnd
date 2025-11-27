@@ -39,6 +39,8 @@ export default function Mesas() {
   const [tablaMateriaOpciones, setTablaMateriaOpciones] = useState([]); // array de nombres
   const [tablaFiltroTurno, setTablaFiltroTurno] = useState(''); // nombre exacto de turno
   const [tablaFiltroTipo, setTablaFiltroTipo] = useState(''); // tipo de mesa
+  const [tablaFiltroCurso, setTablaFiltroCurso] = useState(''); // id del curso
+  const [tablaFiltroFecha, setTablaFiltroFecha] = useState(''); // fecha exacta
   const [filtrosVisibles, setFiltrosVisibles] = useState(false);
   const buscarBtnRef = useRef(null);
   const [loading, setLoading] = useState(false);
@@ -341,21 +343,26 @@ export default function Mesas() {
       setActaMasivoCargando(true);
       let exitosas = 0;
       let fallidas = 0;
+      let yaExistentes = 0;
+      
       for (const mesaId of mesasSeleccionadas) {
         const mesa = mesas.find(m => m.id === mesaId);
         if (!mesa) continue;
         
         const tieneAlumnos = Array.isArray(mesa.alumnos) && mesa.alumnos.length > 0;
-        const notasCompletas = tieneAlumnos && (mesa.alumnos.every(a => a.notaFinal !== null && a.notaFinal !== undefined));
         
-        if (mesa.estado === 'FINALIZADA' && tieneAlumnos && notasCompletas) {
+        if (mesa.estado === 'FINALIZADA' && tieneAlumnos) {
           try {
             try {
+              // Verificar si ya existe acta
               await obtenerActaPorMesa(token, mesaId);
+              yaExistentes++;
+              // No hacer nada, ya existe
             } catch {
+              // No existe, generar nueva
               await generarActa(token, { mesaId: mesaId });
+              exitosas++;
             }
-            exitosas++;
           } catch {
             fallidas++;
           }
@@ -364,11 +371,17 @@ export default function Mesas() {
         }
       }
       await refreshMesas();
-      if (fallidas === 0) {
-        toast.success(`Se generaron/obtuvieron ${exitosas} acta(s)`);
-      } else {
-        toast.warning(`${exitosas} exitosas, ${fallidas} no pudieron generarse`);
+      
+      if (fallidas === 0 && exitosas > 0) {
+        toast.success(`Se generaron ${exitosas} acta(s)${yaExistentes > 0 ? `, ${yaExistentes} ya existían` : ''}`);
+      } else if (exitosas === 0 && yaExistentes > 0) {
+        toast.info(`Todas las actas ya estaban generadas (${yaExistentes})`);
+      } else if (exitosas > 0 && fallidas > 0) {
+        toast.warning(`${exitosas} generadas, ${fallidas} no pudieron procesarse${yaExistentes > 0 ? `, ${yaExistentes} ya existían` : ''}`);
+      } else if (exitosas === 0 && fallidas > 0) {
+        toast.error(`No se pudieron generar actas: ${fallidas} mesas no válidas`);
       }
+      
       setShowConfirmarActaMasivo(false);
       setMesasSeleccionadas(new Set());
     } catch (e) {
@@ -385,17 +398,15 @@ export default function Mesas() {
       let fallidas = 0;
       let yaExistentes = 0;
       
-      // Filtrar solo mesas finalizadas con notas completas y sin acta
+      // Filtrar solo mesas finalizadas con convocados
       const mesasCandidatas = mesasFiltradas.filter(m => {
         if (m.estado !== 'FINALIZADA') return false;
         const tieneAlumnos = Array.isArray(m.alumnos) && m.alumnos.length > 0;
-        if (!tieneAlumnos) return false;
-        const notasCompletas = m.alumnos.every(a => a.notaFinal !== null && a.notaFinal !== undefined);
-        return notasCompletas;
+        return tieneAlumnos;
       });
       
       if (mesasCandidatas.length === 0) {
-        toast.info('No hay mesas finalizadas con notas completas para generar actas');
+        toast.info('No hay mesas finalizadas con convocados para generar actas');
         setShowConfirmarActasTodas(false);
         return;
       }
@@ -499,8 +510,10 @@ export default function Mesas() {
       .filter(m => !tablaFiltroEstado || m.estado === tablaFiltroEstado)
       .filter(m => !tablaFiltroMateriaSel || String(m.materiaNombre || materiaNombrePorId.get(m.materiaCursoId) || '').trim() === tablaFiltroMateriaSel)
       .filter(m => !tablaFiltroTurno || (m.turnoNombre || turnoPorFecha(m.fecha) || '').trim() === tablaFiltroTurno)
-      .filter(m => !tablaFiltroTipo || (m.tipoMesa || 'EXAMEN') === tablaFiltroTipo);
-  }, [mesas, tablaFiltroEstado, tablaFiltroMateriaSel, tablaFiltroTurno, tablaFiltroTipo, materiaNombrePorId, turnoPorFecha]);
+      .filter(m => !tablaFiltroTipo || (m.tipoMesa || 'EXAMEN') === tablaFiltroTipo)
+      .filter(m => !tablaFiltroCurso || String(m.curso?.id || '') === String(tablaFiltroCurso))
+      .filter(m => !tablaFiltroFecha || m.fecha === tablaFiltroFecha);
+  }, [mesas, tablaFiltroEstado, tablaFiltroMateriaSel, tablaFiltroTurno, tablaFiltroTipo, tablaFiltroCurso, tablaFiltroFecha, materiaNombrePorId, turnoPorFecha]);
   const totalPaginas = Math.max(1, Math.ceil(mesasFiltradas.length / pageSize));
   const items = mesasFiltradas.slice((pagina - 1) * pageSize, pagina * pageSize);
   const onPaginaChange = (p) => setPagina(Math.max(1, Math.min(totalPaginas, p)));
@@ -604,11 +617,26 @@ export default function Mesas() {
               </Col>
               <Col md={3} sm={6} xs={12}>
                 <Form.Group>
+                  <Form.Label>Curso</Form.Label>
+                  <Form.Select value={tablaFiltroCurso} onChange={(e)=> { setTablaFiltroCurso(e.target.value); setPagina(1); }}>
+                    <option value="">Todos</option>
+                    {cursos.map(c => <option key={c.id} value={c.id}>{`${c.anio ?? ''}°${c.division ?? ''}`}</option>)}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={3} sm={6} xs={12}>
+                <Form.Group>
                   <Form.Label>Materia</Form.Label>
                   <Form.Select value={tablaFiltroMateriaSel} onChange={(e)=> { setTablaFiltroMateriaSel(e.target.value); setPagina(1); }}>
                     <option value="">Todas</option>
                     {tablaMateriaOpciones.map(n => <option key={n} value={n}>{n}</option>)}
                   </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={3} sm={6} xs={12}>
+                <Form.Group>
+                  <Form.Label>Fecha</Form.Label>
+                  <Form.Control type="date" value={tablaFiltroFecha} onChange={(e)=> { setTablaFiltroFecha(e.target.value); setPagina(1); }} />
                 </Form.Group>
               </Col>
               <Col md={3} sm={6} xs={12}>
@@ -631,7 +659,7 @@ export default function Mesas() {
                 </Form.Group>
               </Col>
               <Col md="auto" className="d-flex align-items-end">
-                <Button variant="secondary" onClick={()=>{ setTablaFiltroEstado(''); setTablaFiltroMateriaSel(''); setTablaFiltroTurno(''); setTablaFiltroTipo(''); setPagina(1); }}>Limpiar filtros</Button>
+                <Button variant="secondary" onClick={()=>{ setTablaFiltroEstado(''); setTablaFiltroMateriaSel(''); setTablaFiltroTurno(''); setTablaFiltroTipo(''); setTablaFiltroCurso(''); setTablaFiltroFecha(''); setPagina(1); }}>Limpiar filtros</Button>
               </Col>
             </Row>
           )}
@@ -640,11 +668,13 @@ export default function Mesas() {
           {hasSearched && mesasSeleccionadas.size > 0 && (
             <Row className="mb-3 p-3 bg-light border rounded">
               <Col>
-                <span className="me-3"><strong>{mesasSeleccionadas.size} mesa(s) seleccionada(s)</strong></span>
-                <Button size="sm" variant="outline-primary" className="me-2" onClick={()=> setMesasSeleccionadas(new Set())}>Deseleccionar todo</Button>
-                <Button size="sm" variant="warning" className="me-2" onClick={()=> setShowConfirmarFinalizarMasivo(true)} disabled={finalizarMasivoCargando}>Finalizar</Button>
-                <Button size="sm" variant="info" className="me-2" onClick={()=> setShowConfirmarActaMasivo(true)} disabled={actaMasivoCargando}>Generar actas</Button>
-                <Button size="sm" variant="danger" onClick={()=> setShowConfirmarDelMasivo(true)} disabled={delMasivoCargando}>Eliminar</Button>
+                <div className="d-flex flex-wrap align-items-center gap-2">
+                  <span className="me-2"><strong>{mesasSeleccionadas.size} mesa(s) seleccionada(s)</strong></span>
+                  <Button size="sm" variant="outline-primary" onClick={()=> setMesasSeleccionadas(new Set())}>Deseleccionar todo</Button>
+                  <Button size="sm" variant="info" onClick={()=> setShowConfirmarActaMasivo(true)} disabled={actaMasivoCargando}>Generar actas seleccionadas</Button>
+                  <Button size="sm" variant="warning" onClick={()=> setShowConfirmarFinalizarMasivo(true)} disabled={finalizarMasivoCargando}>Finalizar</Button>
+                  <Button size="sm" variant="danger" onClick={()=> setShowConfirmarDelMasivo(true)} disabled={delMasivoCargando}>Eliminar</Button>
+                </div>
               </Col>
             </Row>
           )}
@@ -678,15 +708,12 @@ export default function Mesas() {
               <tbody>
                   {items.map(m => {
                   const tieneAlumnos = Array.isArray(m.alumnos) && m.alumnos.length > 0;
-                  const notasCompletas = tieneAlumnos && (m.alumnos.every(a => a.notaFinal !== null && a.notaFinal !== undefined));
-                  const puedeActa = m.estado === 'FINALIZADA' && tieneAlumnos && notasCompletas;
+                  const puedeActa = m.estado === 'FINALIZADA' && tieneAlumnos;
                   const hint = m.estado !== 'FINALIZADA'
                     ? 'La mesa debe estar FINALIZADA'
                     : !tieneAlumnos
                       ? 'La mesa no tiene convocados'
-                      : !notasCompletas
-                        ? 'Faltan notas finales en algunos alumnos'
-                        : '';
+                      : '';
                   // Obtener nombre del curso
                   let cursoStr = '-';
                   if (m.curso) {
@@ -1244,16 +1271,21 @@ export default function Mesas() {
       {/* Modal Confirmar Generar Actas Masivo */}
       <Modal show={showConfirmarActaMasivo} onHide={()=>setShowConfirmarActaMasivo(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Generar actas</Modal.Title>
+          <Modal.Title>Generar actas de mesas seleccionadas</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p>¿Generarás actas para las <strong>{mesasSeleccionadas.size} mesa(s)</strong> seleccionadas?</p>
-          <p className="text-muted mb-0">Solo se generarán actas para mesas finalizadas con notas completas.</p>
+          <p className="text-muted mb-2">Requisitos para generar acta:</p>
+          <ul className="text-muted mb-0">
+            <li>La mesa debe estar finalizada</li>
+            <li>Debe tener al menos un convocado</li>
+            <li>No es necesario que las notas estén completas</li>
+          </ul>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={()=>setShowConfirmarActaMasivo(false)} disabled={actaMasivoCargando}>Cancelar</Button>
           <Button variant="info" onClick={confirmarActaMasivo} disabled={actaMasivoCargando}>
-            {actaMasivoCargando ? <><Spinner animation="border" size="sm" className="me-2" />Generando...</> : 'Generar'}
+            {actaMasivoCargando ? <><Spinner animation="border" size="sm" className="me-2" />Generando...</> : 'Generar actas'}
           </Button>
         </Modal.Footer>
       </Modal>
@@ -1267,9 +1299,10 @@ export default function Mesas() {
           <p>¿Generarás actas para <strong>todas las mesas finalizadas</strong> que aún no tienen acta?</p>
           <p className="text-muted mb-0">El sistema:</p>
           <ul className="text-muted mb-0">
-            <li>Detectará automáticamente las mesas finalizadas con notas completas</li>
+            <li>Detectará automáticamente las mesas finalizadas con convocados</li>
             <li>Solo generará actas nuevas (no duplicará las existentes)</li>
-            <li>Omitirá mesas sin convocados o sin notas completas</li>
+            <li>Omitirá mesas sin convocados</li>
+            <li>Las actas se pueden generar aunque falten alumnos o no tengan notas cargadas</li>
           </ul>
         </Modal.Body>
         <Modal.Footer>
