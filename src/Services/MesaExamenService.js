@@ -79,7 +79,7 @@ export const finalizarMesa = async (token, mesaId) => {
 
 export const crearMesasMasivas = async (token, payload) => {
   void token
-  const data = await httpClient.post('/mesas/masivas', payload)
+  const data = await httpClient.post('/mesas/masivas', payload, { timeoutMs: 600000 })
   if (data.code < 0) throw new Error(data.mensaje || 'Error al crear mesas masivas')
   return data.mesas || []
 };
