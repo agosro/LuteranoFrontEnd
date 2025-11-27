@@ -12,7 +12,7 @@ import { listarCursos, listarCursosPorDocente, listarCursosPorPreceptor } from "
 import { listarAlumnosConFiltros, listarAlumnosEgresados } from "../Services/AlumnoService";
 // import { listarAlumnosPorCurso } from "../Services/HistorialCursoService";
 import { obtenerInformeAnualAlumno } from "../Services/ReporteAnualAlumnoService";
-import { listarMaterias } from "../Services/MateriaService";
+import { obtenerMateriaPorId } from "../Services/MateriaService";
 
 export default function ReporteAnualAlumno() {
   const { user } = useAuth();
@@ -41,7 +41,7 @@ export default function ReporteAnualAlumno() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
-  const [todasLasMaterias, setTodasLasMaterias] = useState([]);
+  const [materiasPrevia, setMateriasPrevia] = useState([]);
   const printRef = useRef(null);
 
   // Cargar cursos según rol
@@ -63,19 +63,6 @@ export default function ReporteAnualAlumno() {
       }
     })();
   }, [token, user]);
-
-  // Cargar todas las materias para poder mostrar nombres de previas
-  useEffect(() => {
-    if (!token) return;
-    (async () => {
-      try {
-        const lista = await listarMaterias(token);
-        setTodasLasMaterias(lista || []);
-      } catch {
-        // noop
-      }
-    })();
-  }, [token]);
 
   // Derivar opciones de año/ división
   const aniosCursoOptions = useMemo(() => {
@@ -215,13 +202,28 @@ export default function ReporteAnualAlumno() {
   const dto = data?.data; // ReporteAnualAlumnoDto
   const materias = useMemo(() => dto?.materias || [], [dto]);
 
-  // Previas de años anteriores (basado en materiasPreviasIds del backend)
-  const materiasPrevia = useMemo(() => {
-    if (!Array.isArray(dto?.materiasPreviasIds) || dto.materiasPreviasIds.length === 0) return [];
-    return dto.materiasPreviasIds
-      .map(id => todasLasMaterias.find(m => String(m.id) === String(id)))
-      .filter(Boolean);
-  }, [dto, todasLasMaterias]);
+  // Cargar previas de años anteriores cuando cambie el DTO
+  useEffect(() => {
+    if (!dto?.materiasPreviasIds || dto.materiasPreviasIds.length === 0 || !token) {
+      setMateriasPrevia([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const promises = dto.materiasPreviasIds.map(id => 
+          obtenerMateriaPorId(token, id).catch(() => null)
+        );
+        const results = await Promise.all(promises);
+        if (active) {
+          setMateriasPrevia(results.filter(Boolean));
+        }
+      } catch {
+        if (active) setMateriasPrevia([]);
+      }
+    })();
+    return () => { active = false; };
+  }, [dto, token]);
 
   const cantPrevias = materiasPrevia.length;
 
