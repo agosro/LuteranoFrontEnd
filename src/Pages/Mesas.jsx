@@ -83,6 +83,8 @@ export default function Mesas() {
   const [finalizarMasivoCargando, setFinalizarMasivoCargando] = useState(false);
   const [showConfirmarActaMasivo, setShowConfirmarActaMasivo] = useState(false);
   const [actaMasivoCargando, setActaMasivoCargando] = useState(false);
+  const [showConfirmarActasTodas, setShowConfirmarActasTodas] = useState(false);
+  const [actasTodasCargando, setActasTodasCargando] = useState(false);
 
   // Helpers de rol (tolera prefijo ROLE_)
   // hasRole ya no requerido en esta vista (permisos manejados vía rutas y página de gestión)
@@ -376,6 +378,64 @@ export default function Mesas() {
     }
   };
 
+  const confirmarActasTodas = async () => {
+    try {
+      setActasTodasCargando(true);
+      let exitosas = 0;
+      let fallidas = 0;
+      let yaExistentes = 0;
+      
+      // Filtrar solo mesas finalizadas con notas completas y sin acta
+      const mesasCandidatas = mesasFiltradas.filter(m => {
+        if (m.estado !== 'FINALIZADA') return false;
+        const tieneAlumnos = Array.isArray(m.alumnos) && m.alumnos.length > 0;
+        if (!tieneAlumnos) return false;
+        const notasCompletas = m.alumnos.every(a => a.notaFinal !== null && a.notaFinal !== undefined);
+        return notasCompletas;
+      });
+      
+      if (mesasCandidatas.length === 0) {
+        toast.info('No hay mesas finalizadas con notas completas para generar actas');
+        setShowConfirmarActasTodas(false);
+        return;
+      }
+      
+      for (const mesa of mesasCandidatas) {
+        try {
+          // Verificar si ya existe acta
+          try {
+            await obtenerActaPorMesa(token, mesa.id);
+            yaExistentes++;
+          } catch {
+            // No existe, generar nueva
+            await generarActa(token, { mesaId: mesa.id });
+            exitosas++;
+          }
+        } catch {
+          fallidas++;
+        }
+      }
+      
+      await refreshMesas();
+      
+      if (fallidas === 0 && exitosas > 0) {
+        toast.success(`Se generaron ${exitosas} acta(s) nueva(s)${yaExistentes > 0 ? `, ${yaExistentes} ya existían` : ''}`);
+      } else if (exitosas === 0 && yaExistentes > 0) {
+        toast.info(`Todas las actas ya estaban generadas (${yaExistentes})`);
+      } else if (exitosas > 0 && fallidas > 0) {
+        toast.warning(`${exitosas} exitosas, ${fallidas} fallidas${yaExistentes > 0 ? `, ${yaExistentes} ya existían` : ''}`);
+      } else if (exitosas === 0 && fallidas > 0) {
+        toast.error(`No se pudieron generar actas: ${fallidas} fallidas`);
+      }
+      
+      setShowConfirmarActasTodas(false);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setActasTodasCargando(false);
+    }
+  };
+
   // Abrir gestión de fechas en nueva pestaña
   const abrirGestionFechas = () => {
     // Filtrar solo mesas en estado CREADA (excluir finalizadas)
@@ -477,9 +537,9 @@ export default function Mesas() {
 
           {/* Fila de alcance y acciones */}
           <Row className="mb-3 g-2 align-items-end">
-            <Col md={8}>
+            <Col md={6}>
               <Row className="g-2">
-                <Col sm={6} md={4}>
+                <Col sm={6} md={5}>
                   <Form.Group>
                     <Form.Label>Alcance</Form.Label>
                     <Form.Select value={alcance} onChange={(e)=> setAlcance(e.target.value)}>
@@ -489,7 +549,7 @@ export default function Mesas() {
                   </Form.Group>
                 </Col>
                 {alcance === 'CURSO' && (
-                  <Col sm={6} md={4}>
+                  <Col sm={6} md={5}>
                     <Form.Group>
                       <Form.Label>Curso</Form.Label>
                       <Form.Select value={cursoBusquedaId} onChange={(e)=> setCursoBusquedaId(e.target.value)}>
@@ -504,25 +564,26 @@ export default function Mesas() {
                 </Col>
               </Row>
             </Col>
-            <Col className="text-md-end">
-              <Row className="g-2">
-                <Col sm="auto">
-                  <Button variant="outline-dark" onClick={()=> navigate('/mesa-de-examen/historial')}>Ver historial</Button>
-                </Col>
+            <Col md={6} className="text-md-end">
+              <div className="d-flex flex-wrap justify-content-md-end gap-2">
+                <Button variant="outline-dark" onClick={()=> navigate('/mesa-de-examen/historial')}>Ver historial</Button>
                 {hasSearched && mesasFiltradas.length > 0 && (
-                  <Col sm="auto">
+                  <>
                     <Button variant="warning" onClick={abrirGestionFechas}>
                       Gestión de Fechas
                     </Button>
-                  </Col>
+                    <Button 
+                      variant="outline-info" 
+                      onClick={()=> setShowConfirmarActasTodas(true)}
+                      disabled={actasTodasCargando}
+                    >
+                      Generar todas las actas
+                    </Button>
+                  </>
                 )}
-                <Col sm="auto">
-                  <Button variant="info" onClick={()=> { setCrearMasivaAnio(cicloYear); setCrearMasivaForm({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setMateriasMasivas([]); setShowCrearMasiva(true); }}>Crear masiva</Button>
-                </Col>
-                <Col sm="auto">
-                  <Button variant="success" onClick={abrirCrearMesa}>Crear mesa</Button>
-                </Col>
-              </Row>
+                <Button variant="info" onClick={()=> { setCrearMasivaAnio(cicloYear); setCrearMasivaForm({ turnoId: '', fecha: '', tipoMesa: 'EXAMEN', cursoIds: [], materiaIds: [] }); setCrearMasivaError(''); setCrearMasivaResultado(null); setMateriasMasivas([]); setShowCrearMasiva(true); }}>Crear masiva</Button>
+                <Button variant="success" onClick={abrirCrearMesa}>Crear mesa</Button>
+              </div>
             </Col>
           </Row>
 
@@ -1193,6 +1254,28 @@ export default function Mesas() {
           <Button variant="secondary" onClick={()=>setShowConfirmarActaMasivo(false)} disabled={actaMasivoCargando}>Cancelar</Button>
           <Button variant="info" onClick={confirmarActaMasivo} disabled={actaMasivoCargando}>
             {actaMasivoCargando ? <><Spinner animation="border" size="sm" className="me-2" />Generando...</> : 'Generar'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal Confirmar Generar Todas las Actas */}
+      <Modal show={showConfirmarActasTodas} onHide={()=>setShowConfirmarActasTodas(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Generar todas las actas</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>¿Generarás actas para <strong>todas las mesas finalizadas</strong> que aún no tienen acta?</p>
+          <p className="text-muted mb-0">El sistema:</p>
+          <ul className="text-muted mb-0">
+            <li>Detectará automáticamente las mesas finalizadas con notas completas</li>
+            <li>Solo generará actas nuevas (no duplicará las existentes)</li>
+            <li>Omitirá mesas sin convocados o sin notas completas</li>
+          </ul>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={()=>setShowConfirmarActasTodas(false)} disabled={actasTodasCargando}>Cancelar</Button>
+          <Button variant="info" onClick={confirmarActasTodas} disabled={actasTodasCargando}>
+            {actasTodasCargando ? <><Spinner animation="border" size="sm" className="me-2" />Generando...</> : 'Generar todas'}
           </Button>
         </Modal.Footer>
       </Modal>
