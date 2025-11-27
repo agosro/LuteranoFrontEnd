@@ -48,3 +48,15 @@ export const obtenerCicloLectivoPorId = async (token, id) => {
     throw err;
   }
 };
+
+// Obtener ciclo lectivo actual (año corriente)
+export const obtenerCicloLectivoActual = async (token) => {
+  try {
+    void token
+    const data = await httpClient.get('/ciclos-lectivos/actual')
+    return data
+  } catch (err) {
+    console.error('Error obtener ciclo lectivo actual:', err);
+    throw err;
+  }
+};
