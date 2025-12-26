@@ -67,6 +67,30 @@ Los roles del sistema y sus permisos principales en el frontend:
 
 ---
 
+
+## 🖼️ Capturas del sistema
+
+### Login y autenticación
+![Login](./screenshots/login.PNG)
+
+### Dashboard
+![Dashboard](./screenshots/Captura1.PNG)
+
+### Materias
+![Materias](./screenshots/Captura3.PNG))
+
+### Asistencia de alumnos
+![Asistencia](./screenshots/Captura4.PNG))
+
+### Gestión de usuarios y roles
+![Usuarios](./screenshots/Captura2.PNG))
+
+### Mesa de Examen
+![Usuarios](./screenshots/Captura5.PNG))
+
+### Reportes
+![Usuarios](./screenshots/Captura6.PNG))
+
 ## 📂 Estructura del proyecto
 
 ```plaintext
